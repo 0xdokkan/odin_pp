@@ -539,7 +539,7 @@ draw_arsenal_sky :: proc(renderer: ^Renderer, room: ^game.Room) {
 		case .Cannon_Fired: draw_cannon_shot(renderer, room, cue)
 		case .Cannon_Broken: draw_cannon_debris(renderer, cue)
 		case .Spider_Bite, .Spider_Died, .Spider_Hatched, .Spider_Nest_Struck, .Spider_Nest_Closed: draw_spider_nest_cue(renderer, cue)
-		case .Queen_Ran: draw_queen_cue(renderer, cue)
+		case .Queen_Ran, .Queen_Struck, .Queen_Closed: draw_queen_cue(renderer, cue)
 		case .Black_Hole_Swallowed: draw_hole_swallow(renderer, cue)
 		case .Dino_Stomp: draw_dino_stomp(renderer, room, cue)
 		case .Ride_Begun, .Ride_Ended: draw_dino_roar(renderer, cue)

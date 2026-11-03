@@ -2,6 +2,7 @@ package devtools
 import run_session "../run"
 
 import "core:fmt"
+import audio "../engine/audio"
 import app "../engine/app"
 import artifacts "artifacts"
 import game "../game"
@@ -11,8 +12,9 @@ import render "../render"
 
 // REGINA (game/queen.odin, docs/piano-ia.md, Fase 11), in the real window, in the IA's arena: the card played by the rules
 // with no foe on her lines (odin_pp_regina_00.png); a foe set on a diagonal, her run and her blow
-// (odin_pp_regina_01.png, 02); of two foes the nearest (odin_pp_regina_03.png); a low wall that stops a line
-// (odin_pp_regina_wall.png).
+// (odin_pp_regina_run_NN.png, odin_pp_regina_02.png); of two foes the nearest (odin_pp_regina_03.png); a low wall that stops
+// a line (odin_pp_regina_wall.png); at no seconds she topples (odin_pp_regina_fall.png). Fase 12: each of her five sounds has
+// sounded.
 mechanics_lab_queen :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
@@ -57,18 +59,18 @@ mechanics_lab_queen :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	// A foe on a diagonal: she runs to the cell next to him and strikes.
 	foe := &room.enemies[chaser]
 	health := foe.health
-	foe.position = grid.offset(cell, 3, 3)
+	foe.position = grid.offset(cell, 4, -4)
 	mechanics_lab_hold(room, foe.id)
-	shot := false
+	// The run and the blow, close together.
 	for frame in 0..<60 {
 		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
-		if !shot && room.enemies[chaser].health < health { shot = true; artifacts.screenshot("odin_pp_regina_01.png") }
+		if frame < 18 && frame%6 == 2 { artifacts.screenshot(fmt.ctprintf("odin_pp_regina_run_%02d.png", frame/6)) }
 		if frame == 59 { artifacts.screenshot("odin_pp_regina_02.png") }
 	}
 	foe = &room.enemies[chaser]
 	if health-foe.health != game.QUEEN_BASE_DAMAGE { fmt.eprintln("mechanics lab: the Queen struck for", health-foe.health); return false }
 	index, found = game.object_index_by_id(room, id)
-	if !found || room.objects[index].position != grid.offset(cell, 2, 2) { fmt.eprintln("mechanics lab: the Queen did not stop next to her foe"); return false }
+	if !found || room.objects[index].position != grid.offset(cell, 3, -3) { fmt.eprintln("mechanics lab: the Queen did not stop next to her foe"); return false }
 
 	// Of two foes on her lines, the nearest; the chaser out of them.
 	at := room.objects[index].position
@@ -103,6 +105,27 @@ mechanics_lab_queen :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	for _ in 0..<40 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
 	if room.enemies[chaser].health != other_health { fmt.eprintln("mechanics lab: the Queen struck through a low wall"); return false }
 	artifacts.screenshot("odin_pp_regina_wall.png")
-	fmt.eprintln("mechanics lab Queen: ran down a diagonal, the nearest of two struck, a low wall held")
+
+	// At no seconds she topples.
+	index, found = game.object_index_by_id(room, id)
+	if !found { fmt.eprintln("mechanics lab: the Queen is gone too soon"); return false }
+	room.objects[index].life = 1
+	toppled := false
+	for _ in 0..<180 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if !toppled && render.queen_toppling(renderer) {
+			toppled = true
+			for _ in 0..<10 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+			artifacts.screenshot("odin_pp_regina_fall.png")
+		}
+	}
+	if game.emplacement_count(room, .Queen) != 0 || !toppled { fmt.eprintln("mechanics lab: the Queen did not topple and go"); return false }
+	sounds := renderer.tactical.lab_sounds
+	if sounds == nil { fmt.eprintln("mechanics lab: no sounds to count"); return false }
+	for sfx in ([5]audio.Lab_Sfx{.Card_Queen, .World_Queen_Place, .World_Queen_Run, .World_Queen_Strike, .World_Queen_Fall}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: the Queen's sound", sfx, "never sounded"); return false }
+	}
+	fmt.eprintf("mechanics lab Queen: ran down a diagonal, the nearest of two struck, a low wall held; sounds: place %d, run %d, strike %d, fall %d\n",
+		sounds.played[.World_Queen_Place], sounds.played[.World_Queen_Run], sounds.played[.World_Queen_Strike], sounds.played[.World_Queen_Fall])
 	return true
 }

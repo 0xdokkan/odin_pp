@@ -6,6 +6,16 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-04 — Regina: aspetto e suoni (solo laboratorio)
+
+Commit **«Piano IA, Fase 12 fatta: aspetto e suoni della Regina»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 12). Regole e
+numeri della carta non cambiano. Icona nuova nella cella 39: la regina in avorio con corona e fasce d'oro. Sul tabellone è un
+pezzo degli scacchi in avorio e oro scuro con un anello di 20 tacche per i secondi; corre lasciando una scia d'oro, si inclina
+sul colpo, alla fine si rovescia. Suoni da codice (`tools/audio/sfx_queen.py`), solo nel laboratorio: `card_queen` rifatto, nuovi
+`world_queen_place`, `world_queen_run`, `world_queen_strike`, `world_queen_fall`. Gli altri 255 suoni sono identici byte per byte.
+
+**IA aggiornata:** nessun cambiamento necessario, non ci sono contenuti di gioco nuovi.
+
 ## 2026-11-04 — Carta nuova: Regina (solo laboratorio)
 
 Commit **«Piano IA, Fase 11 fatta: Regina»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 11). Carta nuova `Queen`,

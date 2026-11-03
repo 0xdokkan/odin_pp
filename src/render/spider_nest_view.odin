@@ -43,10 +43,6 @@ nest_sagging :: proc(renderer: ^Renderer) -> bool {
 	return false
 }
 
-// How many of the ring's ticks are lit, one a second.
-@(private)
-nest_ticks_lit :: proc(life: i32) -> int { return clamp(int(life), 0, int(game.SPIDER_NEST_SECONDS)) }
-
 // The jerk of the legs at `age`: 0 or 1, the two sets of legs in turn.
 @(private)
 spider_leg_jerk :: proc(age: f32) -> int { return int(age*SPIDER_LEG_STEPS)%2 }
@@ -102,14 +98,18 @@ draw_spider_nest :: proc(renderer: ^Renderer, object: Presentation_Grid_Object, 
 		}
 	}
 
-	// The ring of the seconds: a tick a second, lit while it is left, red at the end.
-	lit := nest_ticks_lit(object.life)
-	total := int(game.SPIDER_NEST_SECONDS)
 	on := GOTHIC_RED if object.life <= 3 else rl.Color{196, 150, 255, 255}
-	for tick in 0..<total {
+	draw_seconds_ring(cx, cz, ground, 0.47, object.life, game.SPIDER_NEST_SECONDS, on)
+}
+
+// A ring of ticks on the floor round a thing that lasts: one a second of its `total`, lit while it is left.
+@(private)
+draw_seconds_ring :: proc(cx, cz, ground, radius: f32, life, total: i32, on: rl.Color) {
+	lit := int(clamp(life, 0, total))
+	for tick in 0..<int(total) {
 		angle := f32(tick)/f32(total)*2*math.PI-math.PI/2
 		color := on if tick < lit else rl.Color{52, 44, 68, 255}
-		rl.DrawCube({cx+math.cos(angle)*0.47, ground+0.012, cz+math.sin(angle)*0.47}, 0.05, 0.016, 0.05, color)
+		rl.DrawCube({cx+math.cos(angle)*radius, ground+0.012, cz+math.sin(angle)*radius}, 0.05, 0.016, 0.05, color)
 	}
 }
 

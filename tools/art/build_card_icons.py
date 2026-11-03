@@ -92,7 +92,7 @@ docs/piano-ia.md adds to it (its Fasi 0 and 8):
     cell 37  IA: a brain of circuits on a dark ground, curved folds on the
              left, cyan traces with white nodes on the right, a steel stem.
     cell 38  Nido di ragni: a cobweb, its spider at the middle.
-    cell 39  Regina (provisional): a chess queen.
+    cell 39  Regina: a chess queen of ivory and dark gold.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -965,29 +965,29 @@ assert all(len(row) == 28 for row in SPIDER_WEB) and len(SPIDER_WEB) == 28
 
 ICONS.update({38: SPIDER_WEB})
 
-# docs/piano-ia.md, Fase 11: the Regina's provisional icon, a chess queen (its Fase 12).
+# docs/piano-ia.md, Fase 12: the Regina's icon, a chess queen of ivory and dark gold.
 CHESS_QUEEN = (
     "............................",
-    "............................",
     ".............KK.............",
-    "............KRRK............",
-    "......KK....KRRK....KK......",
-    ".....KYYK....KK....KYYK.....",
+    "............KYYK............",
+    "............KYQK............",
+    "......KK.....KK.....KK......",
     ".....KYYK...KIIK...KYYK.....",
-    "......KK....KIIK....KK......",
+    ".....KYQK...KIiK...KYQK.....",
+    "......KK...KIIiK....KK......",
     "......KIK..KIIiiK..KIK......",
     "......KIIK.KIIiiK.KIiK......",
     ".......KIIKIIIiiiKIiK.......",
     ".......KIIIIIIiiiIiiK.......",
-    "........KKKKKKKKKKKK........",
-    ".........KIIIIiiiiK.........",
+    "........KQQQYYYQQQQK........",
+    ".........KKKKKKKKKK.........",
     "..........KIIIiiiK..........",
     "...........KIIiiK...........",
     "...........KIIiiK...........",
     "...........KIIiiK...........",
     "..........KIIIiiiK..........",
     ".........KKKKKKKKKK.........",
-    "........KIIIIIiiiiiK........",
+    "........KQQQYYYQQQQK........",
     ".......KIIIIIIiiiiiiK.......",
     ".......KIIIIIIiiiiiiK.......",
     "......KIIIIIIIiiiiiiiK......",

@@ -226,7 +226,7 @@ comunque nel momento in cui i rami si uniscono.
 | 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
 | 10 | Nido di ragni: aspetto e suoni | 9 | Fatta | vedi Esito |
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Fatta | vedi Esito |
-| 12 | Regina: aspetto e suoni | 11 | Da fare | — |
+| 12 | Regina: aspetto e suoni | 11 | Fatta | vedi Esito |
 | 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
 | 14 | Lanciafiamme: aspetto e suoni | 13 | Da fare | — |
 | 15 | Nel gioco vero: le quattro carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12, 14 | Da fare | — |
@@ -1806,6 +1806,32 @@ Passi:
 Check della fase: i test del disegno, dei suoni e delle icone; l'atto `regina`.
 
 **Fatto quando:** l'utente approva aspetto e suoni.
+
+### Esito (4 novembre 2026)
+
+Fatta, con le proposte del piano. **L'approvazione dell'utente su aspetto e suoni manca ancora:** ho guardato le catture ma
+nessuno ha ascoltato i suoni.
+
+- **La Regina** ([render/queen_view.odin](../src/render/queen_view.odin)): pezzo degli scacchi in avorio e oro scuro, a tredici
+  gradini di resina, con la corona a otto punte, le perline d'oro e la sfera in cima. Alla base un anello di 20 tacche per i
+  secondi, come il Nido (`draw_seconds_ring`, ora in comune).
+- **La corsa:** scivola lungo la linea e le caselle che attraversa si accendono d'oro. Sulla casella resta una scia che si
+  spegne.
+- **Il colpo:** si inclina verso il nemico come un pezzo che cattura, con un lampo d'oro su di lui.
+- **La fine:** il pezzo si rovescia sul pavimento e sparisce.
+- **L'icona:** cella 39, la regina in avorio con corona e fasce d'oro.
+- **I suoni** ([tools/audio/sfx_queen.py](../tools/audio/sfx_queen.py)): `card_queen` rifatto e 4 nuovi (`world_queen_place`,
+  `run`, `strike`, `fall`). Sono 260 in tutto, gli altri 255 sono identici.
+- **Laboratorio:** l'atto `regina` controlla anche la caduta e che tutti i 5 suoni siano partiti. Catture nuove
+  `odin_pp_regina_run_NN.png` e `odin_pp_regina_fall.png`.
+
+**Cambiamenti rispetto al piano, spiegati:**
+
+- **L'inclinazione** è un taglio obliquo dei gradini, non una vera rotazione: gli altri oggetti non girano e si vede bene.
+- **La corsa dura un terzo circa dell'animazione:** il colpo parte insieme a lei, e con la corsa lenta il danno compariva quando
+  era ancora lontana.
+
+Nessun contenuto di gioco nuovo: la IA non cambia.
 
 ## Fase 13 — Lanciafiamme: regole e prototipo; la IA lo conosce
 
