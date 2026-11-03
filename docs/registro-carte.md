@@ -6,6 +6,15 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — IA: i casi speciali (solo laboratorio)
+
+Commit **«Piano IA, Fase 7 fatta: i casi speciali»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 7). La carta non
+cambia. Ora la IA consiglia anche durante **Movimento Ombra** (i passi dell'ombra, scelta dell'utente), la carta Ombra
+stessa, la scarica delle **bobine di Tesla** e il cambio con l'**arma di riserva**; conta quello che i dispositivi posati
+(cannoni, buchi, bobine) faranno ancora dopo l'orizzonte. **Non consiglia mai** le carte che aprono una vista (le
+quattro in prima persona e Napoli): dentro si gioca a mano e quanto valgono non si può simulare; lì la IA sta zitta.
+Quando non ha un consiglio scrive «IA: ...» sopra il Viandante, mai un segno sbagliato.
+
 ## 2026-11-03 — IA: conta lo stato della partita e tutte le cure vere (solo laboratorio)
 
 Commit **«Piano IA, Fase 6 fatta: lo stato della partita»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 6). La carta

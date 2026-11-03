@@ -25,6 +25,10 @@ Move_Kind :: enum u8 {
 	Key,
 	// FERETRO: an arrow loosed at the foe `target` (its charges: Ctrl and a click).
 	Shoot,
+	// The Tesla coils discharged (or their ring opened): run.execute_gameplay_command's Activate.
+	Activate,
+	// The reserve weapon taken in hand: run.execute_gameplay_command's Equip.
+	Equip,
 }
 
 Move :: struct {
@@ -69,6 +73,11 @@ play_move :: proc(room: ^game.Room, move: Move) -> (committed: bool) {
 	if room == nil || room.player == nil || room.phase != .Combat { return false }
 	switch move.kind {
 	case .Step:
+		// Inside Movimento Ombra the keys walk the shadow, on its own beats (run.execute_gameplay_command).
+		if game.tactical_shadow_active(room) {
+			committed = game.try_shadow_step(room, move.direction) == .Moved
+			break
+		}
 		spent := room.player.tactical.beat_spent
 		room.player.tactical.critical_next = game.tactical_claim_beat(room, 0)
 		result := game.try_move_player(room, move.direction)
@@ -80,6 +89,8 @@ play_move :: proc(room: ^game.Room, move: Move) -> (committed: bool) {
 	case .Dodge:
 		committed = game.try_dodge_player(room, move.direction)
 	case .Wait:
+		// In the shadow, waiting is letting its seconds run: no command, the world stands still.
+		if game.tactical_shadow_active(room) { return true }
 		committed = game.wait_player_turn(room) != .Invalid_Phase
 	case .Card:
 		spent := room.player.tactical.beat_spent
@@ -104,6 +115,16 @@ play_move :: proc(room: ^game.Room, move: Move) -> (committed: bool) {
 		}
 	case .Defend:
 		committed = answer_defense(room, move.defense, move.direction, move.succeed)
+	case .Activate:
+		opened_ring: bool
+		committed, opened_ring = game.activate_tesla(room)
+		if committed && !opened_ring { game.finish_player_combat_command(room, 1) }
+	case .Equip:
+		committed = game.equip_reserved_weapon(room)
+		if committed {
+			game.clear_event_log(room.recent_events)
+			if room.phase == .Combat { game.finish_player_combat_command(room, 1) }
+		}
 	case .Shoot:
 		// run.execute_gameplay_command's Shoot: never stamped with a beat.
 		result := game.shoot_player_arrow(room, move.target.entity)
@@ -196,6 +217,13 @@ frame_room :: proc(room: ^game.Room, dt: f32, policy := Defense_Policy.None) {
 		game.tactical_tick(room, dt, true, false)
 		return
 	}
+	// MOVIMENTO OMBRA (after the cast, as the controller): the world stands still, only the shadow's clock runs; its
+	// end is a command of its own.
+	if game.tactical_shadow_active(room) {
+		game.tactical_tick(room, dt, true, false)
+		if game.tactical_shadow_due(room) { game.tactical_end_shadow(room); game.tactical_end_combat(room) }
+		return
+	}
 	if room.qte.kind != .None {
 		if policy == .Best && answer_best_defense(room) { game.tactical_end_combat(room); return }
 		room.qte.remaining = max(f32(0), room.qte.remaining-dt)
@@ -226,6 +254,8 @@ frame_room :: proc(room: ^game.Room, dt: f32, policy := Defense_Policy.None) {
 // Whether the player may act now: no defence keys up, no beat pending, and the rules let him step, strike or play.
 player_free :: proc(room: ^game.Room) -> bool {
 	if room == nil || room.player == nil || room.phase != .Combat { return false }
+	// In the shadow he may step whenever the shadow's last step is over and its seconds are not.
+	if game.tactical_shadow_active(room) { return !game.tactical_shadow_step_busy(room) && room.player.tactical.shadow_remaining > 0 }
 	if room.qte.kind != .None || room.tactical_pulse.pending || game.tactical_player_busy(room) || game.tactical_is_casting(room) { return false }
 	return game.tactical_allows_action(room) || game.tactical_allows_movement(room) || game.tactical_allows_cards(room)
 }

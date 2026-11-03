@@ -12,7 +12,8 @@ import grid "../engine/grid"
 //   goes to the target's cell (the foe, the floor or the player himself);
 // - a defence (DIFENDI): the frame on the right key in the defence panel (tactical_hud.odin), and the dodge's landing;
 // - a wait (ASPETTA): a small clock under the player; the refocus (RIMESCOLA): the word only;
-// - the warning: a red «!» with the life the player's own move risks, over him for half a second.
+// - the warning: a red «!» with the life the player's own move risks, over him for half a second;
+// - no advice (still thinking, or a case it cannot play out): «IA: ...», never a wrong sign.
 // The word goes over the player. Nothing is drawn on a cell the player cannot see: the advice reveals nothing.
 // The pilot (run/advisor_driver.odin) sets it every frame; nothing while the IA is off or stands still (the views).
 
@@ -108,7 +109,9 @@ draw_advice_floor :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u3
 	faint := rl.Color{IA_COLOR.r, IA_COLOR.g, IA_COLOR.b, 45}
 	#partial switch advice.mark {
 	case .Step, .Defend:
-		from := advice_ground(room.player.position)
+		// In the shadow the arrow leaves the shadow, not the body that waits.
+		origin := room.player.tactical.shadow_position if game.tactical_shadow_active(room) else room.player.position
+		from := advice_ground(origin)
 		way := rl.Vector2Normalize({center.x-from.x, center.z-from.z})
 		if way == {} { way = {0, -1} }
 		rl.DrawPlane(center, {0.84, 0.84}, faint)
@@ -155,6 +158,8 @@ draw_advice_word :: proc(renderer: ^Renderer, room: ^game.Room) {
 	p := room.player.position
 	over := tactical_project(renderer, {f32(p.x)+0.5, f32(p.y)+0.5}, 1.75)
 	if advice_shown(renderer, room) && advice.word != nil { draw_tactical_label(renderer, over, advice.word, "", IA_COLOR) }
+	// WHEN IT DOES NOT KNOW (Fase 7): no advice yet, or none it can stand by: no sign, only «IA: ...». Never a wrong one.
+	if game.ia_active(room) && advice.mark == .None { draw_tactical_label(renderer, over, "IA: ...", "", IA_COLOR) }
 	if advice.warning != nil && advice.warning_left > 0 && game.ia_active(room) {
 		draw_tactical_label(renderer, {over.x, over.y-30}, advice.warning, "", ADVICE_WARNING_COLOR)
 	}

@@ -9,9 +9,10 @@ import grid "../engine/grid"
 
 // How the IA uses a card:
 // - Advised: it tries it, on its targets, and the rules in the copy play it out;
-// - Later: a card that opens a view or the shadow, where the copy's player would stand still and its worth come out
-//   too low; the IA advises it from Fase 7 («I casi speciali»);
-// - Never: no card to play in a fight (the rod's slot fishes a cleared room), or the IA itself.
+// - Later: a card the IA will advise in a later phase (none, since Fase 7);
+// - Never: a card whose worth no copy can tell: the views (first person, Napoli's club and grandpa), played by the
+//   player's own hand and eyes, where the IA stands still (the user's choice); no card to play in a fight (the rod's
+//   slot fishes a cleared room); the IA itself. «O le sa simulare, o sta zitta» (docs/piano-ia.md, Fase 7).
 Advisor_Card_Use :: enum u8 { Advised, Later, Never }
 
 Advisor_Card :: struct {
@@ -26,7 +27,7 @@ EVERY_CARD :: "test_advisor_tries_every_card"
 @(private = "file")
 ADVISED :: Advisor_Card{use = .Advised, why = "giocata nella copia con le regole vere", puzzle = EVERY_CARD}
 @(private = "file")
-VIEW :: Advisor_Card{use = .Later, why = "apre una vista: Fase 7", puzzle = EVERY_CARD}
+VIEW :: Advisor_Card{use = .Never, why = "apre una vista: dentro si gioca a mano e la IA sta zitta; quanto vale non si simula", puzzle = EVERY_CARD}
 
 // Every card (an enumerated array: a card without its line does not build).
 @(rodata)
@@ -43,7 +44,7 @@ ADVISOR_CARDS := [game.Card_Id]Advisor_Card{
 	.Fate_Strike = ADVISED, .Chain_Lightning = ADVISED, .Sundering_Blow = ADVISED, .Prismatic_Barrage = ADVISED,
 	.Twin_Venom = ADVISED, .Shock_Floor = ADVISED, .Tesla_Coil = ADVISED, .Titan_Grip = ADVISED, .Storm_Crown = ADVISED,
 	.Sei_Denari = ADVISED, .Sette_Denari = ADVISED,
-	.Shadow_Step = {use = .Later, why = "Movimento Ombra ferma il mondo: Fase 7", puzzle = EVERY_CARD},
+	.Shadow_Step = {use = .Advised, why = "Movimento Ombra: la copia fa i passi dell'ombra", puzzle = "test_advisor_walks_the_shadow"},
 	.Poison_Pool = ADVISED, .Wildfire = ADVISED, .Deflect = ADVISED, .Coffin = ADVISED, .Fate_Dice = ADVISED,
 	.Venom_Blade = ADVISED, .Lasso = ADVISED,
 	.Fishing_Rod = {use = .Never, why = "pesca a stanza vuota, fuori dal combattimento", puzzle = EVERY_CARD},
@@ -53,7 +54,7 @@ ADVISOR_CARDS := [game.Card_Id]Advisor_Card{
 	.Marley_Party = ADVISED, .Flood_Wave = ADVISED, .Field_Cannon = ADVISED, .Laser_Cannon = ADVISED,
 	.Devouring_Hole = ADVISED, .Dino_Ride = ADVISED,
 	.First_Person_Brawler = VIEW, .First_Person_Fencer = VIEW, .First_Person_Archer = VIEW,
-	.Napoli = {use = .Later, why = "il D4 apre una vista o la tavola: Fase 7", puzzle = EVERY_CARD},
+	.Napoli = {use = .Never, why = "il D4 può aprire una vista (il bastone, il nonno): quanto vale non si simula", puzzle = EVERY_CARD},
 	.IA = {use = .Never, why = "la IA non consiglia se stessa: rigiocata ripartirebbe dai suoi secondi", puzzle = EVERY_CARD},
 	.Count = {use = .Never, why = "nessuna carta"},
 }

@@ -39,7 +39,7 @@ Round :: struct { depth: int, horizon: f32 }
 @(rodata) ROUNDS := [?]Round{{1, HORIZON_SHORT}, {2, HORIZON_SHORT}, {3, HORIZON_SHORT}, {2, HORIZON_LONG}, {3, HORIZON_LONG}}
 
 // What the advice says to do, for the marks.
-Advice_Kind :: enum u8 { None, Step, Bump, Dodge, Diagonal, Wait, Defend, Key, Card, Refocus, Shoot }
+Advice_Kind :: enum u8 { None, Step, Bump, Dodge, Diagonal, Wait, Defend, Key, Card, Refocus, Shoot, Activate, Equip }
 
 Advice :: struct {
 	valid: bool,
@@ -183,9 +183,18 @@ root_moves :: proc(room: ^game.Room, out: []Move) -> (count: int) {
 		for direction in game.Move_Direction { out[count] = {kind = .Key, direction = direction}; count += 1 }
 	case q.kind != .None:
 		out[count] = {kind = .Key, direction = q.keys[q.progress]}; count += 1
+	case game.tactical_shadow_active(room):
+		// MOVIMENTO OMBRA: the world stands still; the shadow steps, or its seconds run out where it stands.
+		out[count] = {kind = .Wait}; count += 1
+		for direction in game.Move_Direction { out[count] = {kind = .Step, direction = direction}; count += 1 }
 	case:
 		count = board_moves(out)
 		out[count] = {kind = .Refocus}; count += 1
+		// The Tesla coils on the board, the reserve weapon: when there are.
+		for object in room.objects {
+			if object.kind == .Tesla_Coil { out[count] = {kind = .Activate}; count += 1; break }
+		}
+		if room.player.equipment.reserve.id != .None { out[count] = {kind = .Equip}; count += 1 }
 		if game.player_charges(room, .Arrows) > 0 {
 			for enemy in room.enemies {
 				if count == len(out) { break }
@@ -269,6 +278,8 @@ describe :: proc(room: ^game.Room, move: Move) -> (reply: Reply) {
 @(private)
 describe_kind :: proc(room: ^game.Room, move: Move) -> (reply: Reply) {
 	p := room.player.position
+	// In the shadow the steps are the shadow's.
+	if game.tactical_shadow_active(room) { p = room.player.tactical.shadow_position }
 	switch move.kind {
 	case .Step:
 		cell := game.add_position(p, game.direction_offset(move.direction))
@@ -288,6 +299,8 @@ describe_kind :: proc(room: ^game.Room, move: Move) -> (reply: Reply) {
 	case .Card: return {kind = .Card, cell = target_cell(room, move.target), move = move}
 	case .Refocus: return {kind = .Refocus, cell = p, move = move}
 	case .Shoot: return {kind = .Shoot, cell = target_cell(room, move.target), move = move}
+	case .Activate: return {kind = .Activate, cell = p, move = move}
+	case .Equip: return {kind = .Equip, cell = p, move = move}
 	}
 	return
 }

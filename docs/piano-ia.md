@@ -221,7 +221,7 @@ comunque nel momento in cui i rami si uniscono.
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Fatta | vedi Esito |
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Fatta | vedi Esito |
 | 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Fatta | vedi Esito |
-| 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Da fare | — |
+| 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Fatta | vedi Esito |
 | 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Da fare | — |
 | 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
 | 10 | Nido di ragni: aspetto e suoni | 9 | Da fare | — |
@@ -1436,6 +1436,71 @@ Passi:
 Check della fase: i test del pacchetto `advisor` e dei casi toccati; gli atti del laboratorio dei casi provati.
 
 **Fatto quando:** tutti i casi sono provati; in mille situazioni a caso non c'è nessun consiglio impossibile.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase e la scelta dell'utente sull'Ombra (la IA consiglia i passi dell'ombra).
+
+1. **Movimento Ombra** ([simulate.odin](../src/advisor/simulate.odin), [search.odin](../src/advisor/search.odin)): la
+   copia ora fa i passi dell'ombra con le stesse regole del gioco, lascia scorrere i suoi secondi e fa uscire il
+   Viandante dove sta l'ombra. Dentro l'Ombra le prime mosse sono i quattro passi e «aspetta» (che non è un comando:
+   i secondi scorrono da soli); il segno parte dall'ombra, non dal corpo fermo. La carta Ombra ora è consigliata.
+2. **Le carte che aprono una vista** (le quattro in prima persona e Napoli): **la IA non le consiglia mai**. Il piano
+   diceva «o le sa simulare, o sta zitta»: dentro una vista si gioca a mano, e quanto vale non si può simulare. Dentro
+   le viste la IA sta zitta e i suoi secondi si fermano (scelta dell'utente).
+3. **Due comandi in più:** scaricare le **bobine di Tesla** (con l'anello) e prendere l'**arma di riserva**. Ora tutti
+   i comandi del giocatore sul tabellone sono consigliati; `Later` nella tabella delle carte e dei comandi non è più
+   usato da nessuno.
+4. **Le carte lunghe:** prova nuova, per **ogni** carta che la IA consiglia (52, sola in mano): giocata dal gioco e dalla
+   copia, poi 5 secondi di mondo, e le due stanze sono uguali campo per campo. Lazzo, Pinball, Marley, cannoni, buchi,
+   Dinosauro, onda, bobine, frecce e bombe in volo compresi. Una lezione: nella prima versione della prova la mano aveva
+   ancora le altre carte e la «prima giocata» era quasi sempre la Dash; ora in mano resta solo la carta provata.
+5. **Oltre l'orizzonte** ([objects.odin](../src/advisor/objects.odin)): quello che i dispositivi posati faranno ancora
+   (i battiti del cannone e del buco, le cariche delle bobine) conta nella valutazione.
+6. **Le tabelle per sempre** (objects.odin): ogni oggetto della griglia (`object_knowledge`), ogni struttura
+   (`structure_knowledge`) e ogni tipo di casella (`tile_knowledge`), con `switch` senza ramo di riserva.
+7. **Quando non sa:** senza un consiglio pronto compare «IA: ...» sopra il Viandante, mai un segno sbagliato.
+
+**Test** ([advisor_special_test.odin](../src/integration/advisor_special_test.odin)), tutti verdi:
+- **consiglio possibile:** in **1000 situazioni** di partite a caso, nell'arena IA e in quelle di altezze, strutture,
+  piani e ascensori, il gioco accetta sempre la mossa consigliata: **0 rifiuti**;
+- **52 carte** giocate dalla copia come dal gioco;
+- **arene speciali:** partite a caso con altezze, strutture, piani, ascensori e cancelli: copia e gioco sempre uguali;
+- **l'Ombra:** le prime mosse sono i passi dell'ombra, il consiglio parte dalla cella dell'ombra, la copia cammina ed
+  esce come il gioco;
+- le tabelle di oggetti, strutture e caselle.
+
+**Il torneo nelle arene speciali** (un combattimento per arena, 40 secondi, 4 nemici):
+
+| Arena | IA: vita persa, nemici uccisi | Il più vicino: vita persa, nemici uccisi |
+|---|---:|---:|
+| Altezze | 0, 3 | 0, 3 |
+| Strutture | 0, 3 | 0, 3 |
+| Piani | 0, 3 | 0, 1 |
+| Ascensori | 0, 2 | 0, 2 |
+
+Tutti i test delle fasi prima restano verdi (49 in tutto); nel torneo dell'arena IA la IA perde 0 vita e uccide 158
+nemici.
+
+**Le mappe grandi** (Spazio, 224×224 con gli strati, 4 nemici, `-o:speed`, senza thread):
+
+| Cosa | Valore |
+|---|---|
+| Fotografia e radice | 1,2 ms |
+| Primo consiglio | 125 ms |
+| Ricerca intera | 1238 nodi in 8,6 s (circa 144 nodi al secondo, contro 2400 nell'arena) |
+
+In parole semplici: il consiglio arriva in un ottavo di secondo, in tempo per una mano vera, ma guardare più avanti costa
+circa 17 volte di più che in un'arena, perché ogni volta che i nemici ripianificano il gioco ricalcola il loro campo
+delle distanze. Il costo è nelle regole, non nella copia; cambiarlo vorrebbe dire toccare il modo in cui i nemici
+cercano la strada nel gioco vero. Non l'ho fatto in questa fase: la IA sulle mappe grandi per ora consiglia soprattutto
+col primo giro. La fotografia pesa 1,2 ms solo quando la situazione cambia.
+
+**Laboratorio:** l'atto `ia` completo più la scena dell'Ombra (`odin_pp_ia_shadow_NN.png`): la carta giocata sotto il
+fendente, un passo dell'ombra consigliato e fatto, il Viandante esce dove sta l'ombra.
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 49 test verdi; l'atto `ia`.
+Non fatti: benchmark (la fase non cambia il disegno salvo la scritta «IA: ...»), verifica completa.
 
 ## Fase 8 — Aspetto e suoni della IA
 

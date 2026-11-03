@@ -21,11 +21,11 @@ WHOLE_WORK :: 4000
 
 // The IA's arena, its foes free to plan.
 @(private = "file")
-search_test_arena :: proc(t: ^testing.T, data: ^level.Level, player: ^game.Player) -> game.Room {
+search_test_arena :: proc(t: ^testing.T, data: ^level.Level, player: ^game.Player, arena := run_session.Mechanics_Lab_Arena.IA) -> game.Room {
 	created: bool
 	player^, created = game.create_player(run_session.DEMO_PLAYER_STATS)
 	testing.expect(t, created)
-	room, built := run_session.create_mechanics_lab_room(data, player, game.DEFAULT_TACTICAL_CONFIG, .IA)
+	room, built := run_session.create_mechanics_lab_room(data, player, game.DEFAULT_TACTICAL_CONFIG, arena)
 	testing.expect(t, built)
 	return room
 }
@@ -450,22 +450,24 @@ tournament_move :: proc(room: ^game.Room, who: Contender, search: ^advisor.Searc
 }
 
 @(private = "file")
-tournament_fight :: proc(t: ^testing.T, who: Contender, start: grid.Position, search: ^advisor.Search) -> (fight: Fight) {
+tournament_fight :: proc(t: ^testing.T, who: Contender, start: grid.Position, search: ^advisor.Search, arena := run_session.Mechanics_Lab_Arena.IA) -> (fight: Fight) {
 	data: level.Level
 	defer level.destroy(&data)
 	player: game.Player
-	room := search_test_arena(t, &data, &player)
+	room := search_test_arena(t, &data, &player, arena)
 	defer game.destroy_room(&room)
-	room.player.position = start
-	// The arena's four foes and, across the arena, one more of each: eight, so that the fight can hurt.
-	extra := [?]grid.Position{{x = 18, y = 15}, {x = 3, y = 14}, {x = 11, y = 2}, {x = 3, y = 9}}
-	for k in 0..<4 {
-		foe := room.enemies[k]
-		foe.id, foe.position = u32(800+k), extra[k]
-		foe.intent, foe.tactical_cooldown, foe.recovery_pulses = {}, 0, 0
-		if _, taken := game.enemy_index_at(&room, foe.position); !taken && foe.position != start { append(&room.enemies, foe) }
+	if arena == .IA {
+		room.player.position = start
+		// The arena's four foes and, across the arena, one more of each: eight, so that the fight can hurt.
+		extra := [?]grid.Position{{x = 18, y = 15}, {x = 3, y = 14}, {x = 11, y = 2}, {x = 3, y = 9}}
+		for k in 0..<4 {
+			foe := room.enemies[k]
+			foe.id, foe.position = u32(800+k), extra[k]
+			foe.intent, foe.tactical_cooldown, foe.recovery_pulses = {}, 0, 0
+			if _, taken := game.enemy_index_at(&room, foe.position); !taken && foe.position != start { append(&room.enemies, foe) }
+		}
+		game.plan_enemy_intents(&room)
 	}
-	game.plan_enemy_intents(&room)
 	health, foes := room.player.health, len(room.enemies)
 	kiting: combatdebug.Max_Distance_Policy_State
 	defences := 0
@@ -537,6 +539,23 @@ test_advisor_tournament :: proc(t: ^testing.T) {
 	}
 	testing.expectf(t, 3*totals[.IA].lost <= 2*totals[.Kiting].lost, "the IA lost %d life, the simple rule %d", totals[.IA].lost, totals[.Kiting].lost)
 	testing.expectf(t, totals[.IA].lost <= totals[.Nearest].lost, "the IA lost %d life, the nearest-foe player %d", totals[.IA].lost, totals[.Nearest].lost)
+}
+
+// THE TOURNAMENT IN THE SPECIAL ARENAS (Fase 7): heights, structures, layers, lifts, the player starting where each
+// arena puts him: the IA loses no more life than the nearest-foe player, and strikes down at least as many foes as
+// half of what he does (its own cells, cliffs and shafts are the copy's too).
+@(test)
+test_advisor_tournament_in_the_special_arenas :: proc(t: ^testing.T) {
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	for arena in ([?]run_session.Mechanics_Lab_Arena{.Heights, .Structures, .Layers, .Lifts}) {
+		ia := tournament_fight(t, .IA, {}, &search, arena)
+		nearest := tournament_fight(t, .Nearest, {}, &search, arena)
+		log.infof("tournament %v: the IA lost %d and killed %d, the nearest-foe player lost %d and killed %d", arena, ia.lost, ia.kills, nearest.lost, nearest.kills)
+		testing.expectf(t, ia.lost <= nearest.lost, "%v: the IA lost %d life, the nearest-foe player %d", arena, ia.lost, nearest.lost)
+		testing.expectf(t, 2*ia.kills >= nearest.kills, "%v: the IA killed %d foes, the nearest-foe player %d", arena, ia.kills, nearest.kills)
+	}
 }
 
 // THE MEASURES (logged): nodes a second; the round reached in 1, 10 and 100 ms; a frame's slice of the pilot.

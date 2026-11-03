@@ -212,6 +212,8 @@ advisor_view :: proc(room: ^game.Room, advice: advisor.Advice) -> render.Advice_
 	case .Wait: return {mark = .Wait, cell = advice.cell, word = "ASPETTA"}
 	case .Refocus: return {mark = .Refocus, cell = advice.cell, word = "RIMESCOLA"}
 	case .Card: return {mark = .Card, cell = advice.cell, word = "CARTA", card_id = advice.move.card_id}
+	case .Activate: return {mark = .Refocus, cell = advice.cell, word = "TESLA"}
+	case .Equip: return {mark = .Refocus, cell = advice.cell, word = "ARMA DI RISERVA"}
 	case .Defend:
 		view := render.Advice_View{mark = .Defend, cell = advice.cell, word = "DIFENDI", defense = advice.move.defense, has_defense = true}
 		if advice.move.defense == .Dodge { view.key, view.has_key = advice.move.direction, true }
@@ -238,9 +240,9 @@ advisor_command_use :: proc(kind: Gameplay_Command_Kind) -> (use: Advisor_Comman
 	case .Play_Card: return .Advised, "le carte della mano, sui loro bersagli migliori (advisor/cards.odin)"
 	case .Refocus: return .Advised, "rimescolare la mano"
 	case .Shoot: return .Advised, "la freccia del Feretro, a ogni nemico"
-	case .Activate: return .Later, "le bobine di Tesla: Fase 7, coi casi speciali"
-	case .Equip: return .Later, "l'arma di riserva: Fase 7, coi casi speciali"
-	case .Shadow_Emerge: return .Later, "Movimento Ombra: Fase 7, coi casi speciali"
+	case .Activate: return .Advised, "scaricare le bobine di Tesla (o aprirne l'anello)"
+	case .Equip: return .Advised, "prendere in mano l'arma di riserva"
+	case .Shadow_Emerge: return .World, "Movimento Ombra finito: il Viandante esce dove sta l'ombra"
 	case .Ability: return .Outside, "l'abilità del vecchio prototipo: il tabellone non la offre"
 	case .Timeout, .Continue_Pulse, .QTE_Fail, .Lasso_Spin, .Pinball_Roll, .Enemy_Flight:
 		return .World, "il mondo che va avanti da solo"
@@ -257,7 +259,10 @@ advisor_move_commands :: proc(room: ^game.Room, move: advisor.Move) -> (commands
 	switch move.kind {
 	case .Step: commands[0] = base; commands[0].kind, commands[0].direction = .Move, move.direction; count = 1
 	case .Dodge: commands[0] = base; commands[0].kind, commands[0].direction = .Dodge, move.direction; count = 1
-	case .Wait: commands[0] = base; commands[0].kind = .Wait; count = 1
+	case .Wait:
+		// In the shadow waiting is no command: its seconds run by themselves.
+		if room != nil && game.tactical_shadow_active(room) { return }
+		commands[0] = base; commands[0].kind = .Wait; count = 1
 	case .Refocus: commands[0] = base; commands[0].kind = .Refocus; count = 1
 	case .Card:
 		commands[0] = base
@@ -277,6 +282,8 @@ advisor_move_commands :: proc(room: ^game.Room, move: advisor.Move) -> (commands
 		count = 2 if move.succeed || move.defense == .Dodge else 1
 	case .Key: commands[0] = base; commands[0].kind, commands[0].direction = .QTE_Key, move.direction; count = 1
 	case .Shoot: commands[0] = base; commands[0].kind, commands[0].target = .Shoot, move.target; count = 1
+	case .Activate: commands[0] = base; commands[0].kind = .Activate; count = 1
+	case .Equip: commands[0] = base; commands[0].kind = .Equip; count = 1
 	}
 	return
 }

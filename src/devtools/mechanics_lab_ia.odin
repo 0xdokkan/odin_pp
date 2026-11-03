@@ -89,7 +89,8 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 	if !mechanics_lab_ia_follow(window, renderer, room, controller, cards, buffer) { return false }
 	if !mechanics_lab_ia_defend(window, renderer, room, data, controller, cards, buffer) { return false }
 	if !mechanics_lab_ia_warning(window, renderer, room, data, controller, cards, buffer) { return false }
-	return mechanics_lab_ia_progress(window, renderer, room, data, controller, cards, buffer)
+	if !mechanics_lab_ia_progress(window, renderer, room, data, controller, cards, buffer) { return false }
+	return mechanics_lab_ia_shadow(window, renderer, room, data, controller, cards, buffer)
 }
 
 // The foes free, the player follows the IA's advice for twenty seconds of the world, or until its seconds are over.
@@ -330,5 +331,46 @@ mechanics_lab_ia_progress :: proc(window: ^app.Window, renderer: ^render.Rendere
 	}
 	run_session.advisor_set_context({})
 	renderer.tactical.mechanics_lab_ia_progress = 0
+	return true
+}
+
+// MOVIMENTO OMBRA (Fase 7): under the cleave the Strike of the hand becomes the Ombra and is played; in the shadow the
+// world stands still and the IA advises the shadow's steps, its arrow from the shadow (odin_pp_ia_shadow_00.png); the
+// advice followed until the shadow's seconds are over, the player rises where the shadow stands (odin_pp_ia_shadow_01.png).
+@(private = "file")
+mechanics_lab_ia_shadow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	if !mechanics_lab_ia_scene(window, renderer, room, data, controller, cards, buffer, false) { return false }
+	deck := &room.player.deck
+	shadow_id: u32
+	for &card in deck.hand[:deck.hand_count] {
+		if card.definition_id != .Strike { continue }
+		card.definition_id, card.upgrade_level = .Shadow_Step, 0
+		if owned, found := game.owned_card_index_by_id(deck, card.id); found { deck.owned[owned] = card }
+		shadow_id = card.id
+	}
+	if shadow_id == 0 || !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Play_Card, origin_phase = .Combat, card_id = shadow_id,
+		target = game.entity_target(game.PLAYER_ENTITY)}) { fmt.eprintln("mechanics lab: the Ombra was not played"); return false }
+	for _ in 0..<240 {
+		if game.tactical_shadow_active(room) && advisor.player_free(room) { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	if !game.tactical_shadow_active(room) { fmt.eprintln("mechanics lab: no shadow after the Ombra"); return false }
+	steps := 0
+	shown := false
+	for _ in 0..<600 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if !game.tactical_shadow_active(room) { break }
+		advice := run_session.advisor_current_advice()
+		if !advice.valid || !advisor.player_free(room) || render.renderer_blocks_player_input(renderer) { continue }
+		if !shown { artifacts.screenshot("odin_pp_ia_shadow_00.png"); shown = true }
+		commands, count := run_session.advisor_move_commands(room, advice.move)
+		for command in commands[:count] { run_session.commit_gameplay_command(room, renderer, cards, command) }
+		if advice.kind == .Step { steps += 1 }
+	}
+	for _ in 0..<30 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+	artifacts.screenshot("odin_pp_ia_shadow_01.png")
+	if !shown || game.tactical_shadow_active(room) { fmt.eprintln("mechanics lab: no advice in the shadow, or the shadow never ended"); return false }
+	fmt.eprintf("mechanics lab IA shadow: %d steps of the shadow advised and walked, the player rose at %v\n", steps, room.player.position)
 	return true
 }

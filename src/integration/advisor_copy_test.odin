@@ -70,7 +70,7 @@ advisor_test_command :: proc(move: advisor.Move) -> run_session.Gameplay_Command
 	case .Card: command.kind = .Play_Card
 	case .Refocus: command.kind = .Refocus
 	// The random games play only the five above.
-	case .Diagonal, .Defend, .Key, .Shoot: command.kind = .None
+	case .Diagonal, .Defend, .Key, .Shoot, .Activate, .Equip: command.kind = .None
 	}
 	return command
 }
@@ -93,6 +93,11 @@ advisor_test_real_frame :: proc(room: ^game.Room, dt: f32) {
 	}
 	if room.phase != .Combat { game.lift_tick(room, dt); return }
 	if game.tactical_is_casting(room) { game.tactical_tick(room, dt, true, false); return }
+	if game.tactical_shadow_active(room) {
+		game.tactical_tick(room, dt, true, false)
+		if game.tactical_shadow_due(room) { world(room, .Shadow_Emerge) }
+		return
+	}
 	if room.qte.kind != .None {
 		room.qte.remaining = max(f32(0), room.qte.remaining-dt)
 		if room.qte.remaining <= 0 { world(room, .QTE_Fail) }

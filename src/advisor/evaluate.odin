@@ -13,8 +13,9 @@ Root_Facts :: struct {
 	ids: [game.MAX_ENEMIES_PER_ROOM]u32,
 	healths: [game.MAX_ENEMIES_PER_ROOM]i32,
 	archetypes: [game.MAX_ENEMIES_PER_ROOM]game.Enemy_Archetype,
-	// The statuses on the board at the root, at their worth (cards.odin, statuses_value).
-	statuses: f32,
+	// The statuses on the board at the root, at their worth (cards.odin, statuses_value), and the player's devices
+	// (objects.odin, objects_value).
+	statuses, devices: f32,
 	// The game's state (context.odin) and the weight of a point of life it gives.
 	game_context: Game_Context,
 	life_weight: f32,
@@ -32,6 +33,7 @@ root_facts :: proc(room: ^game.Room, game_context: Game_Context = {}) -> (facts:
 		facts.enemy_count += 1
 	}
 	facts.statuses = statuses_value(room)
+	facts.devices = objects_value(room)
 	return
 }
 
@@ -115,6 +117,8 @@ evaluate :: proc(room: ^game.Room, facts: ^Root_Facts, elapsed: f32, risk: f32 =
 	value -= risk
 	// What the statuses gained or lost since the root will do past the horizon.
 	value += statuses_value(room)-facts.statuses
+	// What the devices set down since the root will still do past the horizon.
+	value += objects_value(room)-facts.devices
 	if room.phase != .Combat { return value+WIN_VALUE }
 	// The position: the blows still to land past the horizon, the ways out, the weakest foe near, an archer's line.
 	p := room.player.position
@@ -132,6 +136,8 @@ evaluate :: proc(room: ^game.Room, facts: ^Root_Facts, elapsed: f32, risk: f32 =
 // sei già al sicuro». On a threatened cell: the first free step out of every threat, else a dodge out of it; a foe
 // next to him: the bump on the weakest one; else a safe step towards the weakest foe; else wait.
 fast_move :: proc(room: ^game.Room) -> Move {
+	// In the shadow the fast rule lets its seconds run out: the shadow's steps are the search's own.
+	if game.tactical_shadow_active(room) { return {kind = .Wait} }
 	p := room.player.position
 	if cell_threat(room, p) > 0 {
 		for direction in game.Move_Direction {
@@ -199,7 +205,13 @@ advice_possible :: proc(room: ^game.Room, advice: Advice, at: grid.Position) -> 
 	if room.player.position != at && room.qte.kind == .None { return false }
 	switch move.kind {
 	case .Wait, .Refocus: return true
+	case .Activate:
+		for object in room.objects { if object.kind == .Tesla_Coil { return true } }
+		return false
+	case .Equip: return room.player.equipment.reserve.id != .None
 	case .Step:
+		// The shadow's step: from the shadow, which only the player's own steps move.
+		if game.tactical_shadow_active(room) { return true }
 		if advice.kind == .Bump { _, foe := game.enemy_index_at(room, advice.cell); return foe }
 		return step_is_free(room, advice.cell)
 	case .Diagonal: return step_is_free(room, advice.cell)
