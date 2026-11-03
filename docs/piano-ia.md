@@ -1,6 +1,6 @@
 [← Odin PP](../README.md)
 
-# Piano di lavoro: la carta «IA», il Nido di ragni e la Regina
+# Piano di lavoro: la carta «IA», il Nido di ragni, la Regina e il Lanciafiamme
 
 Scritto il 3 novembre 2026 sul ramo `piano-ia`, partito da `piano-napoli` (commit `6ea365b`, uguale a
 `origin/piano-napoli`). È lo stato più nuovo del gioco: le carte in prima persona, il succo dei colpi, le frecce
@@ -21,11 +21,15 @@ La carta è **sempre in cerca** della mossa migliore. Il gioco è dinamico, quin
 guarda **qualche passo avanti**; e pensa anche al fatto che il giocatore può **non seguire** il consiglio e fare di
 testa sua. È un'intelligenza superiore che ti dice sempre la prossima mossa giusta.
 
-Lo stesso giorno l'utente ha aggiunto al piano **due carte nuove** e **una regola per sempre**:
+Lo stesso giorno l'utente ha aggiunto al piano **altre tre carte** e **una regola per sempre**:
 - il **Nido di ragni**: lo posi a terra e per 20 secondi fa uscire dei ragnetti intangibili, che corrono dal nemico più
   vicino, gli danno un morso piccolo e muoiono. I nemici lo possono colpire, e ogni colpo gli toglie dei secondi;
 - la **Regina**: un pezzo degli scacchi che posi sulla griglia e che nessuno può distruggere. Per 20 secondi guarda
   lungo le sue linee (le mosse della regina degli scacchi) e, appena un nemico ci entra, corre fino a lui e lo colpisce;
+- il **Lanciafiamme**: per 20 secondi il Viandante impugna un lanciafiamme e non usa altre carte né colpi a mano.
+  Spara tenendo premuto il tasto sinistro, guarda sempre verso il mouse e la fiamma lo segue, restando un attimo
+  indietro quando gira. Ogni nemico bruciato prende danno al massimo una volta ogni 2 secondi, più uno stack di
+  bruciatura, e intanto il Viandante cammina come sempre;
 - la **regola per sempre**: da quando la IA esiste, ogni cosa nuova del gioco, fatta da questo PC o da altri, con
   Claude, con Codex o con un'altra IA, aggiorna anche la IA, così ha sempre tutte le informazioni per trovare la mossa
   migliore (sezione «La regola per sempre»).
@@ -58,6 +62,8 @@ Parole del documento:
 - **Nido** e **ragnetti:** l'oggetto a terra del Nido di ragni e i ragnetti che fa uscire.
 - **Linea:** una delle 8 direzioni in cui si muove la regina degli scacchi (in orizzontale, in verticale e in
   diagonale), lunga quanto la stanza.
+- **Scia della fiamma:** quando il lanciafiamme gira, la fiamma già uscita continua dritta dove andava e resta un
+  attimo indietro, come l'acqua di una canna che si sposta.
 
 ## Decisioni dell'utente (3 novembre 2026)
 
@@ -105,7 +111,7 @@ Note sulle decisioni:
 
 | Domanda | Risposta |
 |---|---|
-| Le carte nuove | **Nido di ragni** e **Regina**, nel piano dopo le fasi di laboratorio della IA (Fasi 9-12) e prima del gioco vero (Fase 13) |
+| Le carte nuove | **Nido di ragni** e **Regina**, nel piano dopo le fasi di laboratorio della IA (Fasi 9-12); poi il Lanciafiamme (Fasi 13-14) e il gioco vero (Fase 15) |
 | Costo e rarità | **Nido di ragni: non comune, 2 energia**, come il Cannone (prezzo 6, peso 70, 40 in spedizione). **Regina: rara, 3 energia**, come il Buco Nero (prezzo 8, peso 60, 60 in spedizione) |
 | Il nido e i nemici | **Un nemico che ha il nido accanto e non ha te accanto lo colpisce:** il nido fa anche un po' da esca. Il nido non ha una vita a numeri: **ogni colpo gli toglie gli stessi secondi**, qualunque colpo e di qualunque nemico; a zero secondi il nido sparisce |
 | I ragnetti | **Camminano attorno ai muri** e attraversano nemici e Viandante (sono intangibili), 4 caselle al secondo; un morso piccolo al nemico più vicino, poi muoiono, senza esplodere |
@@ -129,6 +135,20 @@ Note sulle decisioni:
 | Ritmo della Regina | il primo colpo **appena** un nemico entra in una linea, poi **uno ogni 2 s** | al massimo 10 colpi, 40 danni: 2 al secondo come il Cannone, ma sempre a segno e indistruttibile, per questo è rara e costa 3 energia |
 | Regine insieme | **una** | — |
 | Dove si posano | come il Cannone: una casella libera da 1 a 3 caselle di distanza, in vista | — |
+
+### Il Lanciafiamme
+
+| Domanda | Risposta |
+|---|---|
+| Che cosa fa | Il Viandante **impugna un lanciafiamme per 20 s**: finché ce l'ha **non usa altre carte e non colpisce a mano**. Spara **tenendo premuto il tasto sinistro** |
+| Il danno | Lo stesso nemico si può bruciare di continuo, ma prende danno **al massimo una volta ogni 2 s**; a ogni colpo prende anche **uno stack di bruciatura**. La fiamma può prendere più nemici insieme |
+| La mira | Il Viandante **guarda sempre verso il mouse** e ruota di continuo per puntarlo; la fiamma esce dal lanciafiamme e segue la sua rotazione |
+| La scia | Quando la fiamma si sposta, **resta per qualche fotogramma dov'era prima**, per sembrare più vera |
+| Il movimento | **Quello di sempre:** i passi sulle caselle, anche mentre spara |
+| Costo e rarità | **Rara, 3 energia**, come le carte in prima persona e Napoli (prezzo 8, peso 60, 60 in spedizione) |
+| Danno e portata | **3 danni a colpo, fiamma lunga 3 caselle** |
+| La IA intanto | **Si ferma, come nelle viste:** niente consigli, e i suoi secondi si fermano finché dura il lanciafiamme. La IA però conosce la carta, per consigliare quando giocarla (regola per sempre) |
+| Cosa ferma la fiamma | **Muri e coperture** la fermano; passa sopra i **muretti bassi**, come la vista. **Accende anche barili e terreno:** i barili esplodono, il ghiaccio si scioglie, a terra resta il fuoco dell'Incendio |
 
 ## La regola per sempre: la IA conosce tutto il gioco
 
@@ -198,7 +218,9 @@ comunque nel momento in cui i rami si uniscono.
 | 10 | Nido di ragni: aspetto e suoni | 9 | Da fare | — |
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Da fare | — |
 | 12 | Regina: aspetto e suoni | 11 | Da fare | — |
-| 13 | Nel gioco vero: le tre carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12 | Da fare | — |
+| 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
+| 14 | Lanciafiamme: aspetto e suoni | 13 | Da fare | — |
+| 15 | Nel gioco vero: le quattro carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12, 14 | Da fare | — |
 
 ## Come funziona oggi (punto di partenza)
 
@@ -278,6 +300,24 @@ comunque nel momento in cui i rami si uniscono.
 - **Le linee sulla griglia** ([targeting.odin](../src/game/targeting.odin)): `trace_targeting_line` traccia una linea
   fra due caselle e `targeting_path_blocker` trova la prima cosa che la ferma; il Cannone spara lungo la sua direzione
   (`cannon_line`). È la strada per le linee della Regina.
+- **La bruciatura** (`Status_Kind.Burn`, [pulse.odin](../src/game/pulse.odin)): i suoi stack sono il danno di ogni
+  morso e **non calano mai**. Nel gioco senza finestra morde ogni 4 battiti (`EXPEDITION_DRAW_BEATS`, in
+  `expedition_finish_beat`), con tanti danni quanti sono gli stack.
+- **I fuochi a terra, i barili, il ghiaccio** ([ground.odin](../src/game/ground.odin)). Un fuoco a terra (quello
+  dell'Incendio) è una croce che allunga i bracci ogni 4 battiti, per 4 volte, poi si spegne. I bracci si fermano ai
+  muri, e chi entra nel fuoco prende la bruciatura; **il Viandante no, mai**. Al massimo 32 fuochi per stanza
+  (`MAX_GROUND_FIRES`). I barili sono oggetti che esplodono (`explosive`), come quando li prende la brace del
+  demolitore; i blocchi di ghiaccio (`Ice_Block`) si rompono con un colpo.
+- **Le viste come famiglia di armi** ([first_person.odin](../src/game/first_person.odin)). Ogni arma è una voce di
+  `First_Person_Weapon` (AK, pugni, spada, arco, bastone, nonno), con le sue regole in `FIRST_PERSON_WEAPONS`: la carta,
+  se si prende in groppa al Dinosauro, se la camera sta dietro la schiena.
+  - Tutte hanno i secondi (+2 a potenziamento e +2 sul tick: `FIRST_PERSON_SECONDS_PER_UPGRADE`,
+    `FIRST_PERSON_CRITICAL_SECONDS`), il divieto delle carte e il salvataggio (`First_Person_Save`).
+  - Lo stato di ognuna sta in un `#raw_union` (`First_Person_Arms`), che pesa quanto l'arma più grande.
+  - Nelle viste i passi vanno al ritmo del Viandante solo con spada e arco (`tactical_player_pace`).
+- **Il mouse sul tabellone:** `pick_ground_cell` ([height_view.odin](../src/render/height_view.odin)) trova la casella
+  sotto il mouse; l'Inondazione e il Cannone prendono già una direzione dal mouse
+  ([flood_aim.odin](../src/run/flood_aim.odin)).
 - **I numeri per il bilanciamento:**
   - i nemici del laboratorio ([sandbox.odin](../src/game/sandbox.odin)): inseguitore 12 di vita (colpo 2), arciere 10
     (2), bruto 18 (3), bombarolo 12 (2);
@@ -410,6 +450,11 @@ comunque nel momento in cui i rami si uniscono.
 - **La Regina:** `Card_Id.Queen`, nome «Regina», con un oggetto nuovo, `Grid_Object_Kind.Queen`, che ferma i passi e
   che nessuno può colpire. Guarda le sue 8 linee con lo stesso tracciato delle linee delle carte; corsa e colpo sono
   un'azione d'attacco come la mazzata di Napoli. Le regole stanno in `game/queen.odin`.
+- **Il Lanciafiamme:** `Card_Id.Flamethrower`, «Lanciafiamme», con un'arma nuova della famiglia delle viste,
+  `First_Person_Weapon.Flamethrower`, e un segno nuovo nelle sue regole: la camera **resta sul tabellone**. Dalla
+  famiglia prende i secondi, il divieto delle carte, il salvataggio e la pausa della IA. La mira, la storia delle
+  direzioni della fiamma e i nemici bruciati da poco stanno nel `#raw_union`, senza farlo crescere. Le regole stanno in
+  `game/first_person_flame.odin`, i comandi in `run/first_person_input.odin`.
 - **I tipi nuovi vanno in fondo agli elenchi** (`Card_Id`, `Grid_Object_Kind`, `Effect_Kind`), così i salvataggi
   vecchi non cambiano, come per la tavolata di Napoli.
 
@@ -561,7 +606,7 @@ Proposta (da confermare all'inizio della fase):
 Passi:
 1. **Punto di partenza.** Le misure finali di Napoli sono state fatte sullo stesso commit `6ea365b`: 1893 test, 2562
    catture, 165 suoni, 1,535 ms a immagine nel benchmark (circa 650 al secondo), stanza di 9208 byte. Sono il
-   riferimento. Non si rifà la verifica completa, che arriva nella Fase 13 in ordine incrociato col commit di partenza.
+   riferimento. Non si rifà la verifica completa, che arriva nella Fase 15 in ordine incrociato col commit di partenza.
 2. **La carta nel codice:** `Card_Id.IA` e la sua definizione (rara, 2 energia, prezzo 8, peso 60, `Lab_Only`, mira
    `Self`, 5 potenziamenti); l'effetto `.IA`; `resolve_ia_card`; l'evento `IA_Begun`. Poi le tabelle che lo chiedono:
    `EXPEDITION_CARD_COSTS` (50), `CARD_VISUALS`, le descrizioni, i suggerimenti della mano, l'anteprima dei
@@ -1058,17 +1103,136 @@ Check della fase: i test del disegno, dei suoni e delle icone; l'atto `regina`.
 
 **Fatto quando:** l'utente approva aspetto e suoni.
 
-## Fase 13 — Nel gioco vero
+## Fase 13 — Lanciafiamme: regole e prototipo; la IA lo conosce
 
-**Obiettivo:** se l'utente lo vuole, la IA, il Nido di ragni e la Regina passano al gioco vero, coi film, i salvataggi
-e la verifica completa.
+**Obiettivo:** nel laboratorio il Viandante impugna il lanciafiamme per 20 s, punta col mouse, brucia i nemici (al
+massimo un colpo ogni 2 s per nemico, con la bruciatura), accende barili, ghiaccio e terreno, e intanto cammina come
+sempre; e la IA sa quando consigliare la carta.
+
+Proposta (i numeri in più sono di Claude, da confermare all'inizio della fase):
+- **La carta:** `Card_Id.Flamethrower`, «Lanciafiamme», rara, 3 energia, prezzo 8, peso 60, 60 in spedizione,
+  `Lab_Only` fino all'ultima fase, mira `Self`. Come le altre viste: **+2 s a potenziamento** (5 potenziamenti, al
+  massimo 30 s) e **+2 s sul tick**.
+- **Un'arma nuova della famiglia delle viste,** `First_Person_Weapon.Flamethrower`, con un segno nuovo nelle regole
+  delle armi: la camera **resta sul tabellone**, senza discesa. Dalla famiglia prende i secondi, il divieto delle carte,
+  il salvataggio e la pausa della IA (scelta dell'utente). Il suo stato sta nel `#raw_union`, non più grande dell'arma
+  più grande di oggi: la stanza non cresce.
+- **Il movimento di sempre:** WASD fa i passi sulle caselle del tabellone (non rispetto alla mira), al ritmo del
+  Viandante (0,4 s), anche mentre spara. Un passo contro un nemico non lo colpisce: il passo si ferma.
+- **La mira:** il punto del tabellone sotto il mouse dà la direzione. Il Viandante ruota verso di lei a **720° al
+  secondo** (mezzo giro in un quarto di secondo): gira in fretta ma si vede girare, e la fiamma segue lui, non il mouse.
+- **La fiamma:** lunga **3 caselle** dal bocchettone, larga da 0,4 a 1,2 caselle. Corre a **15 caselle al secondo**, e
+  ogni pezzo di fiamma va dritto nella direzione in cui è uscito. Così, quando il Viandante gira, la punta resta
+  indietro di circa un quinto di secondo (12 fotogrammi) e il centro di metà: è la scia che chiede l'utente. Le regole
+  tengono le direzioni degli ultimi istanti, a passi fissi di 1/120 s come i passi fissi dei pugni, e colpiscono
+  **dove la fiamma si vede**, non solo dove punta il bocchettone.
+- **Il colpo:** ogni nemico toccato dalla fiamma prende **3 danni e 1 stack di bruciatura**, poi per **2 s** la fiamma
+  non gli fa niente; se i nemici sono più di uno, ognuno ha il suo tempo. Una tabella piccola nello stato dell'arma
+  ricorda i nemici bruciati da poco: è lo stesso principio del tempo di immunità di molti giochi, tenuto separato per
+  ogni bersaglio.
+- **Barili, ghiaccio e terreno:**
+  - un barile toccato esplode, come quando lo prende la brace del demolitore;
+  - un blocco di ghiaccio toccato si scioglie;
+  - una casella dove la punta della fiamma resta almeno **1 s** prende fuoco come l'Incendio (1 di bruciatura), al
+    massimo **un fuoco nuovo al secondo**; i fuochi a terra non toccano mai il Viandante.
+- **Cosa la ferma:** muri e coperture sì, muretti bassi no.
+- **In parole semplici:** un nemico tenuto nella fiamma per 20 s prende 30 danni diretti, e la sua bruciatura sale a 10
+  stack: circa altri 30 danni mentre il lanciafiamme dura, poi 10 ogni 4 s finché vive. Con tre nemici nella fiamma, il
+  triplo.
+
+Domande all'utente all'inizio della fase:
+- **I numeri** qui sopra: rotazione, velocità e larghezza della fiamma, fuoco a terra.
+- **Schivata e difesa a tasti** mentre impugna il lanciafiamme. Proposta: restano come sempre.
+- **Il tasto lasciato.** Proposta: la fiamma si spegne subito, ma quella già uscita finisce la sua corsa e brucia
+  ancora.
+- **Sigla e icona provvisorie.** Proposta: `LNF` e un lanciafiamme disegnato da codice.
+
+Passi:
+1. **Le regole** (`game/first_person_flame.odin`): l'arma, i secondi, la mira con la rotazione, la storia delle
+   direzioni, la forma della fiamma e i colpi, la tabella dei 2 s, la bruciatura, barili, ghiaccio e fuoco a terra. Un
+   comando a ogni fotogramma, come quello del bastone di Napoli (`First_Person_Club`): il tasto tenuto e il punto del
+   mouse.
+2. **Il ritmo dei passi:** `tactical_player_pace` dà il ritmo del Viandante anche ai passi del lanciafiamme (oggi solo a
+   spada e arco); i passi seguono il tabellone, non la mira.
+3. **I comandi** (`run/first_person_input.odin`, `drive_first_person_flame`): il mouse sul tabellone e il tasto
+   sinistro tenuto.
+4. **Salvataggio:** lo stato dell'arma in `First_Person_Save`, con la sua chiave, come le altre armi.
+5. **Aspetto provvisorio:** una fiamma semplice fatta di puntini che vanno dritti (la scia si vede già); il Viandante
+   che si gira verso il mouse.
+6. **La IA lo conosce** (regola per sempre):
+   - la voce della carta: quanto vale giocarla adesso. La copia fa girare il lanciafiamme con una regola semplice
+     («punta il nemico più vicino») fino all'orizzonte, e conta i secondi che restano oltre l'orizzonte;
+   - il comando nuovo nella tabella dei comandi, escluso: mentre il lanciafiamme dura la IA si ferma (scelta
+     dell'utente);
+   - puzzle: con tre nemici vicini la IA consiglia il lanciafiamme; con un nemico solo a 2 di vita consiglia il colpo
+     a mano.
+7. **Laboratorio:** la carta nel mazzo dell'arena «Prima persona» (muri, nicchie, coperture, un arciere e un bruto),
+   più due barili e un blocco di ghiaccio. Un atto nuovo, `lanciafiamme` (`ODIN_PP_LAB_ONLY=lanciafiamme`):
+   - il Viandante gira la fiamma da un nemico all'altro, e si vede la scia;
+   - un nemico preso due volte a 2 s di distanza, con la bruciatura che sale;
+   - un muro che ferma la fiamma e un muretto che non la ferma;
+   - un barile che esplode, il ghiaccio che si scioglie, il fuoco a terra;
+   - il Viandante che cammina mentre spara.
+
+   Catture `odin_pp_lanciafiamme_NN.png`.
+8. **Test:**
+   - 3 danni e 1 bruciatura a colpo; mai due colpi allo stesso nemico in meno di 2 s; più nemici insieme;
+   - la fiamma colpisce dove si vede, anche mentre il Viandante gira;
+   - muri sì, muretti no; barili, ghiaccio e fuoco a terra;
+   - i passi al ritmo di sempre; nessuna carta e nessun colpo a mano mentre dura;
+   - i secondi coi potenziamenti e sul tick; il salvataggio; la stanza che resta di 9208 byte.
+9. Voce nuova in [registro-carte.md](registro-carte.md): «Carta nuova: Lanciafiamme (solo laboratorio)», con «IA
+   aggiornata».
+
+Check della fase: i test della carta, delle armi della vista e del consigliere; gli atti `lanciafiamme` e
+`prima_persona`.
+
+**Fatto quando:** nel laboratorio il lanciafiamme funziona come deciso e l'utente lo prova; i test sono verdi.
+
+## Fase 14 — Lanciafiamme: aspetto e suoni
+
+**Obiettivo:** la fiamma è bella da vedere e si sente.
+
+Proposta (da confermare all'inizio della fase, guardando le catture):
+- **La fiamma:** tante particelle lasciate nel mondo, non attaccate al bocchettone. Così, quando il Viandante gira, la
+  fiamma si piega e resta indietro come l'acqua di una canna: è il modo dei motori di gioco, le particelle «nello spazio
+  del mondo». I colori vanno dal bianco e giallo al bocchettone all'arancio e al rosso, fino al fumo scuro in punta; la
+  luce si somma (fusione additiva), con un po' di fumo sopra. La fiamma illumina il pavimento di arancio, e l'aria
+  calda tremola un poco.
+- **Il lanciafiamme:** un modello 3D di carta fatto da codice, come i guantoni e l'asso di bastoni, col serbatoio sulla
+  schiena e il bocchettone che punta esattamente dove gira il Viandante. Il cartoncino del Viandante si specchia a
+  destra o a sinistra secondo la mira.
+- **I nemici bruciati:** il lampo del colpo e una fiammella che resta sulla loro carta finché bruciano.
+- **L'icona:** un lanciafiamme con la fiammata, in una cella libera dell'atlante.
+- **I suoni, da codice:** lo scatto dell'accensione, il ruggito continuo della fiamma (un rumore filtrato che respira),
+  lo sfiato quando si spegne, il crepitio sui nemici, il colpo sordo del barile che prende fuoco. Solo nel laboratorio,
+  come gli altri.
+
+Passi:
+1. Le particelle, da una riserva fissa: nessuna memoria presa a ogni fotogramma, un solo lotto di disegno.
+2. Il modello del lanciafiamme e il Viandante che si specchia.
+3. La luce sul pavimento e l'aria calda.
+4. L'icona.
+5. I suoni (`tools/audio/sfx_flamethrower.py`).
+6. Laboratorio: l'atto `lanciafiamme` con una serie di catture fitte, per vedere bene la scia mentre gira.
+7. Benchmark in ordine incrociato (ABBA) con la fiamma accesa: la fiamma si disegna a ogni fotogramma e non deve
+   rallentare il gioco.
+
+Check della fase: i test del disegno, dei suoni e delle icone; l'atto `lanciafiamme`; il benchmark ABBA.
+
+**Fatto quando:** l'utente approva fiamma, scia e suoni.
+
+## Fase 15 — Nel gioco vero
+
+**Obiettivo:** se l'utente lo vuole, la IA, il Nido di ragni, la Regina e il Lanciafiamme passano al gioco vero, coi
+film, i salvataggi e la verifica completa.
 
 Proposta (da confermare all'inizio della fase):
-- Le tre carte entrano nelle offerte, nei negozi e nella collezione (si toglie `Lab_Only`).
+- Le quattro carte entrano nelle offerte, nei negozi e nella collezione (si toglie `Lab_Only`).
 - Ogni carta ha il suo film di «Mostra effetto».
 
 Passi:
-1. **Domanda all'utente:** le tre carte entrano nelle offerte, nei negozi e nella collezione?
+1. **Domanda all'utente:** le quattro carte entrano nelle offerte, nei negozi e nella collezione?
 2. **I film di «Mostra effetto»** (`card_demo.odin`):
    - **IA**, una scena con i tre consigli: un nemico annuncia un colpo, la IA segna il passo per schivarlo e il
      Viandante lo fa; poi il mirino sul nemico, e il colpo a mano; poi la cornice su una carta e sulla sua casella, e la
@@ -1076,11 +1240,14 @@ Passi:
      nuova del film;
    - **Nido di ragni:** il nido posato fra il Viandante e due nemici, i ragnetti che mordono, un inseguitore che lo
      colpisce e i secondi che calano;
-   - **Regina:** la Regina posata, un nemico che entra nella sua diagonale, la corsa e il colpo, poi il secondo nemico.
+   - **Regina:** la Regina posata, un nemico che entra nella sua diagonale, la corsa e il colpo, poi il secondo nemico;
+   - **Lanciafiamme:** il Viandante gira la fiamma da un nemico all'altro (si vede la scia), la bruciatura che sale, un
+     barile che esplode e il fuoco a terra; un'azione nuova del film tiene il tasto e muove la mira.
 
    I test controllano che ogni film mostri i suoi eventi.
-3. **Run, spedizione e campagna:** i salvataggi (i secondi della IA stanno nel giocatore, nido, ragnetti e Regina sono
-   oggetti); i costi in spedizione (50, 40, 60); la vita massima di 32 in spedizione.
+3. **Run, spedizione e campagna:** i salvataggi (i secondi della IA stanno nel giocatore; nido, ragnetti e Regina sono
+   oggetti; il lanciafiamme sta nella vista); i costi in spedizione (50, 40, 60, 60); la vita massima di 32 in
+   spedizione.
 4. **La regola per sempre:** si controlla che `AGENTS.md`, `CLAUDE.md` e [sviluppo.md](sviluppo.md) dicano ancora il
    vero, e che le tabelle della IA abbiano tutto quello che il gioco ha in quel momento (anche quello arrivato da altri
    rami).
@@ -1112,6 +1279,17 @@ Passi:
   prova).
 - **La Regina che chiude la strada.** Occupa la sua casella e corre accanto ai nemici: può chiudere un corridoio anche
   al Viandante. Dura 20 s, la IA lo sa (lo prova un puzzle), e il disegno mostra dove sta per andare.
+- **La fiamma che si vede e quella che colpisce.** Se fossero diverse, il giocatore si sentirebbe imbrogliato. Per
+  questo le regole tengono la storia delle direzioni della fiamma, e un test confronta la forma disegnata con quella
+  delle regole.
+- **Troppa bruciatura.** Gli stack non calano mai: tenere un nemico forte (un boss) nella fiamma a lungo gliene dà
+  tanti. I 2 s fra un colpo e l'altro li tengono a 10 in 20 s; la prova automatica di un minuto (come quella delle
+  viste) e la partita di prova dell'utente lo controllano.
+- **Barili e fuoco vicino al Viandante.** Un barile che esplode accanto a lui lo ferisce, come oggi; i fuochi a terra
+  invece non lo toccano mai. I fuochi sono al massimo 32 per stanza, e il lanciafiamme ne accende al massimo uno al
+  secondo.
+- **Le particelle della fiamma e le prestazioni.** Una riserva fissa di particelle, nessuna memoria presa a ogni
+  fotogramma, un solo lotto di disegno; il benchmark ABBA della Fase 14 lo misura.
 - **Il thread.** Due thread che toccano la stessa memoria sono il bug più difficile da trovare. Regola fissa: il thread
   non legge mai la stanza vera, solo la fotografia fatta dal gioco; il consiglio torna in un triplo buffer; nel
   fotogramma non ci sono lock. Il calcolo a pezzi resta come riserva.
@@ -1208,6 +1386,18 @@ Il Nido di ragni e la Regina:
 - [Practical Taunt (TV Tropes)](https://www.tvtropes.org/pmwiki/pmwiki.php/Main/PracticalTaunt) e
   [Decoy (Warframe Wiki)](https://wiki.warframe.com/w/Decoy): l'esca che si prende i colpi al posto del giocatore
 
+Il Lanciafiamme:
+- [Flame Thrower (Team Fortress 2 Wiki)](https://wiki.teamfortress.com/wiki/Flame_Thrower) e
+  [Jungle Inferno Update (Team Fortress 2 Wiki)](https://wiki.teamfortress.com/wiki/Jungle_Inferno_Update): il
+  lanciafiamme del Pyro, la bruciatura che dura quanto la fiamma ti ha toccato
+- [TrailModule.worldSpace (Unity)](https://docs.unity3d.com/ScriptReference/ParticleSystem.TrailModule-worldSpace.html)
+  e [Spawn particles with the rotation of the emitter (Unity Discussions)](https://discussions.unity.com/t/spawn-particles-with-the-rotation-of-the-emitter/663799):
+  le particelle lasciate nello spazio del mondo restano indietro quando chi le spara gira
+- [Quaternion.RotateTowards (Unity)](https://docs.unity3d.com/450/Documentation/ScriptReference/Quaternion.RotateTowards.html):
+  girare verso un bersaglio con una velocità massima, senza mai superarlo
+- [Invincibility frame (Terraria Wiki)](https://terraria.wiki.gg/wiki/Invincibility_frame): il tempo in cui lo stesso
+  colpo non fa di nuovo danno allo stesso bersaglio, tenuto separato per ogni fonte di danno
+
 La regola per sempre:
 - [AGENTS.md, il formato aperto per gli agenti (InfoQ)](https://infoq.com/news/2025/08/agents-md/): il file che leggono
   Codex, Jules, Cursor, Aider, RooCode e Zed
@@ -1289,3 +1479,22 @@ Le risposte scritte dall'utente alle seconde domande:
 
 > **Dove scrivere la regola per sempre:** documenti, un CLAUDE.md e qualcosa che intervenga anche in caso di uso di
 > altre IA come codex
+
+La terza richiesta (3 novembre 2026):
+
+> vorrei aggiungere una nuova carta nel documento del piano di lavoro. Questa carta permette al giocatore di
+> equipaggiare un lanciafiamme, mentre è equipaggiato non può usare altre carte o attaccare normalmente, per 20 secondi
+> il giocatore può usare un lanciafiamme che può essere usato sparando col tasto sinistro premuto, si può fare danno
+> ripetuto sullo stesso nemico ma con un delay di prendere danno di 2 secondi da un hit ad un altro, ovvero se sparo
+> sullo stesso nemico per tanto tempo esso prende danno una volta ogni due secondi. Insieme al danno il nemico o i
+> nemici colpiti ottengono anche uno stack di status di bruciatura. Mentre stai usando questa carta, il giocatore guarda
+> sempre nella direzione del mouse, quindi quando il mouse si sposta per esempio da destra a sinistra, anche il
+> giocatore ruota fino a puntare a destra. (ruota costantemente per puntare la direzione del mouse) Girando la visuale
+> decidi dove si spara con il lanciafiamme, la fiamma sparata di continua segue il movimento del lanciafiamme che segue
+> la rotazione del personaggio. L'effetto della fiamma che cambia di posizione deve essere fatto in modo tale da
+> rimanere per qualche frame nella posizione antecedente allo spostamento per dare un senso di realismo migliore.
+> Durante l'uso di questa carta il movimento rimane quello del gioco standard, quindi il giocatore può spostarsi nelle
+> caselle anche mentre spara.
+
+Le risposte dell'utente alle domande sul Lanciafiamme: rara, 3 energia; 3 danni e 3 caselle; la IA si ferma come nelle
+viste; la fiamma la fermano muri e coperture, e accende anche barili e terreno.
