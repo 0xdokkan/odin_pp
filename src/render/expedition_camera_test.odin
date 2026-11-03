@@ -12,7 +12,7 @@ import grid "../engine/grid"
 @(test)
 test_expedition_combat_camera_keeps_near_fighters_above_hand_and_pickable :: proc(t: ^testing.T) {
 	r := new(Renderer); defer free(r)
-	orbit := Tactical_Orbit{yaw = math.PI/4, pitch = .68, distance = 27.5}
+	orbit := Tactical_Orbit{yaw = EXPEDITION_CAMERA_YAW, pitch = EXPEDITION_CAMERA_PITCH, distance = 27.5}
 	axis := rl.Vector3{math.cos(orbit.yaw), 0, math.sin(orbit.yaw)}
 	target := (rl.Vector3{.5, 0, .5})+axis*1.21
 	points := [?]rl.Vector3{{.5, -.15, .5}, {.5, 2.2, .5}, {6.5, -.15, 6.5}, {6.5, 2.2, 6.5}, {7.5, -.15, 6.5}, {7.5, 2.2, 6.5}}
@@ -56,7 +56,7 @@ test_expedition_combat_framing_is_bounded_and_exploration_is_unchanged :: proc(t
 	s.player = {entity = game.PLAYER_ENTITY, position = {0, 0}, visible = true, health = 10}
 	s.phase = .Combat; s.enemy_count = 1
 	s.enemies[0] = {entity = game.enemy_entity(1), position = {8, 7}, visible = true, health = 5, archetype = .Brute}
-	orbit := Tactical_Orbit{yaw = math.PI/4, pitch = .68, distance = 27.5}
+	orbit := Tactical_Orbit{yaw = EXPEDITION_CAMERA_YAW, pitch = EXPEDITION_CAMERA_PITCH, distance = 27.5}
 	target := rl.Vector3{1.35, 0, 1.35}
 	framed := expedition_combat_camera_target(r, orbit, target)
 	testing.expect(t, rl.Vector3Distance(framed, target) > .5)

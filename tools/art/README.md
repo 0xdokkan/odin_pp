@@ -1,4 +1,144 @@
-# Pipeline grafica (Blender)
+# Pipeline grafica
+
+## Spedizione cartoon (Odin)
+
+Il robot della spedizione e i sei nemici Cyber sono disegni procedurali in
+`src/render/expedition_robot.odin` e `src/render/expedition_cartoon.odin`.
+La prima creazione del materiale rasterizza le pose in un atlante nearest:
+104×104 pixel per cella, 60 pixel per unità del disegno, sei pose per clip.
+Gli otto pixel di padding aggiuntivi non cambiano scala o posizione degli attori.
+La sagoma è l'unione della posa neutra e della sua versione specchiata,
+allargata di sette pixel (due d'inchiostro e cinque avorio), troncata alle suole.
+Negli ultimi tre pixel la dilatazione si restringe a un pixel, preservando
+lo spazio fra i piedi invece di unirli con una striscia di carta.
+La stessa maschera stabile ritaglia tutte le animazioni e governa il picking.
+Cannoni, antenne, serbatoi e scudi Cyber sono accoppiati nel disegno, così la
+rotazione della stampa non lascia grandi lobi vuoti sul supporto simmetrico.
+Le sorgenti sono codice scritto a mano; non si modificano `living_data.odin`
+o `flipbook_data.odin` per cambiare queste figure. Il robot dell'hub usa lo
+stesso disegno sorgente. Gli altri biomi conservano i rig e i costumi esistenti.
+
+I macchinari e gli oggetti speciali sono disegnati in
+`expedition_fixture_art.odin`: 96 illustrazioni (sei funzioni e due arredi per
+ciascuno dei dodici biomi), in due pose su celle 104×104. Le due pose condividono
+una sagoma stabile allargata di otto pixel: sei avorio e due d'inchiostro.
+Negli ultimi cinque pixel sopra il terreno il margine torna a un solo pixel;
+non esiste carta sotto le radici. La densità resta 60 pixel per unità e il
+padding protegge antenne e contorni dal bordo dell'atlante. Stampa e maschere
+sono caricate una volta per materiale, senza upload durante l'animazione.
+
+Le macchine principali Cyber e West hanno quattro pose 104×208 in
+`expedition_fixture_hero.odin` e `expedition_fixture_west.odin`: pressa e sega
+a telaio, ciascuna con tre gruppi secondari. Condividono `hero_print` 416×624
+e `hero_paper` 416×312; non alterare le celle dell'altro bioma quando si
+estende il pack. Il contorno rimane da otto pixel e il culling usa la sagoma
+opaca. Il terreno delle due officine è pittura procedurale precalcolata
+1024×1024, con mipmap: modificare le funzioni sorgenti Cyber/West, non PNG
+generati. Tetti e arredi murali sono geometria stampata nei file
+`expedition_cyber_building.odin` e `expedition_west_building.odin`.
+
+La pipeline Blender sottostante continua a generare gli attori delle altre
+viste. Il materiale carta condiviso usa meno grana e un taglio piatto;
+nelle spedizioni non si disegnano più piedistalli sotto gli attori.
+
+Pareti e oggetti condividono `EXPEDITION_BODY_GLSL`: inchiostro scuro, taglio
+avorio sottile, campiture nette e dettagli registrati in coordinate mondo.
+Le palette Cyber sono in `expedition_cyber.odin`; i verdi delle foglie e il
+giallo dei macchinari sono pigmenti, non nuove luci. I riferimenti e la lettura
+artistica sono documentati in `docs/presentazione.md`.
+
+Il moonshot dell'ambiente usa sorgenti vettoriali native: profili concavi in
+`expedition_profiles.odin`, moduli in `expedition_cyber.odin` e nelle tre famiglie
+`ascent/descent/dread`, arredi in `expedition_biome_forms.odin`. Un profilo è
+un poligono semplice in ordine orario (massimo 32 vertici), con radice a y=0;
+la triangolazione preserva le rientranze. Le verifiche coprono area, orientamento,
+quote, ingombri nelle celle e determinismo del bake. Per nuovi moduli scegliere
+un profilo intenzionale, poche superfici dipinte e contorni selettivi.
+
+`expedition_print.odin` contiene i disegni delle pareti per tutti i biomi.
+Il tag UV di `ink_wall_sheet` li separa dagli oggetti: non aggiungere glifi
+generici a tutte le facce. Derivate prima della ripetizione delle coordinate,
+contrasto minore dei segni interni, niente texture o allocazioni per frame.
+Le nuove geometrie riusano upload, cache e distruzione del materiale esistenti.
+
+## Regolare sole, corsi e contatto del redesign
+
+Direzione, mappe, estensione, filtro e bias sono in `expedition_sun.odin`;
+tinta delle bande e neon in `expedition_lighting.odin`. Saturazione e
+separazione cromatica sono in `EXPEDITION_HDR_RESOLVE`
+(`expedition_post.odin`), vignetta in `tactical_surface.odin`.
+Controllare geometria e caster prima di compensare un difetto con il bias.
+
+`paperCourses` in `expedition_print.odin` regola i corsi per bioma.
+`ink_wall_sheet`, `ink_wall_post` e `WALL_*` in
+`expedition_architecture.odin` governano zoccolo, corpo, copertina e pilastri.
+I raccordi delle facce dipendono dall'altezza; i pilastri usano invece vicini
+anche ad altezze diverse. Le facce mantengono UV di stampa [0,1] o [4,5].
+
+Le modifiche del 3 novembre sono integrate; copie e delta sono sotto
+`build/redesign-sole/session-20261103/`. Renderer 477/477 con E attiva e
+smoke oggetti/fallback/camminata/full passano; G è verificata in v4.
+Il confronto finale e il controllo del movimento a percorso identico sono
+conclusi. Il target 60 FPS non è raggiunto; variabilità e limiti residui sono
+documentati in `VERIFICA_REDESIGN_SOLE.txt`.
+C/D usa `expedition_structure_objects.odin` per le forme intere e
+`structure_expedition.odin` per le finiture; Cyber/West conservano le
+stampe dedicate. F1 regola vasca e quota foglie in `expedition_cyber.odin`.
+F2 passa `post_fill` esplicito a `ink_wall_sheet`: evitare riconoscimenti
+della funzione basati sul colore. G regola palette e bordo in
+`paperAccumulation`, densità dei segni in `paperDetails`
+(`expedition_floor.odin`); `expedition_sky_crowd` resta condiviso con l'AO.
+Le scorciatoie del frammento saltano solo contributi nulli e devono mantenere
+questa condivisione. F4 scala il disegno della pressa in
+`cyber_press_art` del 6% in larghezza e del 2% in altezza, senza cambiare
+densità, cella, atlas o quad; verificare le quattro pose e i bordi del supporto.
+La selezione degli accessori in `expedition_fixture_sprites.odin` deve
+restare identica fra colore e caster. Gli interni in
+`expedition_cyber_building.odin` conservano arredi sulle pareti e vano
+della porta libero; i budget delle stampe restano distinti dall'involucro.
+
+E ha una sola intensità, `EXPEDITION_ACTOR_SHADOW_STRENGTH`, in
+`expedition_actor_shadow.odin`: `.15`, approvata dall'utente dopo confronto
+on/off, con `EXPEDITION_ACTOR_SHADOW=true` di default. Il flag false resta
+disponibile per i confronti. Controllare pigmenti, carta, inchiostro e flash;
+le fughe F3 non sono parte della proposta attiva.
+
+Usare contact sheet 2×2 delle catture native senza correggerne colori o
+contenuto; `index.txt` conserva l'associazione con i file originali.
+
+## Pigmento officine P1
+
+Il generatore `tools/art/build_workshop_stock.py` usa Python 3 con la sola
+libreria standard. Per rigenerare o verificare integralmente serve anche
+Odin nel `PATH`, oppure indicato dalla variabile `ODIN`. Il programma Odin
+temporaneo lavora su immagini CPU e non apre una finestra o un contesto GL.
+
+1. Modificare le routine autorevoli in `expedition_cyber_floor.odin`,
+   `expedition_west_ground.odin` o `expedition_workshop_stock.odin`.
+   Il generatore estrae dichiarazioni e funzioni; le formule non vanno
+   duplicate in Python e i PNG non vanno ritoccati a mano.
+2. Dalla radice del repository eseguire
+   `python3 tools/art/build_workshop_stock.py` per rigenerare i due PNG
+   1024×1024, `assets/workshop-stock/manifest.json` e
+   `src/render/expedition_workshop_stock_data.odin`. Conservare insieme
+   questi file e la modifica delle sorgenti che li ha prodotti.
+3. Eseguire `python3 tools/art/build_workshop_stock.py --check` per il
+   controllo economico di versione, sorgenti, generatore, dichiarazioni
+   embedded e hash PNG. È lo stesso controllo degli script `check.sh` e
+   `check.ps1`; non compila e non genera nuovi asset.
+4. Eseguire `python3 tools/art/build_workshop_stock.py --verify` quando
+   occorre la riproduzione integrale: rigenera in temporaneo, confronta
+   manifest e hash dei 2.097.152 pixel RGBA e verifica il roundtrip PNG.
+   Non sostituisce i file presenti. Completare con un caricamento reale per
+   verificare decode/upload, riuso, mipmap e assenza di rigenerazione al draw.
+
+In PowerShell usare `python` al posto di `python3`, con Python 3 nel `PATH`.
+`--check` fallisce se sorgenti o generatore cambiano senza rigenerazione;
+`--verify` richiede gli asset già aggiornati. Nessuno dei due misura il costo
+GPU del caricamento o del pavimento. Il runtime incorpora i PNG e non
+dipende da una cache scrivibile; il fallback procedurale è limitato al load.
+
+## Pipeline Blender
 
 Gli script di questa cartella girano dentro il Python di Blender 3.5+ (che include
 numpy); non servono altri pacchetti. Tutti i risultati sono deterministici.

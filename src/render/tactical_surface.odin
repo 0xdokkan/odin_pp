@@ -15,7 +15,7 @@ Tactical_Surface :: struct {
 	resolve: rl.Shader,
 	post: ^Expedition_Post,
 	hdr_active, hdr_failed: bool,
-	frozen_location, focus_location, aspect_location: c.int,
+	frozen_location, focus_location, aspect_location, vignette_location: c.int,
 }
 
 // `frozen` (MOVIMENTO OMBRA): the world's colours drain toward a cold grey,
@@ -27,9 +27,15 @@ uniform sampler2D texture0;
 uniform float frozen;
 uniform vec3 focus;
 uniform float aspect;
+uniform float vignette;
 out vec4 finalColor;
 void main() {
     vec3 c = texture(texture0, fragTexCoord).rgb;
+    // The expeditions' diorama falls off gently toward the frame.
+    if (vignette > 0.0) {
+        vec2 d = (fragTexCoord - 0.5)*vec2(2.0, 1.8);
+        c *= 1.0 - vignette*smoothstep(0.55, 1.5, length(d));
+    }
     if (frozen > 0.001) {
         float grey = dot(c, vec3(0.299, 0.587, 0.114));
         vec3 still = mix(vec3(grey), c, 0.2)*vec3(0.82, 0.88, 1.10)*0.8;
@@ -77,7 +83,8 @@ create_tactical_surface :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D)
 	// or room that was drawn into the parent canvas earlier in the same frame.
 	resolve := rl.LoadShaderFromMemory(nil, TACTICAL_SURFACE_RESOLVE)
 	renderer.tactical.surface^ = {target=target,parent=parent,resolve=resolve,frozen_location=rl.GetShaderLocation(resolve,"frozen"),
-		focus_location=rl.GetShaderLocation(resolve,"focus"),aspect_location=rl.GetShaderLocation(resolve,"aspect")}
+		focus_location=rl.GetShaderLocation(resolve,"focus"),aspect_location=rl.GetShaderLocation(resolve,"aspect"),
+		vignette_location=rl.GetShaderLocation(resolve,"vignette")}
 }
 
 @(private)
@@ -134,6 +141,8 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 	rl.ClearBackground(RESIN_BACKGROUND)
 	frozen := renderer.tactical.shadow.frozen
 	rl.SetShaderValue(surface.resolve, surface.frozen_location, &frozen, .FLOAT)
+	vignette := f32(0.17) if renderer.tactical.expedition else 0
+	rl.SetShaderValue(surface.resolve, surface.vignette_location, &vignette, .FLOAT)
 	if frozen > 0 {
 		// The surface's uv runs bottom up.
 		at := renderer.tactical.shadow.at

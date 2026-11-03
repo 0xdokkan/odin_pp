@@ -41,14 +41,14 @@ float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
 void main() {
     vec2 uv = fragTexCoord;
     float d = dist(uv);
-    float de = dist(uv - edgeDir*EDGE_PX/cell);
+    float de = d; // Flat cartoon cut: no offset extrusion or suspended sticker.
     float aa = max(fwidth(d), 0.03)*0.8;
     float paper = 1.0 - smoothstep(PAPER_PX - aa, PAPER_PX + aa, d);
     float body = max(paper, 1.0 - smoothstep(PAPER_PX - aa, PAPER_PX + aa, de));
     float ink = 1.0 - smoothstep(INK_PX - aa, INK_PX + aa, min(d, de));
     if (ink < 0.01) discard;
     vec2 px = floor(uv*cell*4.0);
-    float grain = (hash(px) - 0.5)*0.026 + (hash(floor(uv*cell*0.6)) - 0.5)*0.022;
+    float grain = (hash(px) - 0.5)*0.008;
     vec3 sheet = sheetColor + grain;
     vec3 col = mix(vec3(0.051, 0.078, 0.118), vec3(0.643, 0.596, 0.514), body);
     col = mix(col, sheet, paper);

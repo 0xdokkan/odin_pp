@@ -1,0 +1,303 @@
+PRESTAZIONI E PROSSIMA SCENA ILLUSTRATA
+31 ottobre 2026
+
+SCOPO E STATO
+Piano operativo per rendere il gioco più fluido e portare una porzione del
+mondo a un livello visivo completo. Le attività sotto sono lavoro futuro,
+salvo i dati storici indicati esplicitamente. Non costituiscono un nuovo
+benchmark né la verifica di una nuova direzione artistica già implementata.
+
+La direzione resta quella di PROMPT_MOONSHOT_MONDO_ILLUSTRATO.txt: pixel art
+dentro sagome di cartoncino spesse, luoghi abitabili e gameplay leggibile.
+Il passo successivo è migliorare forme, scala e composizione di una scena,
+con un budget misurato. Aggiungere piccoli oggetti ovunque non risolve la
+sensazione di terreno piatto e di mondo ancora provvisorio.
+
+BASE DI PARTENZA VERIFICATA
+Fonte: VERIFICA_MONDO_ILLUSTRATO_STEP2.txt e relativi log. Apple M1,
+1920×1080, build -o:none, target FPS 0, vsync disabilitato, 60 frame di
+riscaldamento e 600 campioni. Sono intervalli fra frame presentati, NON
+misure GPU isolate, e non descrivono ancora le prestazioni in release.
+
+Scena / build           media ms   mediana ms   p95 ms   massimo ms
+Cyber precedente           18,731       18,775   23,038       27,018
+Cyber step 2               18,249       18,172   22,935       27,187
+West precedente            13,891       13,893   18,298       21,914
+West step 2                14,646       14,750   18,384       22,489
+
+Cyber recupera 0,482 ms medi; West costa 0,755 ms in più con i suoi nuovi
+contenuti. Nessuno dei due casi certifica 60 FPS costanti. Durante questi
+campioni la cache geometrica ha zero ricostruzioni e zero upload.
+
+La pittura del terreno al primo uso costa invece 2676,508 ms CPU in Cyber
+e 1081,349 ms in West, più 9,423 e 6,811 ms di upload/mipmap. È una pausa
+iniziale concreta, separata dal costo a regime. Ogni texture con mipmap
+occupa 5,333 MiB GPU; l'attuale proprietario ne conserva al massimo due.
+
+Il combattimento a sei nemici ha una baseline estesa di 26,018 ms medi,
+24,325 ms di mediana e 33,141 ms p95. La misura finale dopo l'ultima
+ottimizzazione dei candidati HP resta aperta: i tentativi documentati
+si sono fermati prima di creare la finestra. La coppia breve precedente
+30,281 -> 30,246 ms NON misura quella ottimizzazione finale.
+
+1. PRESTAZIONI: MISURARE PRIMA DI SCEGLIERE IL COLLO DI BOTTIGLIA
+
+P0 — Baseline release riproducibile e recupero della misura HP
+- Compilare una build -o:speed e registrare toolchain, hash dei sorgenti,
+  opzioni, risoluzione effettiva, camera, seed e hardware. Tenere distinta
+  la build -o:none utile al debug; non confrontare due livelli diversi
+  di ottimizzazione attribuendo la differenza a una modifica del renderer.
+- Quattro scene: officina Cyber, officina West, combattimento Cyber con
+  sei nemici e percorso con rilievo/interno. Conservare gli atti fissi per
+  il confronto e una passeggiata reale per picchi e caricamenti. Confermare
+  gli indici sul driver attuale, senza affidarsi ai numeri storici soltanto.
+- Per ogni coppia prima/dopo: 60 frame di riscaldamento, 600 campioni,
+  tre ripetizioni per variante in ordine alternato A/B, B/A, A/B.
+  Confrontare ogni scena separatamente e riportare tutte le ripetizioni,
+  non solo il run migliore o una media che nasconde il combattimento.
+- Canvas 1920×1080, FPS senza limite, vsync disabilitato; nessuna cattura,
+  lettura framebuffer, compilazione, suite CPU o altra prova GPU durante
+  i campioni. Le catture visive vengono prodotte in una sessione distinta.
+- Riportare media, mediana, p95, p99 e massimo; CPU per fase, risorse residenti,
+  allocazioni/upload/ricostruzioni e configurazione. I tempi CPU annidati
+  non si sommano come fossero passate indipendenti.
+- Misurare esplicitamente l'ultima selezione anticipata dei candidati HP
+  contro la baseline equivalente, con gli stessi sei nemici e la camera
+  originale conservata. Isolare questa modifica per rendere interpretabile
+  il risultato. Conservare la verifica di equivalenza dei layout.
+
+Criterio di chiusura: quattro baseline release leggibili e ripetibili,
+misura HP finalmente completa e variabilità nota. Se una finestra non si
+apre, annotare il blocco: nessuna estrapolazione dai tempi precedenti.
+Obiettivo di prodotto proposto: 60 FPS a 1080p sul M1 di riferimento,
+con p95 entro 16,67 ms nei percorsi scelti e margine per la scena nuova.
+È un obiettivo da raggiungere, non un risultato già disponibile.
+
+P1 — Eliminare la pausa di generazione della pittura al primo uso
+- Il generatore attuale in expedition_workshop_stock.odin produce una
+  pittura immutabile per bioma e dimensione: non dipende dal seed. Portare
+  questo calcolo nella pipeline di build oppure in una cache persistente
+  con versione/hash del generatore, bioma, dimensioni e formato. Conservare
+  il generatore come sorgente riproducibile e fallback nel caricamento.
+- Caricare la texture prima dell'esplorazione e conservare nel renderer
+  il posizionamento e la rotazione legati ai siti reali: è quel mapping
+  a far coincidere usura e accessi. Non serve duplicare oggi l'immagine
+  per ogni seed. Se in futuro la pittura dipenderà da dati del mondo,
+  estendere la chiave di cache ai dati effettivamente usati.
+- Misurare cache assente, valida e invalidata: tempo CPU, tempo upload,
+  massimo intervallo fra frame, memoria temporanea e peso su disco.
+  Se il lavoro CPU viene diviso o spostato, mantenere gli upload nel
+  contesto grafico corretto e non introdurre ricostruzioni durante il passo.
+- Conservare mipmap, filtraggio, usura coerente con le porte e durata
+  esplicita delle risorse. Il miglioramento non deve alterare l'immagine.
+
+Criterio di chiusura: nessuna generazione della pittura sul primo frame
+di esplorazione; costo a freddo documentato nel caricamento, riuso caldo
+verificato e memoria limitata. Una cache calda veloce da sola non basta.
+
+P2 — Separare davvero CPU e GPU, poi ottimizzare le passate costose
+- Gli attuali tempi di submission descrivono il lavoro CPU attorno alle
+  chiamate di disegno. Non identificano da soli il tempo GPU della passata.
+- Verificare sul contesto effettivo la disponibilità delle timer query.
+  Controllare anche QUERY_COUNTER_BITS: un contatore con zero bit non
+  fornisce una misura utile, pur essendo interrogabile.
+  Se supportate, usare una piccola coda di query: controllare disponibilità
+  e leggere risultati di frame successivi senza attendere sincronicamente.
+  Non aggiungere glFinish o letture bloccanti per ottenere un dato subito.
+  Gestire il caso non supportato esplicitamente e distruggere le query.
+- Misurare terreno, architettura/oggetti, sagome, riflessi e postprocessing
+  con scopes compatibili con l'API, mantenendo distinta la latenza totale.
+  Se mancano query affidabili, usare gli strumenti disponibili e confronti
+  controllati, dichiarando il limite invece di chiamare GPU un tempo CPU.
+- Isolare una variabile alla volta: stessa scena/camera, scala di render
+  controllata, singola passata modificata o esclusa nel solo benchmark.
+  Usare il risultato per scegliere fra costo CPU, pixel elaborati,
+  geometria visibile o passate ripetute.
+- Ridurre riflessi, blur, bloom o risoluzione del post solo se l'isolamento
+  ne dimostra il peso. Verificare HDR, leggibilità delle stampe, contorni
+  e resize; aggiornare i contratti intenzionalmente cambiati. Nessun
+  alleggerimento globale basato soltanto sul nome di un effetto.
+
+P3 — Budget della scena con la camera attuale
+- Misurare area visibile, chunk, vertici, oggetti, draw call e passate
+  usando la camera originale conservata. Il piano non richiede una
+  nuova inquadratura né un aumento della distanza visibile.
+- Se il profilo dimostra un costo significativo degli oggetti distanti,
+  valutare livelli di dettaglio: vicino ricco; distanza media con gruppi
+  e silhouette; lontano con pochi volumi semplificati. I livelli tecnici
+  di dettaglio sono un'opzione da misurare, non un requisito a prescindere.
+  Il costo del fondo deve restare entro il budget della scena.
+- Usare cache e culling dei chunk, riuso degli atlanti e raggruppamento
+  solo dove il profilo li giustifica. Conservare unità e dettagli necessari
+  a bersagli, coperture, picking e fog anche quando si semplifica il decoro.
+- Nessuna nuova allocazione, costruzione texture o upload durante il
+  semplice movimento a scena stabile. Verificare transizioni di distanza,
+  ingresso negli interni e resize, non solo il personaggio fermo.
+
+2. DIAGNOSI VISIVA: COSA RENDE ANCORA ACERBA LA SCENA
+
+Le osservazioni derivano da framebuffer nativi aperti visivamente:
+- build/illustrated-world-step2/after/cyber/odin_pp_cyber_scene_11_officina_lato.png
+- build/illustrated-world-step2/after/west/odin_pp_west_scene_11_officina_lato.png
+- build/illustrated-world-step2/after/west/odin_pp_west_scene_06_rifugio_dentro.png
+- build/illustrated-world-step2/after/cyber/odin_pp_cyber_scene_10_scontro_movimento.png
+- build/illustrated-world-step2/after/cyber/odin_pp_cyber_scene_08_rilievo.png
+- build/illustrated-world-step2/after/west/odin_pp_west_scene_08_rilievo.png
+
+Priorità 1: scala e composizione. Il perimetro rettangolare dell'officina
+ha più peso della macchina; i gruppi secondari sembrano piccoli e lontani.
+Lo spazio vuoto non conduce chiaramente dall'ingresso alla destinazione.
+Gli oggetti esterni distribuiti uniformemente diventano un motivo ripetuto.
+
+Priorità 2: grandi forme del terreno. I rilievi leggono come lastre ampie,
+rettangolari e uniformi, con lati sottili. Il pigmento minuto non basta
+a dare massa o spiegare come salire. Occorrono continuità delle scarpate,
+spessore leggibile, passaggi reali e una scala intermedia fra piattaforma
+e puntinatura. La ripetizione delle quote resta distinta dalla texture.
+
+Priorità 3: profondità. Vicino e lontano hanno contorni e contrasto simili.
+Il fondo compete con il protagonista senza offrire un punto riconoscibile.
+Separare i piani attraverso scala, sovrapposizione controllata, valori
+cromatici e silhouette, mantenendo la camera attuale.
+
+Priorità 4: architettura. Nel rifugio West il tetto scompare correttamente,
+ma il volume resta una scatola con pareti dominanti e interno minuscolo.
+Gli arredi disegnati devono comunicare una funzione e una scala coerente,
+senza suggerire spazi attraversabili dove la collisione resta piena.
+
+Priorità 5: coerenza dei materiali. Sagome illustrate, pavimento uniforme
+e pareti geometriche non hanno ancora lo stesso livello di finitura.
+Contatti al suolo, ombre semplici e campiture grandi coerenti valgono più
+di altro rumore. Controllare anche le grandi macchie luminose attorno
+al personaggio, che possono sembrare sovrapposte al mondo.
+
+3. PROSSIMA MOSSA GRAFICA: UNA PORZIONE CYBER COMPLETAMENTE RISOLTA
+
+Costruire una passeggiata reale di circa 60–90 secondi che comprenda
+avvicinamento, officina, rilievo e interno, con un breve combattimento.
+Scegliere una zona del seed che permetta questi collegamenti veri. Non
+presupporre che officina, rifugio e Data_Node siano già adiacenti e non
+spostare i servizi per rendere convincente una sola inquadratura.
+
+A. Definire la composizione prima del dettaglio
+- Primo piano: uno o due gruppi asimmetrici di forme basse o laterali
+  che incorniciano l'arrivo e lasciano liberi robot, percorso e bersagli.
+- Area giocabile: ingresso leggibile, macchina dominante, due o tre
+  gruppi secondari funzionali e spazio di combattimento intenzionale.
+  Rivedere il rapporto visivo fra perimetro, macchina e oggetti minori
+  entro gli ingombri reali. Prima sagome e scala, poi pixel e decorazioni.
+- Fondo: valorizzare un landmark esistente come silhouette riconoscibile;
+  usare pochi volumi grandi e contrasto ridotto per separare le distanze.
+  Comporre questi piani nella camera attuale, senza richiedere una fascia
+  di cielo né piccoli oggetti completi fuori dall'area di gioco.
+
+B. Dare massa al terreno e un percorso allo sguardo
+- Disegnare i lati dei dislivelli come superfici continue coerenti con
+  quote e materiali, con ombre e strati semplici. Collegare visivamente
+  i tratti dello stesso rilievo invece di enfatizzare ogni singola cella.
+- Lavorare su tre scale: massa della terrazza/scarpata; percorso e gruppi
+  di materiali; pochi frammenti, segni e piante ai margini. Riservare
+  superfici tranquille nelle zone di azione e davanti agli accessi.
+- Usura, cavi e cambi di materiale seguono porte e destinazioni reali.
+  Rendere evidenti le rampe percorribili e distinti i bordi non superabili.
+  Nessuna collina solo dipinta, scaletta finta o dislivello nascosto.
+- Se la topologia esistente limita ancora il risultato, aprire una fase
+  esplicita di generazione del terreno con collisioni, navigazione e
+  salvataggi coerenti. Il precedente prompt preservava quelle regole:
+  non promettere montagne organiche con la sola passata di materiale.
+
+C. Completare un edificio e il suo uso
+- Dare al volume esterno una sagoma riconoscibile con tetto, ingresso
+  e pochi dettagli grandi; mantenere l'impronta e l'accessibilità reali.
+- All'interno scegliere una funzione chiara: zona di lavoro, scorte,
+  riposo o servizio. Pavimento e illustrazioni indicano questa funzione;
+  gli arredi devono rispettare le corsie percorribili.
+- Conservare il tetto nascosto dentro e la lettura dell'interno da fuori
+  secondo le regole già presenti. Verificare pareti su entrambe le facce,
+  occlusione del robot e riapparizione del tetto durante l'uscita.
+
+D. Uniformare il linguaggio e verificare durante il movimento
+- Preservare il margine avorio spesso delle sagome e la pixel art;
+  nessuna basetta, cavalletto o sostegno aggiunto. Contatto al suolo breve
+  e coerente, ombre semplici, densità dei pixel compatibile fra oggetti.
+- Limitare gli accenti più forti a macchina, destinazioni e informazioni
+  di gioco; il fondo ha palette e contrasto più calmi. Non usare bloom
+  o nebbia per nascondere un percorso poco chiaro.
+- Rivedere nella stessa scena esplorazione, interazione, interno,
+  combattimento e movimento. Una bella cattura isolata non conclude
+  questa fase. Non estendere agli altri dieci biomi prima del confronto.
+
+CRITERI DI ACCETTAZIONE DELLA PORZIONE
+- A 960×540 si identifica l'officina senza leggere il nome e si capisce
+  la destinazione principale; a 1920×1080 il dettaglio sostiene la forma.
+- Ingresso, percorso, quote e rampe risultano leggibili. L'area libera
+  sembra scelta per l'azione; i gruppi decorativi indicano la funzione.
+- Il personaggio resta distinguibile su almeno tre distanze e durante
+  lo scontro. Contorni lontani e oggetti davanti non confondono i bersagli.
+- Una passeggiata continua verifica porte, tetti, piani, occlusione e
+  picking. Giocare una carta non dimostra da solo che il movimento nello
+  scontro funzioni: verificare entrambe le azioni esplicitamente.
+- Catture prima/dopo native, stesso seed e camera, senza ritocco; almeno
+  arrivo, macchina, rilievo, interno e scontro. Aprirle visivamente.
+- Ripetere le quattro scene prestazionali dopo i cambiamenti; nessun
+  costo nascosto nel caricamento o nella distanza. Documentare il budget
+  consumato e ciò che rimane aperto, senza compensarlo con medie globali.
+
+4. CAMERA — ORIGINALE RIPRISTINATA E CONSERVATA
+
+L'utente ha annullato la modifica della camera e chiesto il ripristino,
+che è stato eseguito. Il prototipo con inclinazione 26° e FOV verticale
+76° è scartato: la verifica ha mostrato occlusioni reali nel combattimento
+e negli interni. Non ci sono approvazioni o verifiche di consegna pendenti
+per adottare quel prototipo.
+
+Le catture e i log in build/camera-horizon/ restano un archivio della prova,
+non una direzione da applicare. Questo piano usa la camera originale:
+profondità e qualità visiva saranno sviluppate tramite forme del terreno,
+composizione, scala, silhouette e separazione dei piani. Non è richiesto
+un altro cambiamento della camera. Eventuali livelli di dettaglio degli
+oggetti saranno valutati solo se utili dopo il profiling.
+
+5. RIFERIMENTI CONSULTATI E COME USARLI
+
+È lecito e utile cercare online nuovi riferimenti visivi, aprire le immagini
+e confrontarle con framebuffer reali del gioco. Registrare URL e principio
+osservato. Le pagine promozionali non provano il funzionamento del nostro
+renderer; le immagini altrui non diventano asset runtime.
+
+TUNIC — sito e pagina ufficiale Steam:
+https://tunicgame.com/
+https://store.steampowered.com/app/553420/TUNIC/
+Cattura ufficiale effettivamente aperta:
+https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/553420/ss_5fc49d3c5fa34b0d0e6b6a5621f9062bec7ac4d7.1920x1080.jpg
+Interpretazione per il nostro gioco: piattaforme con spessore leggibile,
+scale che spiegano il collegamento fra quote, gruppi di oggetti ai margini
+e arena centrale libera. Trasferire la gerarchia delle forme al cartoncino,
+non la sua resa 3D, gli asset o l'intensità degli effetti luminosi.
+
+Paper Trail — sito ufficiale:
+https://www.papertrailgame.com/
+Cattura ufficiale effettivamente aperta:
+https://img2.storyblok.com/fit-in/3000x1600/f/149930/1000x563/4cf2581118/beautiful-worlds-to-explore.png
+Interpretazione per il nostro gioco: palette contenuta, soglie, archi,
+gruppi e contrasti che danno identità a un piccolo spazio. Adattare
+composizione e chiarezza dei passaggi; conservare la nostra pixel art
+anziché importare il trattamento pittorico o il sistema di piegatura.
+
+Le copie temporanee usate per l'ispezione sono /private/tmp/tunic-scene.jpg
+e /private/tmp/papertrail-worlds.png. Non sono risorse del repository e
+possono scomparire; gli URL sopra registrano la provenienza consultata.
+
+Khronos — specifica ufficiale ARB_timer_query:
+https://registry.khronos.org/OpenGL/extensions/ARB/ARB_timer_query.txt
+Riferimento tecnico per disponibilità dei risultati, bit dei contatori
+e lettura differita. La specifica spiega perché una lettura immediata
+o glFinish può introdurre attese; l'hardware effettivo va comunque provato.
+
+ORDINE DI ESECUZIONE
+1. Misurare la baseline release con camera originale e isolare il confronto HP.
+2. Rimuovere la pausa della pittura e ottenere un profilo CPU/GPU affidabile.
+3. Fissare il budget della scena e comporre la porzione Cyber in forme grandi.
+4. Rifinire terreno, officina e interno; verificare la passeggiata completa.
+5. Confrontare prestazioni e catture; solo dopo trasferire le regole al West
+   e agli altri biomi, conservandone palette e identità.

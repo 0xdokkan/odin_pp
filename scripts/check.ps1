@@ -15,6 +15,8 @@ function Invoke-Odin {
 
 try {
     Invoke-Odin version
+    python tools/art/build_workshop_stock.py --check
+    if ($LASTEXITCODE -ne 0) { throw 'Workshop stock source/artifact verification failed' }
     $fullTests = if ($Quick) { 'false' } else { 'true' }
     Write-Host ("Test profile: " + $(if ($Quick) { 'quick' } else { 'full' }))
     Invoke-Odin check src -vet -strict-style "-define:ODIN_TEST_FULL=$fullTests"

@@ -57,10 +57,17 @@ create_layer_outline :: proc(renderer: ^Renderer) {
 @(private)
 draw_figure_outline :: proc(renderer: ^Renderer, quad: Tactical_Billboard, color: rl.Color) {
 	v := &renderer.tactical
+	// Occlusion is still decided by the layered map. Trace the outside of
+	// the new sheet, so its warning does not paint over the ivory margin.
+	quad:=quad;color:=color
+	if quad.cartoon {
+		quad.texture,quad.source,quad.points=quad.card,quad.card_a,quad.card_points
+		quad.mirror=false;color.a=u8(f32(color.a)*.75)
+	}
 	if v.hidden_shader.id == 0 || quad.texture.id == 0 || quad.source.width <= 0 || quad.source.height <= 0 { return }
 	texel := rl.Vector2{1/f32(quad.texture.width), 1/f32(quad.texture.height)}
 	bounds := rl.Vector4{quad.source.x*texel.x, quad.source.y*texel.y, (quad.source.x+quad.source.width)*texel.x, (quad.source.y+quad.source.height)*texel.y}
-	radius := LAYER_OUTLINE_RADIUS
+	radius := f32(2) if quad.cartoon else LAYER_OUTLINE_RADIUS
 	rl.SetShaderValue(v.hidden_shader, v.hidden_bounds_location, &bounds, .VEC4)
 	rl.SetShaderValue(v.hidden_shader, v.hidden_texel_location, &texel, .VEC2)
 	rl.SetShaderValue(v.hidden_shader, v.hidden_radius_location, &radius, .FLOAT)

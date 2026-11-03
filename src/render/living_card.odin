@@ -595,6 +595,7 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	right := flipbook_camera_right(renderer)
 	below := cell.y-sheet.feet.y
 	lift := (sheet.ground+gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*scale+0.03
+	if v.expedition {lift=0} // Printed feet touch the same ground as the cut.
 	if v.outline_mode == .Hologram { lift = 0; result.card = {} }
 	base := rl.Vector3{at.x+0.5, 0.02+lift+travel_lift, at.y+0.5}
 	// MOVIMENTO OMBRA: the player's card goes down into its shadow; the

@@ -22,7 +22,7 @@ import level "../level"
 
 @(private = "file")
 deck_vertex :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, p, normal: rl.Vector3, color: rl.Color) {
-	append(vertices, Expedition_Baked_Vertex{p, normal, color})
+	append(vertices, Expedition_Baked_Vertex{p, normal, color, {2,2}})
 }
 
 // A quad of the deck's frame (red 0), lit flat: its corners in order round it, its normal turned to `outward`.
@@ -137,7 +137,7 @@ expedition_has_decks :: proc(data: ^level.Level) -> bool {
 }
 
 // Builds every block when the map's geometry is new.
-@(private = "file")
+@(private)
 prepare_expedition_decks :: proc(cache: ^Expedition_Under_Cache, data: ^level.Level, trestles: bool) {
 	if cache.ready && cache.geometry_id == data.geometry_id && cache.revision == data.geometry_revision { return }
 	destroy_expedition_under(cache)
@@ -154,6 +154,23 @@ prepare_expedition_decks :: proc(cache: ^Expedition_Under_Cache, data: ^level.Le
 		for cx in 0..<cache.columns {
 			build_deck_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, trestles, &cache.chunks[cy*cache.columns+cx], &scratch, data.base)
 		}
+	}
+}
+
+// A bridge keeps blocking the light even while its camera-facing cover fades over the robot.
+// Its top, thickness and supports use the same cached geometry as the visible floor pass.
+@(private)
+draw_expedition_deck_casters :: proc(renderer: ^Renderer, room: ^game.Room, material: rl.Material) {
+	data := room.level_data
+	f := renderer.tactical.expedition_floor
+	if data == nil || f == nil || !expedition_has_decks(data) { return }
+	cache := &f.decks
+	if !cache.ready || cache.geometry_id != data.geometry_id || cache.revision != data.geometry_revision { return }
+	p := room.player.position
+	low := grid.Position{x = max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, y = max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
+	high := grid.Position{x = min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), y = min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
+	for cy in low.y..=high.y {
+		for cx in low.x..=high.x { draw_expedition_surface_caster(&cache.chunks[cy*cache.columns+cx], material) }
 	}
 }
 

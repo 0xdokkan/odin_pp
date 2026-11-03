@@ -334,7 +334,9 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	if !v.world_orbit.initialized { reset_tactical_orbit(&v.world_orbit) }
 	if room.player.tactical.config.expedition {
 		reset_tactical_orbit(&v.world_orbit)
-		v.world_orbit.distance = 25
+		v.world_orbit.yaw = EXPEDITION_CAMERA_YAW
+		v.world_orbit.pitch = EXPEDITION_CAMERA_PITCH
+		v.world_orbit.distance = 21
 	}
 	if inside && !refresh_only && !room.player.tactical.config.expedition {
 		update_tactical_orbit_pointer(&v.world_orbit, mouse, point_in_rectangle(mouse, tactical_world_bounds(renderer)),
@@ -417,7 +419,7 @@ Tactical_Billboard :: struct {
 	// Flipbook standees: the paper fields behind the print, the paper margin
 	// around the print in its own pixels, a left-facing mirror, and the two
 	// drawings (uv rects in the field atlas) the cut is morphing between.
-	flipbook, mirror: bool,
+	flipbook, mirror, cartoon: bool,
 	card: rl.Texture2D,
 	card_margin: f32,
 	card_a, card_b: rl.Rectangle,
@@ -432,6 +434,9 @@ Tactical_Billboard :: struct {
 @(private)
 tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, feedback: bool = true,
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) -> Tactical_Billboard {
+	if !renderer.sprite_assets.sprites[int(key)].configured {
+		if quad,ok:=expedition_cartoon_geometry(renderer,key,position,entity);ok {return quad}
+	}
 	if character, ok := flipbook_character(key); ok && renderer.tactical.flipbook.loaded &&
 	   !renderer.sprite_assets.sprites[int(key)].configured {
 		if renderer.tactical.living && renderer.tactical.living_assets.loaded {
@@ -495,40 +500,45 @@ tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, positi
 @(private)
 tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, opacity: f32,
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) {
-	if renderer.tactical.expedition && entity == game.PLAYER_ENTITY && key == .Player {
-		draw_expedition_robot(renderer, position, opacity)
-		return
-	}
 	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
 	pose := tactical_feedback_pose(renderer, key, position)
 	// Sunk in its shadow the player's card is dark, paper and print alike.
 	shade, seen := tactical_shadow_tint(renderer, entity)
 	if shade != rl.WHITE { pose.tint = shade }
-	if renderer.tactical.expedition && key >= .Chaser && key <= .Demolitionist && pose.tint == rl.WHITE {
+	shadow_allowed := pose.tint == rl.WHITE && shade == rl.WHITE
+	if !quad.cartoon && renderer.tactical.expedition && key >= .Chaser && key <= .Demolitionist && pose.tint == rl.WHITE {
 		pose.tint = expedition_enemy_tint(campaign.Biome(renderer.tactical.expedition_biome))
 	}
 	// A foe acting glows, its whole card, paper and print (foe_glow.odin).
 	glow, lit := foe_glow(renderer, entity)
 	if lit > 0 {
-		pose.tint = foe_glow_mix(pose.tint, glow, lit*0.6)
-		shade = foe_glow_mix(shade, glow, lit*0.5)
+		pose.tint = foe_glow_mix(pose.tint, glow, lit*(.22 if quad.cartoon else .6))
+		if !quad.cartoon {shade = foe_glow_mix(shade, glow, lit*0.5)}
 	}
-	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade)
-	if lit > 0 { draw_billboard_print_light(quad, glow, lit*0.55*opacity*seen, 1) }
+	flash := first_person_struck_flash(renderer, entity)
+	shadow_allowed = shadow_allowed && lit <= 0 && flash <= 0 && expedition_actor_sun_visible(renderer, entity, position)
+	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade, shadow_allowed)
+	if lit > 0 { draw_billboard_print_light(quad, glow, lit*(.18 if quad.cartoon else .55)*opacity*seen, 1) }
 	// FIRST PERSON BRAWLER: the struck foe's print flashes white (first_person_fists.odin).
-	if flash := first_person_struck_flash(renderer, entity); flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
+	if flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
 }
 
 @(private)
 draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboard, position: view.Vec2, opacity: f32,
-	tint: rl.Color = rl.WHITE, paper: rl.Color = rl.WHITE) {
+	tint: rl.Color = rl.WHITE, paper: rl.Color = rl.WHITE, shadow_allowed: bool = false) {
 	if quad.texture.id == 0 { return }
 	uv := [4]rl.Vector2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
 	if quad.mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
-	if quad.flipbook {
+	if quad.cartoon {
+		back:=quad;back.cartoon=false;back.flipbook=true;back.card={};back.mirror=false
+		back.points=quad.card_points;back.texture=quad.card;back.source=quad.card_a
+		draw_tactical_billboard_quad(renderer,back,position,opacity,paper)
+	} else if quad.flipbook {
 		// Paper stays paper while the print reacts: no hit flash on the card.
 		if quad.card.id != 0 { draw_flipbook_card(renderer, quad, uv, opacity, paper) }
 	} else { draw_comic_cutout(renderer, quad, position, opacity) }
+	shadow := shadow_allowed && begin_expedition_actor_shadow(renderer, quad)
+	defer { if shadow { rl.EndShaderMode() } }
 	rlgl.SetTexture(quad.texture.id)
 	rlgl.Begin(rlgl.QUADS)
 	rlgl.Color4ub(tint.r, tint.g, tint.b, u8(clamp(opacity, f32(0), f32(1))*255))
@@ -545,7 +555,13 @@ draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboa
 tactical_billboard_hit :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, ray: rl.Ray,
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) -> (distance: f32, hit: bool) {
 	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
-	if quad.living && quad.card.id != 0 { return living_card_hit(renderer, quad, ray) }
+	if quad.cartoon {return expedition_cartoon_hit(renderer,quad,ray)}
+	if quad.living && quad.card.id != 0 {
+		distance,hit=living_card_hit(renderer,quad,ray)
+		costume_distance,costume_hit:=expedition_costume_hit(renderer,key,position,entity,ray)
+		if costume_hit && (!hit || costume_distance<distance) {return costume_distance,true}
+		return
+	}
 	if quad.flipbook && quad.card.id != 0 { return flipbook_card_hit(renderer, quad, ray) }
 	collision := rl.GetRayCollisionQuad(ray, quad.points[0], quad.points[1], quad.points[2], quad.points[3])
 	if !collision.hit { return }
@@ -648,6 +664,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		collect_expedition_edges(renderer,room,expedition_world)
 		prepare_expedition_lights(renderer,room,expedition_world)
 		when EXPEDITION_BENCHMARK {v.draw_timing.cache_lights_ms=expedition_benchmark_elapsed(&stamp)}
+		prepare_expedition_sun(renderer,room,expedition_world)
 		prepare_expedition_reflection(renderer,room,expedition_world)
 		when EXPEDITION_BENCHMARK {v.draw_timing.reflection_ms=expedition_benchmark_elapsed(&stamp)}
 	}

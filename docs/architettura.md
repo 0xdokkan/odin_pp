@@ -99,7 +99,229 @@ point, restano intenzionalmente quelli precedenti.
 La griglia del gioco ha coordinate `(x, y)` e un piano: per ora tutto sta sulla terra
 (piano 0); il terreno 3D e gli sprite sulla camera non introducono movimento verticale. Il canvas virtuale è `960x540`.
 
+### Sole, cielo e contatto del terreno
+
+`Expedition_Material.sun` possiede `Expedition_Sun` (`expedition_sun.odin`);
+`destroy_expedition_material` ne libera mappe e shader. Il sole usa una
+profondità 2048² con confronto hardware, con R8 di riserva se il driver
+richiede un attachment colore. Il cielo usa due target 512² RGBA16F:
+altezza mondo dall'alto e copia per due giri di blur separabile. Le mappe
+coprono 60 unità con matrici agganciate ai texel, indipendenti dal canvas.
+
+I sampler occupano le unità **14 e 15**, legate esplicitamente e slegate
+prima di scrivere nei target. Gli slot del batch del pavimento sono già
+occupati: non aggiungere le mappe con `SetShaderValueTexture`. Il materiale
+comune riusa `EXPEDITION_SUN_GLSL`; il sole attenua le bande cel con una tinta
+fredda, il cielo modella l'occlusione presso i solidi. `skyShade` conserva
+l'illuminazione sotterranea. `lightMirror` esclude il calcolo dove impostato;
+i blocchi riflessi in VBO usano coordinate mondo e `lightMirror=0`, quindi
+ricevono ancora il sole.
+
+`Expedition_Sun_Key` conserva target, vettore destro della camera, revisioni
+di costruzione/upload dell'architettura, revisione del rilievo, maschera dei
+64 tetti e bioma. Una traslazione orizzontale entro 5 unità riusa le mappe;
+rotazioni della carta, modifiche della geometria e cambi dei tetti invalidano
+la cache. `sun.renders` conta i ridisegni. Terreno e deck CPU sono preparati
+prima della chiave: anche la prima passata vede tutte le superfici.
+
+Proiettano ombre blocchi e siti in cache, rilievo, deck con spessore e
+supporti, edifici con tetto governato da `Structure_Views.roof` e sagome
+alpha-tested degli arredi. La dissolvenza sulla soglia conserva il solido
+che proietta ombra; con `roof=false` il tetto esce dai caster. Gli attori
+mantengono il disco di contatto e non sono caster. I caster delle superfici
+riusano le mesh già caricate o, prima dell'upload, gli stessi vertici CPU,
+senza una seconda risorsa GPU.
+
+#### Integrazione del 3–4 novembre 2026, verifiche concluse
+
+Le seguenti modifiche sono integrate nei sorgenti. Le copie e i delta in
+`build/redesign-sole/session-20261103/` ne conservano la provenienza.
+Il renderer passa 477 test con E attiva; smoke oggetti, fallback,
+camminata e completo sono conclusi. G è verificata nelle catture v4 e il
+confronto prestazionale finale ha tutte le dodici corse. Anche il controllo
+del movimento a percorso identico è concluso: restano variabilità e picchi,
+e il target 60 FPS a 1080p non è raggiunto. Esiti e limiti sono nel rapporto:
+
+- **B/P1**: due PNG 1024² embedded, generati dalle routine Odin
+  del pigmento senza duplicarne le formule. Il manifest registra versione e
+  hash di sorgenti, generatore e pixel. Il preload dopo `roguelike_attach`
+  prepara entrambe le texture prima del primo draw; il fallback procedurale
+  resta nel caricamento. `Expedition_Floor` conserva ownership, mipmap e
+  massimo due texture da 5,333 MiB ciascuna. Il probe GPU verifica pixel
+  identici, cache e fallback; decode/upload e primo present sono misurati
+  separatamente nel rapporto. Non sono tempi del caricamento completo del gioco.
+- **B/pavimento**: le scorciatoie del frammento saltano contributi
+  matematicamente nulli. Il confronto finale misura il pacchetto integrato;
+  non attribuisce il beneficio alla sola scorciatoia.
+- **C/D**: una mesh in cache per struttura non edificio
+  evita duplicazioni e allargamento dei blocchi 8×8. Cart, Fountain, Statue,
+  Machine, Ruin e Pen hanno forme proprie; le recinzioni hanno pali e traverse.
+  La cache possiede e libera mesh e linee, compresi upload parziali. Rendering
+  normale, riflesso, fallback e caster condividono la geometria.
+  Anche il fallback senza cache proietta gli oggetti interi. Gli assi hanno
+  entrambi i tappi, verificati con quattro rotazioni e specchio.
+  I muri generici ricevono zoccolo, facce esterne arretrate, copertina e
+  pilastri convessi; Cyber/West preservano le stampe e aggiungono una fascia bassa.
+- **F1/F2/G**: fioriere Cyber contenute nella cella,
+  `post_fill` esplicito per i pilastri blu e angoli avorio.
+  `expedition_sky_crowd` condivide una lettura dell'altezza sfocata fra AO,
+  accumuli del bioma e densità di `paperDetails`. Una maschera bilineare
+  continua esclude hazard e rive senza gradini sulla griglia; audit
+  matematico e catture v4 verificano la correzione.
+- **F4**: il disegno della pressa Cyber è allargato del 6% e alzato del 2%;
+  cella occupata, densità, dimensioni dell'atlante e quad restano invariati.
+  I tre accessori esistenti formano gruppi meno simmetrici nelle stesse
+  dieci celle bloccate, con identica scelta nel pass colore e nei caster.
+  Gli interni riordinano attrezzi e scorte e aggiungono un armadietto
+  dipinto accanto alla porta: +54 vertici Hut e +90 Cottage, senza mobili
+  nelle celle libere o nuove risorse GPU.
+- **E**: shader locale alla spedizione per attenuare
+  soltanto la stampa colorata. Dopo il confronto on/off e l'approvazione
+  dell'utente, `EXPEDITION_ACTOR_SHADOW=true` è il default, forza `.15`;
+  carta, inchiostro e feedback di colpo mantengono il trattamento.
+  Lo shader appartiene al sole del materiale, senza modificare `engine/gfx`.
+  L'idoneità esplicita precede le tinte permanenti del bioma e verifica la
+  grotta per attore, secondo la sua quota e posizione di presentazione.
+  `-define:EXPEDITION_ACTOR_SHADOW=false` conserva il confronto senza effetto.
+
+Gli interventi mantengono mappe, collisioni, quote, picking, visibilità di
+gioco e RNG. Esiti e limiti sono in
+[`VERIFICA_REDESIGN_SOLE.txt`](riferimenti/cartoncino-cartoon/VERIFICA_REDESIGN_SOLE.txt).
+
 ### Proprietà delle scene e transizioni
+
+`Expedition_Material` possiede anche `Expedition_Cartoon_Assets`, creato al
+primo attore di una spedizione. Sono due texture immutabili con filtro nearest:
+stampa RGBA 2496×3120 (720 pose, circa 29,71 MiB) e sagome 832×104 (338 KiB).
+Le otto maschere CPU da 104×104 byte servono al picking; il bordo superiore
+precotto ancora vita e intenzione sopra la sagoma. I buffer CPU di costruzione
+sono temporanei e liberati dopo l'upload. Animazioni, cambio di direzione,
+cambio bioma e resize selezionano soltanto celle/quadrilateri; non ricreano
+texture. `destroy_expedition_material` rilascia entrambi gli atlanti e le
+maschere. Anche il renderer prestato possiede il proprio eventuale materiale
+di spedizione: questa risorsa non introduce proprietà GPU condivisa implicita.
+
+Le mesh dell'architettura conservano la cache a blocchi e rispettano i budget
+di geometria: le coordinate `print_uv` permettono al materiale comune di disegnare
+inchiostro e un sottile margine avorio sui quad, compresi i cappelli rettangolari.
+Lo spessore si adatta alla dimensione proiettata: i controlli piccoli conservano
+colore; i segni più minuti si attenuano quando diventano subpixel.
+`ink_wall_sheet` unisce i margini delle facce adiacenti in tutti i biomi,
+senza cambiare le celle occupate. Le decorazioni delle altre undici famiglie
+sono motivi analitici nello stesso materiale, anziché box sottili sovrapposti.
+L'antialiasing misura le derivate prima della ripetizione delle coordinate,
+evitando cuciture puntinate al confine dei motivi. Non introduce texture,
+allocazioni o upload per frame. `UnloadMesh` libera anche
+il buffer UV; i vertici del terreno usano coordinate sentinella, poiché il
+pavimento conserva il proprio shader e la propria cache.
+
+La libreria `expedition_profiles.odin` aggiunge profili concavi disegnati a mano:
+triangolazione a orecchie con scratch fisso (massimo 32 punti), estrusione e
+contorno selettivo. Viene eseguita nel bake dei blocchi esistenti; la durata di
+mesh, UV e linee resta quella di `Expedition_Architecture_Cache`. Non vengono
+create texture. Le pareti codificano `print_uv.x + 4`: il materiale decodifica
+il tag prima dei bordi e applica le illustrazioni di `expedition_print.odin`
+solo alle facce verticali dell'architettura. Attrezzature, foglie e piccole
+facce non ereditano glifi della parete. `{2,2}` resta la sentinella senza stampa.
+
+`expedition_biome_forms.odin` compone arredi nelle sole celle già occupate dalle
+coperture dell'officina. I profili e le rotazioni non scrivono nella mappa.
+Il movimento degli strumenti è campionato nei due fotogrammi delle stampe,
+con fase cosmetica deterministica per posizione; non invalida la cache.
+
+Gli edifici esplorabili usano `structure_print_cell`: solo facce esposte e un
+dominio UV continuo sui fogli adiacenti. Il tag `x+8` distingue la stampa del
+tetto da quella della facciata (`x+4`). Quota d'appoggio, impronta, apertura del tetto,
+trasparenza dell'involucro e picking continuano a usare i dati strutturali.
+Il contorno viene composto dal materiale, senza un secondo reticolo di linee.
+
+`expedition_ground_art.odin` aggiunge al massimo un piccolo gruppo ogni 4×4
+celle (180 vertici aggiuntivi per blocco 8×8, massimo teorico 6.3 KiB di payload).
+Le radici seguono `point_ground` vertice per vertice; decorazioni sotto 0.12
+unità, assenti da porte, hazard, spawn, strutture e interni dei POI. La scelta
+non dipende dalla posizione corrente del giocatore e non invalida la cache.
+Nei cortili sono ammessi piccoli gruppi solo vicino alle pareti, lontani dal
+punto di interazione e dalle superfici di passaggio.
+
+`Expedition_Material` possiede anche `fixtures` (atlanti nearest e maschere
+CPU), `fixture_shader` e `costumes` (inviluppi CPU dei costumi). I renderer
+prestati possiedono le proprie eventuali istanze; `destroy_expedition_material`
+le rilascia. I 96 disegni dei prop (sei funzioni e due arredi per ciascuno dei
+dodici biomi) usano 104×104 pixel, due pose: stampa 1248×1664 e carta 1248×832,
+11.883 MiB GPU complessivi e circa 0.990 MiB di maschere CPU. I buffer RGBA
+di costruzione sono temporanei. Upload una sola volta per materiale; cambi
+bioma, animazione e resize selezionano rettangoli dell'atlante. Il fallimento
+di upload libera le risorse parziali e mantiene il fallback geometrico.
+
+Le scene Cyber e West aggiungono in `Expedition_Fixture_Assets`
+`hero_print` (**416 × 624 pixel**) e `hero_paper` (**416 × 312 pixel**):
+due texture RGBA, **1,485 MiB GPU complessivi**, 0,495 MiB in più rispetto
+alla sola pressa Cyber. `expedition_fixture_hero.odin` impacchetta
+quattro pose della pressa in celle 104×208 e tre arredi secondari
+(materiali, convogliatore, scaffale) nella fascia inferiore da 104 pixel.
+`expedition_fixture_west.odin` aggiunge sega a telaio, tronchi, banco e assi,
+con quattro pose e celle separate nello stesso pack. Il supporto è l'unione
+delle quattro pose; maschera e bounds sono preparati
+all'upload. Il clock cosmetico seleziona soltanto il rettangolo della stampa;
+lo stato risolto conserva la posa ferma. I buffer RGBA di costruzione sono
+temporanei sull'heap, e il distruttore degli asset libera entrambe le texture
+anche dopo un upload parziale. Rimangono condivisi shader, profondità,
+occlusione, passaggio riflesso e regole di interazione dei prop esistenti.
+La visibilità ai margini di pressa e sega usa una sfera derivata dalla sagoma
+opaca, bordo compreso: la testa rimane visibile anche con i piedi fuori campo.
+Gli altri oggetti conservano i parametri precedenti del frustum.
+
+`expedition_cyber_floor.odin` e `expedition_west_ground.odin` descrivono
+pigmenti e percorsi nelle coordinate locali delle officine. Il generatore
+`tools/art/build_workshop_stock.py` estrae le routine Odin e salva la pittura
+in due PNG incorporati da `expedition_workshop_stock_data.odin`:
+1024×1024 RGBA8, undici livelli mip, filtro trilineare e clamp. Ogni bioma
+costa 5,333 MiB GPU; `Expedition_Floor` possiede al massimo due texture e le
+libera nel proprio distruttore. I buffer CPU sono temporanei. Decode e
+upload avvengono nel caricamento dopo `roguelike_attach`, prima del draw;
+il fallback procedurale resta in quel caricamento. Animazione, draw e resize
+riusano le texture e non rigenerano il pigmento.
+Centro e orientamento restano uniformi per sito, senza modifiche alla mappa.
+La texture dati conserva pericoli e superfici; in Cyber il nibble alto di B
+memorizza anche i raccordi dei muri continui, ricalcolati solo quando cambia
+la geometria. Il pigmento dei dirupi segue quota e normali esistenti.
+Il binding mesh usa `MAP_NORMAL` come alias dello slot 2 del pigmento:
+floorMap=1, workshopStock=2, reflectionSharp=3. Usare ROUGHNESS sovrascriverebbe
+il riflesso; batch e mesh devono mantenere gli stessi slot.
+
+`expedition_cyber_building.odin` completa soltanto `Hut` e `Cottage` Cyber.
+Una composizione canonica segue rotazione e specchio del piano strutturale.
+Facciata, console, banco e scaffale sono triangoli di stampa aderenti alle
+facce dei muri; pochi segni piatti sul pavimento lasciano libero il percorso.
+Il tetto ha spalle piegate entro l'impronta esistente e conserva l'apertura
+sopra la cella `Door`. Viene emesso con i suoi dettagli solo quando
+`Structure_Views.roof` lo richiede; opacità e stato interno provengono ancora
+da `game.structure_visibility`. Questa geometria usa la passata dell'involucro
+esistente, senza texture nuove né allocazioni per frame. I test verificano
+entrambi i piani in tutte le rotazioni e riflessioni, adesione degli arredi
+ai muri, copertura effettiva del tetto e assenza di residui nel taglio interno.
+`expedition_west_building.odin` usa la stessa trasformazione dei piani per
+tetti a falde, legno, imposte e attrezzi dipinti sulle pareti. Il generatore
+colloca due edifici West con le protezioni esistenti di spawn e servizi,
+senza spianare il terreno. I vecchi salvataggi mantengono tile e strutture
+salvati: gli edifici nuovi compaiono soltanto nelle nuove spedizioni.
+Gli altri dieci biomi restano nella roadmap.
+
+Le annotazioni della spedizione riservano le sagome opache: otto bande CPU
+preparate all'upload per il cartoon, inviluppi dei costumi già in cache negli
+altri biomi. Vita e intento cercano una posizione entro 36 pixel dalla testa,
+in ordine stabile di entità; l'eventuale collegamento non attraversa altri
+corpi. Se non esiste spazio resta il cartellino ancorato, senza omettere HP.
+L'allocatore usa memoria fissa; non rigenera maschere durante il disegno.
+
+Le sagome scrivono profondità solo nei pixel opachi. Il passaggio normale
+stampa i pigmenti dopo il resolve; il riflesso usa gli stessi atlanti nel
+passaggio speculare, convertendo esplicitamente sRGB in lineare. I prop si
+attenuano solo quando ingombro proiettato e profondità indicano un attore
+coperto. Interazione E, celle di collisione e navigazione rimangono della mappa.
+Gli inviluppi dei costumi non Cyber sono immutabili, costruiti una volta per
+costume dai suoi estremi animati; la stampa sola cambia posa e orientamento.
+Il picking usa i medesimi poligoni del supporto, senza rettangoli invisibili.
 
 `Effect_Window`, nella sessione della run, possiede il film di
 [Mostra effetto](presentazione.md#mostra-effetto) (`Card_Demo`, sull'heap: la sua stanza punta

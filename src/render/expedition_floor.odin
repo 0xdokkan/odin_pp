@@ -16,6 +16,7 @@ Expedition_Floor_Program :: struct {
 	shader: rl.Shader,
 	map_data, map_size, tint, time, beat, lane, lane_warning, biome: c.int,
 	focus, focus_count, grid_amount, surface: c.int,
+	cyber_workshops, cyber_workshop_count, workshop_stock: c.int,
 	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count, reveal_floor: c.int,
 	// The pass (0 the ground, 1 the rooms under it: expedition_layers.odin, 2 the decks over it: expedition_decks.odin) and
 	// the fade over the robot.
@@ -27,6 +28,9 @@ Expedition_Floor_Program :: struct {
 Expedition_Floor :: struct {
 	data: Expedition_Floor_Data,
 	texture: rl.Texture2D,
+	workshop_stock:[2]rl.Texture2D,
+	workshop_failed:[2]bool,
+	active_stock:rl.Texture2D,
 	plain, tall: Expedition_Floor_Program,
 	failed: bool,
 	// The terraces of the map's relief, over the plane (expedition_terrain.odin).
@@ -91,15 +95,153 @@ float borderMask(int bits,vec2 uv,float width,float aa) {
     if((bits&8)!=0) d=min(d,1.-uv.y);
     return 1.-smoothstep(width,width+aa,d);
 }
-float hash21(vec2 p) {return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-// Analytic staggered joints in world units: no noise or adjacent texel reads.
-// Their derivative width is computed before any per-cell material branch.
-float floorJoint(vec2 p,vec2 size,float stagger,float width,float aa) {
-    float row=floor(p.y/size.y);
-    vec2 uv=fract((p+vec2(mod(row,2.)*stagger,0.))/size);
-    vec2 edge=min(uv,1.-uv)*size;
-    return inkLine(min(edge.x,edge.y),width,aa);
+// Rounded outer banks follow actual terrain connectivity. Shared cell edges
+// have no border, and world-registered bends never become a tiled texture.
+float terrainCoverage(int edges,vec2 uv,vec2 p,float aa) {
+    float d=2.;
+    if((edges&1)!=0) d=min(d,uv.x);
+    if((edges&2)!=0) d=min(d,1.-uv.x);
+    if((edges&4)!=0) d=min(d,uv.y);
+    if((edges&8)!=0) d=min(d,1.-uv.y);
+    float r=.22;
+    if((edges&5)==5 && uv.x<r && uv.y<r) d=min(d,r-length(uv-vec2(r)));
+    if((edges&6)==6 && uv.x>1.-r && uv.y<r) d=min(d,r-length(uv-vec2(1.-r,r)));
+    if((edges&9)==9 && uv.x<r && uv.y>1.-r) d=min(d,r-length(uv-vec2(r,1.-r)));
+    if((edges&10)==10 && uv.x>1.-r && uv.y>1.-r) d=min(d,r-length(uv-vec2(1.-r)));
+    float bend=.018*sin(p.x*5.1+p.y*3.7)+.012*sin(p.y*8.-p.x*2.);
+    return smoothstep(.015,.17+aa,d+bend);
 }
+float hash21(vec2 p) {return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+// Warm paper pigments are authored per biome, rather than brightening an
+// old black/grey material. No tile hash, joints or squares modulate them.
+vec3 paperGround(bool indoor) {
+    vec3 outside=vec3(1.,.925,.78),inside=vec3(.65,.85,.88);
+    if(floorBiome==1) {outside=vec3(.96,.76,.48);inside=vec3(.91,.64,.38);}
+    else if(floorBiome==2) {outside=vec3(.73,.83,.43);inside=vec3(.86,.87,.62);}
+    else if(floorBiome==3) {outside=vec3(.79,.67,.76);inside=vec3(.94,.80,.78);}
+    else if(floorBiome==4) {outside=vec3(1.,.84,.54);inside=vec3(.98,.91,.70);}
+    else if(floorBiome==5) {outside=vec3(.74,.79,.45);inside=vec3(.88,.81,.56);}
+    else if(floorBiome==6) {outside=vec3(.91,.95,.91);inside=vec3(.76,.87,.89);}
+    else if(floorBiome==7) {outside=vec3(.79,.47,.41);inside=vec3(.91,.66,.48);}
+    else if(floorBiome==8) {outside=vec3(.66,.61,.72);inside=vec3(.81,.74,.78);}
+    else if(floorBiome==9) {outside=vec3(.99,.91,.78);inside=vec3(.92,.83,.92);}
+    else if(floorBiome==10) {outside=vec3(.70,.62,.82);inside=vec3(.84,.76,.90);}
+    else if(floorBiome==11) {outside=vec3(.70,.59,.69);inside=vec3(.88,.77,.62);}
+    return indoor?inside:outside;
+}
+float valueNoise(vec2 p) {
+    vec2 i=floor(p),f=fract(p);
+    f=f*f*(3.-2.*f);
+    return mix(mix(hash21(i),hash21(i+vec2(1.,0.)),f.x),mix(hash21(i+vec2(0.,1.)),hash21(i+vec2(1.)),f.x),f.y);
+}
+// The ground is one sheet of coloured card: a slow wash of pigment across
+// several cells and, close enough to resolve it, the card's own fibre.
+vec3 paperStock(vec2 p,vec3 base,float aa) {
+    float wash=valueNoise(p*.13)*.65+valueNoise(p*.31+vec2(7.3,2.1))*.35;
+    base*=1.+(wash-.5)*.13;
+    if(aa>=.09) return base;
+    float fibre=valueNoise(p*vec2(6.,11.)+vec2(3.,9.))*.6+valueNoise(p*vec2(17.,9.)+vec2(1.7,4.4))*.4;
+    return base*(1.+(fibre-.5)*.06*(1.-smoothstep(.03,.09,aa)));
+}
+float drawnSegment(vec2 p,vec2 a,vec2 b,float width,float aa) {
+    vec2 d=b-a;
+    return 1.-smoothstep(width,width+aa,length(p-a-d*clamp(dot(p-a,d)/dot(d,d),0.,1.)));
+}
+`+EXPEDITION_CYBER_FLOOR_GLSL+`
+// A few small pen drawings, scattered away from cell centres. Hashing only
+// places each motif; it never makes a noisy or tiled colour field.
+vec3 paperDetails(vec2 p,vec3 base,float aa,bool indoor,float detailWeight) {
+    vec2 field=p/3.1,seed=floor(field);
+    float h=hash21(seed+vec2(13.,7.));
+    vec2 center=vec2(.22)+vec2(hash21(seed),hash21(seed+37.))*.56;
+    vec2 q=(fract(field)-center)*3.1;
+    float visible=step(.66,h)*(1.-smoothstep(.04,.09,aa));
+    visible*=detailWeight;
+    if(visible==0.) return base;
+    float mark=0.,paint=0.;
+    vec3 ink=base*vec3(.56,.55,.60),pigment=min(base+vec3(.12,.07,.02),1.);
+    if(!indoor && (floorBiome==2 || floorBiome==5 || floorBiome==8)) {
+        // A fallen pointed leaf and two short stems. Dark underside and
+        // one broad painted half give the ground the same hand as foliage.
+        vec2 leaf=(q-vec2(-.06,.02))*vec2(1.,.55);
+        float shape=abs(leaf.x)+abs(leaf.y);
+        mark=inkLine(shape-.13,.014,aa);
+        paint=(1.-smoothstep(.10,.13+aa,shape))*step(0.,leaf.x);
+        mark=max(mark,drawnSegment(q,vec2(-.16,.17),vec2(.06,-.14),.010,aa));
+        mark=max(mark,drawnSegment(q,vec2(.17,.08),vec2(.24,-.04),.012,aa));
+        ink=vec3(.25,.42,.24);pigment=vec3(.68,.71,.31);
+    } else if(!indoor && (floorBiome==1 || floorBiome==4 || floorBiome==7)) {
+        // A deliberate three-armed crack; broken ends leave quiet space.
+        mark=drawnSegment(q,vec2(-.22,.06),vec2(.01,-.02),.012,aa);
+        mark=max(mark,drawnSegment(q,vec2(.01,-.02),vec2(.18,.09),.012,aa));
+        mark=max(mark,drawnSegment(q,vec2(.01,-.02),vec2(.05,-.14),.010,aa));
+        paint=drawnSegment(q,vec2(-.20,.09),vec2(-.03,.03),.018,aa);
+    } else if(floorBiome==6) {
+        // Wind-combed snow: two low arcs rather than printed snowflake icons.
+        float ridge=length((q-vec2(.04,.17))*vec2(.7,1.));
+        mark=inkLine(ridge-.22,.012,aa)*step(q.y,.10)*step(-.17,q.x)*step(q.x,.24);
+        paint=drawnSegment(q,vec2(-.07,-.03),vec2(.15,-.03),.025,aa);
+        ink=vec3(.43,.63,.70);pigment=vec3(1.,.99,.91);
+    } else {
+        // A compact stone group with a painted top and short contact mark.
+        float pebble=length((q-vec2(-.08,0.))*vec2(1.,1.65));
+        mark=inkLine(pebble-.105,.014,aa)*step(-.055,q.y);
+        mark=max(mark,drawnSegment(q,vec2(.10,.025),vec2(.22,-.005),.014,aa));
+        paint=(1.-smoothstep(.065,.09+aa,pebble))*step(q.y,.01);
+    }
+    base=mix(base,pigment,paint*visible*.65);
+    return mix(base,ink,mark*visible*.60);
+}
+
+// Broad deposits collect beside real solids. Their paper-cut edge follows the blurred
+// height field, with a world-space wobble instead of a repeated mark per map cell.
+vec3 paperAccumulation(vec2 p,vec3 base,float aa,float crowd) {
+    if(crowd<.015) return base;
+    float noise=valueNoise(p*.93+vec2(2.7,8.9));
+    float field=crowd-(.055+.12*noise);
+    float edge=max(.012,aa*.28);
+    float cover=smoothstep(-edge,edge,field);
+    float cut=1.-smoothstep(0.,edge*1.8,abs(field));
+    vec3 pigment=vec3(.70,.68,.60);
+    float amount=.50;
+    if(floorBiome==1) pigment=vec3(.77,.57,.34);
+    else if(floorBiome==2) {pigment=vec3(.44,.58,.24);amount=.65;}
+    else if(floorBiome==3) pigment=vec3(.58,.51,.48);
+    else if(floorBiome==4) {pigment=vec3(.96,.75,.41);amount=.70;}
+    else if(floorBiome==5) {pigment=vec3(.43,.49,.23);amount=.60;}
+    else if(floorBiome==6) {pigment=vec3(1.,.99,.92);amount=.82;}
+    else if(floorBiome==7) {pigment=vec3(.43,.38,.42);amount=.65;}
+    else if(floorBiome==8) {pigment=vec3(.42,.49,.31);amount=.60;}
+    else if(floorBiome==9) {pigment=vec3(.98,.89,.91);amount=.70;}
+    else if(floorBiome==10) pigment=vec3(.51,.48,.61);
+    else if(floorBiome==11) {pigment=vec3(.74,.61,.80);amount=.65;}
+    base=mix(base,pigment,cover*amount);
+    return mix(base,base*vec3(.88,.87,.91),cut*.18);
+}
+
+// Continuous permission around hazards, using the floor's existing four
+// samples. The old any-hazard boolean exposed a 2x2 square round each cell.
+float paperDepositPermission(ivec4 near4[4],vec2 f,float aa) {
+    // Terrain paint starts at .5-.03-aa, with at most +.13 of bank wobble.
+    // At very coarse footprints it can reach every nonzero hazard weight.
+    if(aa>=.34) return 0.;
+    float distant=1.-smoothstep(.25,.34,aa);
+    bool allSafe=true;
+    float hazard[4];
+    for(int i=0;i<4;i++) {
+        int terrain=near4[i].g&15;
+        bool safe=terrain==0 || terrain==2 || terrain==3 || terrain==6;
+        hazard[i]=safe?0.:1.;allSafe=allSafe && safe;
+    }
+    if(allSafe) return distant;
+    float field=mix(mix(hazard[0],hazard[1],f.x),mix(hazard[2],hazard[3],f.x),f.y);
+    // A cell's own bilinear weight is >=.25 throughout its square, so this
+    // also keeps Electric/Wind/Gravity glyph cells wholly free of deposits.
+    // The other bound ends the fade before any interpolated hazard bank.
+    float clearAt=min(.25,.34-aa);
+    return distant*(1.-smoothstep(0.,clearAt,field));
+}
+
 void floorMain();
 void caveMain();
 void deckMain();
@@ -149,7 +291,7 @@ void main() {
 void caveMain() {
     vec3 n=normalize(normal);
     if(normal.y<.5 || color.r<.5) {
-        vec3 rock=mix(vec3(.115,.118,.132),biomeTint*.20,.30);
+        vec3 rock=mix(vec3(.45,.43,.40),biomeTint*.45,.25);
         if(color.r<.5) rock*=.66;
         finalColor=vec4(expedition_lit(worldPosition,n,rock,.9,.05),1.);
         return;
@@ -159,11 +301,8 @@ void caveMain() {
     float aa=max(footprint.x,footprint.y);
     ivec2 cell=ivec2(floor(p));
     vec2 uv=fract(p),q=uv-.5;
-    float joint=floorJoint(p,vec2(1.3,.9),.65,.012,aa);
-    float slab=hash21(vec2(cell)*.37+vec2(floor(p.y/.9)));
-    vec3 base=mix(vec3(.150,.145,.158),vec3(.198,.190,.205),slab);
-    base=mix(base,biomeTint*.24,.22);
-    base*=(1.-joint*.30)*mix(.55,1.,color.g);
+    vec3 base=mix(paperGround(false),vec3(.57,.48,.53),.42);
+    base=paperDetails(p,base,aa,true,1.)*mix(.62,1.,color.g);
     vec3 emission=vec3(0.);
     if(gridAmount>0.) {
         float focus=0.;
@@ -175,7 +314,8 @@ void caveMain() {
         float edge=max(abs(q.x),abs(q.y));
         float inset=1.-smoothstep(.44,.45+aa,edge);
         float line=inkLine(edge-.45,.008,aa);
-        base=mix(base,base*1.28+biomeTint*.012,focus*inset);
+        base=mix(base,vec3(.62,.83,.86),focus*inset*.22);
+        base=mix(base,vec3(.15,.39,.48),line*focus*.65);
         emission+=expedition_linear(biomeTint)*line*focus*.22;
     }
     finalColor=vec4(expedition_lit(worldPosition,n,base,.72,.05)+emission,1.);
@@ -197,6 +337,7 @@ void deckMain() {
         if(floorBiome==7) frame=vec3(.40,.35,.28);
         if(floorBiome==8) frame=vec3(.08,.065,.05);
         if(floorBiome==9) frame=vec3(.30,.31,.34);
+        frame=mix(vec3(.90,.85,.72),clamp(frame*2.5,0.,1.),.62);
         if(normal.y<-.5) frame*=.6;
         finalColor=vec4(expedition_lit(worldPosition,n,frame,.8,floorBiome==0?.35:.04),1.);
         return;
@@ -219,10 +360,8 @@ void deckMain() {
         }
         base=mix(base,vec3(.30,.19,.10),rim);
     } else if(floorBiome==3) {
-        // City pop's overpass: concrete slabs across it, a dashed line along its middle, a pale kerb on its open sides.
-        float slab=floorJoint(p,vec2(2.,1.),0.,.010,aa);
-        base=mix(vec3(.105,.108,.118),vec3(.125,.128,.138),abs(fract(q.x*.21)-.5)*2.);
-        base*=1.-slab*.25;
+        // A continuous painted road, with its actual bridge kerb and lane.
+        base=vec3(.18,.14,.19);
         float dash=step(.5,fract(q.x*.5))*(1.-smoothstep(.04,.04+aa,abs(fract(q.y)-.5)));
         if(color.b>.5 || color.g>.5) base=mix(base,vec3(.42,.38,.20),dash*.8);
         base=mix(base,vec3(.30,.30,.32),rim);
@@ -248,7 +387,7 @@ void deckMain() {
         float plank=1.-smoothstep(.36,.36+aa,abs(fract(q.x*3.)-.5));
         float grain=abs(fract(q.y*5.+q.x*.5)-.5)*2.;
         base=mix(vec3(.025,.030,.040),mix(vec3(.30,.25,.20),vec3(.38,.33,.27),grain),plank);
-        float frost=smoothstep(.55,.95,hash21(floor(q*vec2(3.,2.))));
+        float frost=step(.65,.5+.5*sin(q.x*.8+sin(q.y*.5)));
         base=mix(base,vec3(.80,.86,.92),frost*.35*plank);
         base=mix(base,vec3(.42,.36,.26),rim);
         roughness=.85;
@@ -269,31 +408,33 @@ void deckMain() {
         base=mix(base,vec3(.52,.50,.44),rim);
         roughness=.9;
     } else if(floorBiome==9) {
-        // The Cielo's floating island: pearl marble slabs with sparse veins, as its islands, and a gold fillet along its
+        // The Cielo's floating island: pearl paper with sparse veins and a gold fillet along its
         // open sides.
-        float joint=floorJoint(p,vec2(2.,2.),0.,.009,aa);
         float vein=inkLine(fract(p.x*.16+p.y*.09+abs(fract(p.y*.11)-.5)*.22)-.5,.004,aa*.3);
         base=mix(vec3(.236,.246,.262),vec3(.123,.144,.173),vein*.14);
-        base*=1.-joint*.16;
         base=mix(base,vec3(.42,.33,.16),rim);
         emission+=expedition_linear(vec3(.95,.74,.36))*rim*.22;
         roughness=mix(.34,.30,rim);metallic=mix(.04,.55,rim);
     } else {
-        // The data walkway: steel grating in a fine grid between solid plates, a neon rim along its open sides.
-        float grate=max(inkLine(fract(q.x*4.)-.5,.03,aa*4.),inkLine(fract(q.y*4.)-.5,.03,aa*4.));
-        float plate=1.-smoothstep(.08,.08+aa,abs(fract(q.x*.5)-.5)-.38);
-        base=mix(vec3(.105,.115,.134),vec3(.045,.050,.062),grate*(1.-plate));
+        // Continuous printed walkway; the structural rim still identifies
+        // the open edge, without a decorative checkerboard or grating.
+        base=vec3(.16,.22,.27);
         metallic=.55;roughness=.42;
         emission+=expedition_linear(biomeTint)*rim*1.6;
     }
+    // The same matte stock as the ground, retaining each bridge's motif.
+    base=mix(paperGround(true),clamp(base*3.3,0.,1.),.32);
+    base=paperDetails(p,base,aa,true,1.);
+    roughness=max(roughness,.8);metallic*=.07;emission*=.15;
     // Lighter the higher it stands, as the ground (floorMain).
-    base*=1.+clamp(worldPosition.y,0.,.72)*.9;
+    base*=1.+clamp(worldPosition.y,0.,.72)*.10;
     finalColor=vec4(expedition_lit(worldPosition,n,base,roughness,metallic)+emission,1.);
 }
 void floorMain() {
     // The walls of a cliff are dark rock, tinted a little by the biome, lit facet by facet.
     if(normal.y<.5) {
-        vec3 rock=mix(vec3(.05,.055,.07),biomeTint*.12,.5);
+        vec3 rock=mix(vec3(.60,.57,.49),biomeTint*.55,.22);
+        if(floorBiome==0) rock=cyberCliffPigment(worldPosition,normalize(normal),(1.-color.g)*2.);
         // Under the board's plane, in a pit dug under a raised map's base, the biome's rock is lighter at the rim and
         // darker toward the bottom, so that the pit reads as a hollow and not as a slot of black.
         if(worldPosition.y<-.02) rock=mix(mix(vec3(.15,.16,.18),biomeTint*.42,.45),rock,smoothstep(0.,1.7,-worldPosition.y)*.75);
@@ -308,241 +449,116 @@ void floorMain() {
     int kind=tile.r&7,site=tile.b&15;
     if(kind==0) discard;
     vec2 uv=fract(p),q=uv-.5;
-    vec3 base=vec3(9.,11.,18.)/255.;
-    if(site==3) base=vec3(14.,17.,27.)/255.;
-    else if(site==1 || site==9 || site==7) base=vec3(10.,12.,20.)/255.;
-    else if(site==4) base=vec3(10.,12.,19.)/255.;
-    else if(site==5 || site==8) base=vec3(9.,14.,18.)/255.;
-    float roughness=floorSurface.x;
-    vec3 emission=vec3(0.);
-    float contact=1.,reflectionMask=1.;
     bool cyber=floorBiome==0;
-    // Fine continuous four-cell threads are subdued at oblique/minified views.
-    vec2 thread=abs(fract(p*.25-.5)-.5)*4.;
-    float threads=inkLine(min(thread.x,thread.y),.009,aa);
-    if(cyber) {
-        // Broad charcoal panels use cached variation instead of fragment
-        // noise. A very slight diagonal facet breaks the perfectly flat ink.
-        float slab=float(tile.b>>4)/15.;
-        vec2 panelUV=fract(p*.25);
-        float facet=smoothstep(-.025,.025,panelUV.x-panelUV.y);
-        vec3 charcoal=mix(vec3(.078,.087,.106),vec3(.108,.117,.136),slab);
-        float authored=site==3?1.09:1.;
-        base=charcoal*mix(.96,1.035,facet)*authored;
-        float fineJoint=inkLine(min(min(uv.x,1.-uv.x),min(uv.y,1.-uv.y)),.008,aa);
-        base*=1.-fineJoint*.09-threads*.18;
-        // Contact darkening is localized at real wall/fixture footprints.
-        contact=1.-borderMask((tile.r>>3)&15,uv,.025,.7)*.32;
-        float wear=smoothstep(.12,.85,panelUV.x*.65+panelUV.y*.35);
-        roughness=clamp(floorSurface.x+.09+slab*.17+wear*.07,.22,.66);
-        reflectionMask=(.66+.26*(1.-slab))*(1.-wear*.12)*(1.-threads*.62);
-        emission+=expedition_linear(biomeTint)*threads*.018;
-    } else {
-        // The low-frequency variation is already packed in each four-cell
-        // slab. Broad, continuous folds add shape without fragment noise.
-        float slab=float(tile.b>>4)/15.;
-        vec2 panelUV=fract(p*.25);
-        float facet=smoothstep(-aa*.25,aa*.25,panelUV.x-panelUV.y);
-        float drift=abs(fract(p.x*.071+p.y*.043)-.5)*2.;
-        float wallFoot=borderMask((tile.r>>3)&15,uv,.025,.7);
-        bool paved=site==2 || site==3 || site==4 || site==6 || site==7 || site==9;
-        contact=1.-wallFoot*.30;
-        emission+=expedition_linear(biomeTint)*threads*.008;
-        if(floorBiome==1) {
-            // West: warm, matte sand outside; long wooden boardwalks in
-            // authored courts. The arena remains an open dusty corral.
-            float dune=smoothstep(.15,.9,drift);
-            base=mix(vec3(.145,.112,.078),vec3(.195,.155,.106),dune);
-            base*=.96+slab*.06;
-            roughness=.86;reflectionMask=.10;
-            if(paved && site!=6) {
-                float joint=floorJoint(p,vec2(.5,3.),1.5,.009,aa);
-                float grain=abs(fract(p.x*2.+p.y*.035)-.5)*2.;
-                base=mix(vec3(.125,.087,.058),vec3(.18,.128,.081),slab*.5+grain*.35);
-                base*=1.-joint*.26;
-                roughness=.72+slab*.09;reflectionMask=.24*(1.-joint*.7);
-            }
-        } else if(floorBiome==2) {
-            // Jungle soil stays earthy; only the ruins and courts become
-            // weathered stone. Actual tall-grass patches are overlaid below.
-            base=mix(vec3(.075,.091,.059),vec3(.115,.119,.076),drift);
-            roughness=.79;reflectionMask=.19;
-            if(paved) {
-                float joint=floorJoint(p,vec2(1.4,1.),.7,.013,aa);
-                base=mix(vec3(.115,.131,.111),vec3(.15,.16,.13),slab);
-                base*=1.-joint*.23;
-                roughness=.64;reflectionMask=.32*(1.-joint*.65);
-            }
-            base=mix(base,vec3(.066,.091,.052),wallFoot*.14);
-        } else if(floorBiome==3) {
-            // City: asphalt with soft interrupted wet reflections, bordered
-            // by quiet concrete sidewalks and inset courtyard panels.
-            float damp=smoothstep(.32,.85,drift);
-            base=mix(vec3(.065,.070,.087),vec3(.086,.091,.111),facet*.28+slab*.36);
-            roughness=mix(.48,.22,damp);
-            reflectionMask=.36+.40*damp;
-            if(paved || site==1) {
-                float joint=floorJoint(p,vec2(1.,2.),1.,.010,aa);
-                base=mix(vec3(.139,.148,.162),vec3(.172,.179,.192),slab);
-                base*=1.-joint*.23;
-                roughness=.47+slab*.12;
-                reflectionMask=(.36+damp*.15)*(1.-joint*.7);
-            }
-        } else if(floorBiome==4) {
-            // Egypt: sandstone blocks and fine turquoise seams within the
-            // temple courts, surrounded by muted wind-shaped sand.
-            base=mix(vec3(.163,.132,.087),vec3(.204,.171,.116),drift);
-            roughness=.84;reflectionMask=.13;
-            if(paved) {
-                float joint=floorJoint(p,vec2(1.6,.9),.8,.011,aa);
-                base=mix(vec3(.205,.179,.131),vec3(.259,.226,.164),slab);
-                base*=1.-joint*.24;
-                roughness=.64+slab*.10;reflectionMask=.27*(1.-joint*.65);
-                if(site==3 || site==7) {
-                    base=mix(base,vec3(.10,.22,.21),threads*.19);
-                    emission+=expedition_linear(vec3(.12,.48,.43))*threads*.012;
-                }
-            }
-        } else if(floorBiome==5) {
-            // Vietnam: compacted mud with damp depressions; pale, worn
-            // stepping stones identify bunkers and village courtyards.
-            float damp=smoothstep(.40,.82,drift);
-            base=mix(vec3(.083,.086,.060),vec3(.114,.117,.081),slab*.22+drift*.48);
-            roughness=mix(.78,.46,damp);reflectionMask=.15+damp*.29;
-            if(paved) {
-                float joint=floorJoint(p,vec2(1.2,.8),.6,.014,aa);
-                base=mix(vec3(.125,.135,.112),vec3(.159,.165,.135),slab);
-                base*=1.-joint*.25;
-                roughness=.65;reflectionMask=.29*(1.-joint*.65);
-            }
-        } else if(floorBiome==6) {
-            // Snow: dark blue stone under restrained windblown frost.
-            // Slow snow and slippery ice retain their distinct live overlays.
-            float frost=smoothstep(.55,.88,drift);
-            base=mix(vec3(.119,.155,.184),vec3(.266,.302,.328),frost*.55);
-            base*=.97+slab*.05;
-            roughness=.78;reflectionMask=.48;
-            if(paved) {
-                float joint=floorJoint(p,vec2(1.5,1.),.75,.012,aa);
-                base=mix(vec3(.170,.211,.240),vec3(.215,.253,.276),slab);
-                base*=1.-joint*.19;
-                roughness=.63;reflectionMask=.50*(1.-joint*.55);
-            }
-        } else if(floorBiome==7) {
-            // Basalt is cool, dark and angular. Orange cracks appear only
-            // through actual lava terrain or the eruption warning below.
-            float joint=floorJoint(p,vec2(1.5,1.3),.75,.013,aa);
-            base=mix(vec3(.065,.058,.065),vec3(.095,.081,.087),slab);
-            base*=mix(.94,1.045,facet)*(1.-joint*.21);
-            roughness=.48+slab*.18;
-            reflectionMask=(.37-facet*.06)*(1.-joint*.7);
-            if(site==3) {base*=1.10;roughness-=.08;reflectionMask+=.10;}
-        } else if(floorBiome==8) {
-            // Gothic: rain-dark stone with moss around real structures;
-            // the swamp remains a separately readable gameplay material.
-            float joint=floorJoint(p,vec2(.9,1.4),.45,.013,aa);
-            float damp=smoothstep(.20,.80,drift);
-            base=mix(vec3(.088,.101,.098),vec3(.125,.139,.133),slab);
-            base*=1.-joint*.22;
-            base=mix(base,vec3(.068,.086,.051),wallFoot*.23);
-            roughness=.60-damp*.22;
-            reflectionMask=(.40+damp*.26)*(1.-joint*.7);
-        } else if(floorBiome==9) {
-            // Sky marble: broad pearl slabs and sparse angular veins. Gold
-            // belongs to the inset platform fillets, never a luminous wash.
-            float joint=floorJoint(p,vec2(2.,2.),0.,.009,aa);
-            float fold=abs(fract(p.y*.11)-.5)*.22;
-            float vein=inkLine(fract(p.x*.16+p.y*.09+fold)-.5,.004,aa*.3);
-            base=mix(vec3(.207,.221,.241),vec3(.250,.260,.273),slab);
-            base=mix(base,vec3(.123,.144,.173),vein*.14);
-            base*=1.-joint*.16;
-            roughness=.32+slab*.14;
-            reflectionMask=(.52-vein*.12)*(1.-joint*.6);
-            if(site==3 || site==9) {base=mix(base,vec3(.29,.235,.142),threads*.30);}
-        } else if(floorBiome==10) {
-            // Space: dry, faceted asteroid dust surrounds brushed orbital
-            // decking. Fine panel joints interrupt the metallic reflections.
-            base=mix(vec3(.084,.094,.121),vec3(.119,.128,.151),facet*.35+slab*.4);
-            roughness=.84;reflectionMask=.16;
-            if(paved || site==1) {
-                float joint=floorJoint(p,vec2(2.,1.),1.,.010,aa);
-                base=mix(vec3(.105,.123,.157),vec3(.145,.160,.186),slab);
-                base*=1.-joint*.25;
-                roughness=.35+slab*.17;
-                reflectionMask=(.62-facet*.11)*(1.-joint*.7);
-            }
-        } else if(floorBiome==11) {
-            // Secret: quiet obsidian mirrors with gold inlay at authored
-            // platforms. The creator's archive keeps the visual emphasis.
-            float joint=floorJoint(p,vec2(4.,4.),0.,.010,aa);
-            base=mix(vec3(.054,.051,.068),vec3(.085,.078,.101),slab);
-            base*=mix(.94,1.045,facet)*(1.-joint*.17);
-            roughness=.19+slab*.15;
-            reflectionMask=(.73-facet*.12)*(1.-joint*.65);
-            if(paved) {
-                base=mix(base,vec3(.33,.258,.125),threads*.44);
-                emission+=expedition_linear(vec3(.65,.46,.18))*threads*.010;
-            }
+    bool indoor=site==2 || site==3 || site==4 || site==6 || site==7;
+    float crowd=expedition_sky_crowd(worldPosition);
+    float detailWeight=indoor?1.:smoothstep(.025,.22,crowd);
+    // A site's paved ground meets the open ground along the half level of its cells' membership, as the terrain
+    // patches do: built biomes keep straight edges, the others a gentle wobble and a cut line.
+    // The four cells whose centres frame the point, read once for the paved ground and the terrain patches.
+    vec2 around=p-.5;
+    ivec2 c0=ivec2(floor(around));
+    vec2 f=fract(around);
+    ivec4 near4[4]=ivec4[4](mapCell(c0),mapCell(c0+ivec2(1,0)),mapCell(c0+ivec2(0,1)),mapCell(c0+ivec2(1,1)));
+    vec3 base;
+    {
+        bool built=floorBiome==0 || floorBiome==3 || floorBiome==10;
+        if(built) base=paperGround(indoor);
+        else {
+        float m[4];
+        for(int i=0;i<4;i++) {
+            int k=near4[i].b&15;
+            m[i]=(k==2 || k==3 || k==4 || k==6 || k==7)?1.:0.;
+        }
+        float field=mix(mix(m[0],m[1],f.x),mix(m[2],m[3],f.x),f.y);
+        if(field>0. && field<1.) field+=(valueNoise(p*1.7+vec2(2.3,8.1))-.5)*.24*smoothstep(0.,.25,field)*(1.-smoothstep(.75,1.,field));
+        float paved=smoothstep(.5-.03-aa,.5+.03+aa,field);
+        base=mix(paperGround(false),paperGround(true),paved);
+        base=mix(base,base*vec3(.86,.84,.88),(1.-smoothstep(0.,.04+aa,abs(field-.5)))*.5);
         }
     }
-    if(site==15) {
-        // A cave's massif (expedition_floor_data.odin): bare rock, faintly of the biome, split by long cracks.
-        float slab=float(tile.b>>4)/15.;
-        // Few thin cracks, broken where a slow wave runs under them: no net of lines from afar.
-        float crack=inkLine(fract(p.x*.13+p.y*.07+sin(p.y*.29+p.x*.11)*.45)-.5,.005,aa)*step(.35,fract(p.y*.09+p.x*.05));
-        float seam=inkLine(fract(p.y*.11-p.x*.05+sin(p.x*.23)*.4)-.5,.004,aa)*step(.5,fract(p.x*.07-p.y*.03));
-        float grain=mix(.5,hash21(floor(p*3.)),clamp(1.-aa*4.,0.,1.));
-        base=mix(vec3(.112,.110,.118),vec3(.128,.125,.134),slab*.6+grain*.4);
-        base=mix(base,biomeTint*.30,.20);
-        base*=1.-max(crack,seam)*.24;
-        roughness=.88;reflectionMask=.06;contact=1.;
-    }
-    emission+=expedition_linear(biomeTint)*borderMask(tile.a&15,uv,.026,aa)*1.25;
-    emission+=expedition_linear(biomeTint)*borderMask(tile.a>>4,uv,.018,aa)*.44;
-    if(kind!=2) {
-        int terrain=tile.g&15;
+    if(site==15) base=mix(paperGround(false),vec3(.55,.46,.49),.45);
+    // Continue under props as well: clipping to walkable tiles exposes square
+    // collision footprints around narrow trunks and rocks. Solids hide their
+    // own centre; actual hazards and their banks still take precedence below.
+    float deposit=indoor?0.:paperDepositPermission(near4,f,aa);
+    if(deposit>0.) base=mix(base,paperAccumulation(p,base,aa,crowd),deposit);
+    base=paperDetails(p,base,aa,indoor,detailWeight);
+    if((cyber || floorBiome==1) && (tile.r&128)!=0) base=cyberWorkshopGround(p,base,aa);
+    if(cyber) base=cyberGroundContact(p,uv,(tile.b>>4)&15,base,aa);
+    base=paperStock(p,base,aa);
+    float roughness=.9;
+    float reflectionMask=.025;
+    vec3 emission=vec3(0.);
+    // A soft contact under the object, never the rectangular footprint of
+    // its collision cell. The same ground pigment continues underneath it.
+    float contact=1.-(kind==2?(1.-smoothstep(.13,.48,length(q*vec2(1.,1.25))))*.10:0.);
+    base=mix(base,cyber?vec3(.88,.27,.24):biomeTint*.65,borderMask(tile.a&15,uv,.026,aa)*.85);
+    {
+        // Terrain patches are cut paper laid on the ground: their outline is the half level of their membership
+        // interpolated between the four cell centres round the point, with a gentle wobble. A staircase of cells
+        // becomes one slanted cut, every cell's centre keeps exactly its own terrain, and only corners are shared.
+        int own=tile.g&15;
+        int terrain=(own>=2 && own<=8)?0:own;
+        float coverage=1.,cut=0.;
+        {
+            int t[4]=int[4](near4[0].g&15,near4[1].g&15,near4[2].g&15,near4[3].g&15);
+            float best=0.;
+            int bestTerrain=0;
+            bool uniformTerrain=t[0]==t[1] && t[0]==t[2] && t[0]==t[3];
+            if(uniformTerrain) {
+                if(t[0]>=2 && t[0]<=8) {best=1.;bestTerrain=t[0];}
+            } else for(int i=0;i<4;i++) {
+                int k=t[i];
+                if(k<2 || k>8) continue;
+                float v=mix(mix(float(t[0]==k),float(t[1]==k),f.x),mix(float(t[2]==k),float(t[3]==k),f.x),f.y);
+                if(v>best || (v==best && k==own)) {best=v;bestTerrain=k;}
+            }
+            if(bestTerrain!=0) {
+                float wobble=0.;
+                if(best>0. && best<1.) wobble=(valueNoise(p*2.1+vec2(4.7,1.3))-.5)*.26;
+                float field=best+wobble*smoothstep(0.,.25,best)*(1.-smoothstep(.75,1.,best));
+                float edge=smoothstep(.5-.03-aa,.5+.03+aa,field);
+                if(edge>.001) {terrain=bestTerrain;coverage=edge;cut=1.-smoothstep(.0,.045+aa,abs(field-.5));}
+            }
+        }
         // Cached boundaries replace four neighbouring texture fetches.
         int patchEdges=tile.g>>4;
-        float coverage=1.-borderMask(patchEdges,uv,.015,.16+aa);
+        if(terrain>=2 && terrain<=8) base=mix(base,base*vec3(.80,.78,.84),cut*.55);
         if(terrain==1) {
-            // The same electric cell now reads as a cyan panel inset into a
-            // dark metal bezel. Its bright pulse still matches the live beat.
-            float square=max(abs(q.x),abs(q.y));
-            float bezel=1.-smoothstep(.29,.29+aa,square);
-            float panel=1.-smoothstep(.22,.22+aa,square);
-            float rim=inkLine(square-.26,.009,aa);
+            // A small drawn bolt identifies the real electric cell. No blue
+            // square, plate or bezel under it; its pulse follows the beat.
+            float bolt=max(drawnSegment(q,vec2(.045,-.16),vec2(-.065,.015),.018,aa),
+                drawnSegment(q,vec2(-.065,.015),vec2(.065,-.015),.018,aa));
+            bolt=max(bolt,drawnSegment(q,vec2(.065,-.015),vec2(-.045,.16),.018,aa));
             float energized=worldBeat==0?1.:.18;
-            base=mix(base,vec3(.018,.028,.043),bezel);
-            base=mix(base,vec3(.025,.10,.15),panel);
-            emission+=expedition_linear(vec3(.12,.62,1.))*(panel*(.17+energized*.66)+rim*.045);
-            roughness=mix(roughness,.18,bezel);
-            reflectionMask*=1.-panel*.82;
+            base=mix(base,mix(vec3(.67,.43,.22),vec3(1.,.64,.13),energized),bolt*.8);
+            emission+=expedition_linear(vec3(1.,.55,.10))*bolt*energized*.13;
         } else if(terrain==2) {
-            float ripple=.5+.5*sin(p.x*3.+sin(p.y*1.3)*.7);
-            base=mix(base,vec3(.14,.105,.055),coverage*(.25+.13*ripple));
+            base=mix(base,vec3(.68,.44,.27),coverage*.38);
             roughness=max(roughness,.65);
         } else if(terrain==3) {
-            float blade=inkLine(fract(p.x*2.8+p.y*.65)-.5,.026,aa*2.8);
-            base=mix(base,vec3(.05,.12,.035),coverage*(.3+blade*.2));
+            base=mix(base,vec3(.49,.68,.30),coverage*.22);
+            base=paperDetails(p+vec2(.83,1.41),base,aa,false,detailWeight);
             roughness=max(roughness,.55);
         } else if(terrain==4 || terrain==8) {
-            vec3 wet=terrain==4?vec3(.045,.18,.22):vec3(.11,.17,.075);
-            vec3 glint=terrain==4?vec3(.18,.40,.44):vec3(.25,.34,.16);
+            vec3 wet=terrain==4?vec3(.31,.65,.67):vec3(.49,.60,.29);
+            vec3 glint=terrain==4?vec3(.71,.90,.81):vec3(.85,.80,.41);
             float ripple=inkLine(sin(p.x*2.2+p.y*3.+worldClock*.7),.04,aa*3.);
-            // Bank highlights follow only the outer terrain boundary, so
-            // adjacent wet cells still read as one continuous slow region.
-            float bank=borderMask(patchEdges,uv,.035,aa);
+            // Bank highlights follow only the patch's cut, so adjacent wet
+            // cells still read as one continuous slow region.
+            float bank=cut;
             base=mix(base,wet,coverage*(.72+.06*ripple));
             roughness=mix(roughness,.12,coverage);
             emission+=expedition_linear(glint)*(bank*.16+ripple*coverage*.10);
         } else if(terrain==5) {
             float vein=inkLine(sin(p.x*2.+sin(p.y*1.7)*1.4),.025,aa*3.);
-            base=mix(base,vec3(.12,.22,.29),coverage*(.5+.12*vein));
+            base=mix(base,vec3(.54,.78,.85),coverage*(.42+.12*vein));
             emission+=expedition_linear(vec3(.25,.56,.72))*vein*coverage*.13;
             roughness=mix(roughness,.1,coverage);
         } else if(terrain==6) {
-            float grain=mix(.5,hash21(floor(p*5.)),clamp(1.-aa*5.,0.,1.));
-            base=mix(base,vec3(.22,.27,.31),coverage*(.42+grain*.12));
+            base=mix(base,vec3(.61,.54,.53),coverage*.26);
+            base=paperDetails(p+vec2(1.71,.74),base,aa,true,detailWeight);
             roughness=max(roughness,.68);
         } else if(terrain==7) {
             float flow=.5+.5*sin(p.x*3.7+sin(p.y*3.1+worldClock*.35)+worldClock*.9);
@@ -553,10 +569,13 @@ void floorMain() {
             roughness=mix(roughness,.3,coverage);
         } else if(terrain==9) {
             float opened=worldBeat<2?1.:.08;
-            float rails=max(inkLine(abs(q.x)-.33,.018,aa),inkLine(abs(q.y)-.33,.018,aa));
-            float crossbar=inkLine(q.x+q.y,.014,aa);
-            base=mix(base,biomeTint*.14,opened*.3);
-            emission+=expedition_linear(biomeTint)*(rails+crossbar*.35)*opened*(floorBiome==9?.42:.75);
+            // Two short drawn gusts show the phase of the actual wind cell.
+            // They replace the old repeated square lattice.
+            float gust=drawnSegment(q,vec2(-.18,.055),vec2(.11,.055),.012,aa);
+            gust=max(gust,inkLine(length(q-vec2(.11,-.015))-.07,.012,aa)*step(.10,q.x));
+            gust=max(gust,drawnSegment(q,vec2(-.10,-.09),vec2(.04,-.09),.010,aa));
+            base=mix(base,vec3(.69,.47,.24),gust*opened*.6);
+            emission+=expedition_linear(biomeTint)*gust*opened*.20;
             roughness=.16;
         } else if(terrain==10) {
             float r=length(q),ring=inkLine(r-.34,.018,aa);
@@ -564,6 +583,8 @@ void floorMain() {
             float spoke=.6+.4*sin(atan(q.y,q.x)*3.-worldClock*2.);
             emission+=expedition_linear(vec3(.48,.26,1.))*(ring+orbit*.5)*spoke*(floorBiome==10?.5:.85);
         }
+    }
+    if(kind!=2) {
         // Uniform branch: exploration spends no fragment work on up to
         // nine actor-distance/smoothstep evaluations for an invisible grid.
         if(gridAmount>0.) {
@@ -576,7 +597,8 @@ void floorMain() {
             float edge=max(abs(q.x),abs(q.y));
             float inset=1.-smoothstep(.44,.45+aa,edge);
             float rim=inkLine(edge-.45,.008,aa);
-            base=mix(base,base*1.28+biomeTint*.012,focus*inset);
+            base=mix(base,vec3(.62,.83,.86),focus*inset*.22);
+            base=mix(base,vec3(.15,.39,.48),rim*focus*.65);
             emission+=expedition_linear(biomeTint)*rim*focus*.22;
         }
         bool vertical=warningLane.y>.5;
@@ -589,19 +611,21 @@ void floorMain() {
             emission+=expedition_linear(vec3(1.,.25,.035))*(.16+hatch*.4)*pulse;
         }
     }
-    // The higher the ground, the lighter: ten percent a step, so that hills and dunes read from above; no more
-    // than six steps' worth, so that a mountain's top is not white. Under the board's plane, in a pit dug under a raised
+    // Height adds only a small value change to the light stock, capped at six steps so the print does not wash out.
+    // Under the board's plane, in a pit dug under a raised
     // map's base (a stair's, a crevasse), the darker the deeper.
-    base*=1.+clamp(worldPosition.y,0.,.72)*.9;
+    base*=1.+clamp(worldPosition.y,0.,.72)*.10;
     base*=1.-smoothstep(0.,1.7,-worldPosition.y)*.45;
     // The sculpted ground's own normal, smoothed across ramps and hills: a slope turned to the light is lighter.
     vec3 n=normalize(normal);
-    vec3 lit=expedition_lit(worldPosition,n,base,roughness,.3)*contact;
+    vec3 lit=expedition_lit_with_crowd(worldPosition,n,base,roughness,.3,crowd)*contact;
     lit+=expedition_reflection(worldPosition,n,roughness)*reflectionMask*contact;
     // The top edge of a cliff glows faintly in the biome's colour: the relief's vertices carry in their alpha how
     // near such an edge a point is (0 on it, 1 away from it; the plane is always 1).
     float cliff=1.-smoothstep(0.,.08,color.a);
-    emission+=expedition_linear(biomeTint)*cliff*.45;
+    if(cyber) {
+        if(cliff>0.) lit=mix(lit,expedition_lit_with_crowd(worldPosition,n,vec3(.77,.60,.42),.9,.02,crowd),cliff*.58);
+    } else emission+=expedition_linear(biomeTint)*cliff*.45;
     finalColor=vec4(lit+emission,1.);
 }
 `
@@ -626,6 +650,9 @@ load_expedition_floor_program :: proc(p:^Expedition_Floor_Program,source:cstring
 	p.lane_warning=rl.GetShaderLocation(shader,"laneWarning")
 	p.focus=rl.GetShaderLocation(shader,"gridFocus[0]");p.focus_count=rl.GetShaderLocation(shader,"gridFocusCount")
 	p.grid_amount=rl.GetShaderLocation(shader,"gridAmount");p.surface=rl.GetShaderLocation(shader,"floorSurface")
+	p.cyber_workshops=rl.GetShaderLocation(shader,"cyberWorkshops[0]")
+	p.cyber_workshop_count=rl.GetShaderLocation(shader,"cyberWorkshopCount")
+	p.workshop_stock=rl.GetShaderLocation(shader,"workshopStock")
 	p.reveal_eye=rl.GetShaderLocation(shader,"eye");p.reveal_forward=rl.GetShaderLocation(shader,"viewForward")
 	p.reveal_viewport=rl.GetShaderLocation(shader,"viewport")
 	p.reveal_points=rl.GetShaderLocation(shader,"reveal[0]");p.reveal_count=rl.GetShaderLocation(shader,"revealCount")
@@ -634,6 +661,9 @@ load_expedition_floor_program :: proc(p:^Expedition_Floor_Program,source:cstring
 	p.lights=expedition_light_uniforms(shader);p.reflection=expedition_reflection_uniforms(shader)
 	// A block drawn from the video card binds the floor's map as its material's second map (draw_terrain_chunk).
 	p.shader.locs[rl.ShaderLocationIndex.MAP_METALNESS]=p.map_data
+	// Batch texture units are floorMap=1, stock=2, reflectionSharp=3.
+	// Mesh maps must preserve those slots; ROUGHNESS=3 would replace a reflection.
+	p.shader.locs[rl.ShaderLocationIndex.MAP_NORMAL]=p.workshop_stock
 	return true
 }
 
@@ -656,6 +686,7 @@ destroy_expedition_floor :: proc(renderer:^Renderer) {
 	if renderer==nil || renderer.tactical.expedition_floor==nil {return}
 	f:=renderer.tactical.expedition_floor
 	if f.texture.id!=0 {rl.UnloadTexture(f.texture)}
+	for stock in f.workshop_stock {if stock.id!=0 {rl.UnloadTexture(stock)}}
 	if f.plain.shader.id!=0 {rl.UnloadShader(f.plain.shader)}
 	if f.tall.shader.id!=0 && f.tall.shader.id!=f.plain.shader.id {rl.UnloadShader(f.tall.shader)}
 	destroy_expedition_terrain(&f.terrain)
@@ -691,6 +722,12 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	rl.SetShaderValue(shader,p.biome,&biome,.INT)
 	rl.SetShaderValue(shader,p.lane,&lane,.VEC4);rl.SetShaderValue(shader,p.lane_warning,&warning,.INT)
 	rl.SetShaderValue(shader,p.surface,&surface,.VEC2)
+	f.active_stock=ensure_workshop_stock(f,w.biome)
+	workshops,workshop_count:=cyber_floor_workshops(w)
+	if f.active_stock.id==0 {workshop_count=0}
+	workshop_uniform_count:=c.int(workshop_count)
+	rl.SetShaderValue(shader,p.cyber_workshop_count,&workshop_uniform_count,.INT)
+	if workshop_count>0 {rl.SetShaderValueV(shader,p.cyber_workshops,&workshops[0],.VEC4,workshop_uniform_count)}
 	count:c.int;amount:f32
 	if m:=renderer.tactical.expedition_material;m!=nil {
 		count=c.int(m.focus_point_count);amount=m.grid_amount
@@ -717,6 +754,7 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	f.bound=p
 	defer f.bound=nil
 	rl.SetShaderValueTexture(shader,p.map_data,f.texture)
+	if f.active_stock.id!=0 {rl.SetShaderValueTexture(shader,p.workshop_stock,f.active_stock)}
 	set_expedition_reflection(renderer,shader,p.reflection)
 	draw_expedition_floor_plane(renderer,room,dimensions)
 	draw_expedition_terrain(renderer,room)

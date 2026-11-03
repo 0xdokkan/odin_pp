@@ -8,8 +8,8 @@ import rl "vendor:raylib"
 EXPEDITION_PAPER_PARTS :: 96
 Expedition_Paper_Part :: struct { points:[12]rl.Vector2, count:int, color:rl.Color, edge:bool }
 Expedition_Paper :: struct { parts:[EXPEDITION_PAPER_PARTS]Expedition_Paper_Part, count:int, cutout:bool }
-EXPEDITION_PAPER_EDGE :: rl.Color{235,223,195,255}
-EXPEDITION_PAPER_INK :: rl.Color{24,25,32,255}
+EXPEDITION_PAPER_EDGE :: rl.Color{255,242,209,255}
+EXPEDITION_PAPER_INK :: rl.Color{20,29,43,255}
 
 @(private)
 paper_polygon :: proc(model:^Expedition_Paper,points:[]rl.Vector2,color:rl.Color,edge:bool=true) {
@@ -92,6 +92,8 @@ draw_cutout_piece :: proc(part:^Expedition_Paper_Part,base,right,normal:rl.Vecto
 		// A stable, slightly uneven scissor edge, independent of frame time/RNG.
 		w:=width*(.94+f32((index*7+j*11)%5)*.035) if rough else width
 		q:=paper_cut_vertex(part,j,w)
+		// The cut ends at the feet. Paper never curls under them into a base.
+		q.y=max(q.y,0)
 		vertices[j]=base+right*(q.x*scale*flip*horizontal_scale)+rl.Vector3{0,q.y*scale,0}+normal*depth
 	}
 	for j in 1..<part.count-1 {
@@ -103,20 +105,19 @@ draw_cutout_piece :: proc(part:^Expedition_Paper_Part,base,right,normal:rl.Vecto
 // All cream silhouettes are drawn before any print, so overlapping pieces
 // merge into one cut sheet instead of looking like separately edged metal.
 @(private)
-draw_expedition_cutout :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,horizontal_scale:f32) {
+draw_expedition_cutout :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,horizontal_scale:f32,border_scale:f32=1) {
 	normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	flip:f32=-1 if mirror else 1
-	for pass in 0..<3 {
-		width:f32=.115 if pass==0 else (.102 if pass==1 else .097)
-		color:=rl.Color{46,31,29,170} if pass==0 else (rl.Color{151,125,85,255} if pass==1 else EXPEDITION_PAPER_EDGE)
-		offset:=right*.045+rl.Vector3{0,-.036,0} if pass==0 else (right*.018+rl.Vector3{0,-.013,0} if pass==1 else rl.Vector3{})
+	for pass in 0..<2 {
+		width:=(f32(.070) if pass==0 else .053)*border_scale
+		color:=EXPEDITION_PAPER_INK if pass==0 else EXPEDITION_PAPER_EDGE
 		for &part,i in m.parts[:m.count] {
 			if !part.edge {continue}
-			draw_cutout_piece(&part,base+offset*scale,right,normal,scale,flip,horizontal_scale,width,-.03+f32(pass)*.008,color_with_opacity(color,opacity),true,i)
+			draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,width,-.004+f32(pass)*.002,color_with_opacity(color,opacity),true,i)
 		}
 	}
 	for &part,i in m.parts[:m.count] {
-		depth:=.002*f32(i)
+		depth:=.0001*f32(i)
 		if part.edge {draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,.022,depth,color_with_opacity(EXPEDITION_PAPER_INK,opacity))}
 		draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,0,depth+.0005,color_with_opacity(part.color,opacity))
 	}

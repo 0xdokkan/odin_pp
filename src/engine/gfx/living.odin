@@ -12,7 +12,7 @@ import rl "vendor:raylib"
 
 // The drawing paper of a living card: whiter than the classic card, so the
 // light cloaks and robes stand out on it.
-LIVING_SHEET_COLOR :: [3]f32{0.945, 0.937, 0.902}
+LIVING_SHEET_COLOR :: [3]f32{1.0, 0.949, 0.820}
 
 // The action ring: a line `width` screen pixels wide along the card's cut (the
 // outer edge of its ink). Drawn with the card's field on a quad larger than

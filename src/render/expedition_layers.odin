@@ -84,7 +84,7 @@ set_expedition_cave_view :: proc(renderer: ^Renderer, room: ^game.Room, w: ^worl
 
 @(private = "file")
 under_vertex :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, p, normal: rl.Vector3, color: rl.Color) {
-	append(vertices, Expedition_Baked_Vertex{p, normal, color})
+	append(vertices, Expedition_Baked_Vertex{p, normal, color, {2,2}})
 }
 
 // A wall of rock on side `side` of the floor cell at (x, y) (TERRAIN_SIDES' order: north, east, south, west), from

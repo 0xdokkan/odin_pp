@@ -18,6 +18,7 @@ check_dir="$(mktemp -d "${TMPDIR:-/tmp}/odin_pp-check.XXXXXX")"
 trap 'rm -rf -- "$check_dir"' EXIT HUP INT TERM
 
 "$odin_compiler" version
+python3 tools/art/build_workshop_stock.py --check
 printf 'Test profile: %s\n' "$(if "$full_tests"; then printf full; else printf quick; fi)"
 "$odin_compiler" check src -vet -strict-style -define:ODIN_TEST_FULL="$full_tests"
 "$odin_compiler" test src -all-packages -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FULL="$full_tests" -o:none -out:"$check_dir/tests"

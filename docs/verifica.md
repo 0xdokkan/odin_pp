@@ -2,10 +2,77 @@
 
 ## Verifica e smoke test
 
+Il resoconto della sessione del 30 ottobre 2026, con provenienza delle catture,
+costi e limiti residui, è in
+[`VERIFICA_MOONSHOT.txt`](riferimenti/cartoncino-cartoon/VERIFICA_MOONSHOT.txt).
+La direzione complessiva dei prossimi interventi è descritta in
+[`PROMPT_MOONSHOT_MONDO_ILLUSTRATO.txt`](riferimenti/cartoncino-cartoon/PROMPT_MOONSHOT_MONDO_ILLUSTRATO.txt).
+La prima scena Cyber di questa direzione, con terreno, officina e rifugio,
+è verificata in [`VERIFICA_SCENA_CYBER.txt`](riferimenti/cartoncino-cartoon/VERIFICA_SCENA_CYBER.txt).
+La fase successiva (cache terreno, HUD e scena West) è descritta in
+[`VERIFICA_MONDO_ILLUSTRATO_STEP2.txt`](riferimenti/cartoncino-cartoon/VERIFICA_MONDO_ILLUSTRATO_STEP2.txt).
+
 Le catture native e i report degli scenari sono in `build/captures/`, relativa
 alla directory di avvio e già ignorata da Git. I nomi dei file restano stabili
 per i confronti. Anche F8 usa questa directory; gli output di telemetria
 specificati esplicitamente da CLI mantengono il percorso richiesto.
+
+Per la migrazione cartoon, `--smoke-expedition` conserva le 195 viste del
+percorso precedente e aggiunge tre scene con tutti i ruoli Cyber, fermi e con
+movimento/IA attivi. `ODIN_PP_SMOKE_ONLY=cartoon` parte da queste scene.
+`ODIN_PP_SMOKE_ONLY=palette` cattura soltanto le dodici officine (stadi 39–50)
+per confrontare velocemente terreno, architettura e palette, poi termina.
+Restano le tre letture HDR/bloom/riflessi e i resize.
+Il selettore `ODIN_PP_SMOKE_ONLY=presentation` percorre le prime 27 scene,
+compresi HDR, resize e occlusione. `ODIN_PP_SMOKE_ONLY=costumes` aggiunge
+33 scene: undici biomi non Cyber, sei ruoli e tre stati di movimento/IA.
+Controlla inoltre che gli ID dei sei atlanti di attori, prop e officina Cyber non cambino
+durante i ridimensionamenti. Produce dettagli nativi, ritagliati dal framebuffer
+senza riscalatura: `odin_pp_cartoncino_robot.png`, `robot_scontro.png`,
+`movimento.png` e `nemico_0.png`/`nemico_1.png` (prefisso comune
+`odin_pp_cartoncino_`); `ruoli_<fase>.png` e `ruolo_<tipo>_<fase>.png` coprono
+le nuove scene. I test di `expedition_cartoon_test.odin` controllano
+connessione della sagoma, assenza di una placca sotto i piedi, colori discreti,
+animazioni dei ruoli e accordo tra trasparenza e ray picking. Confrontare
+anche officine, occlusione, terreni rialzati e biomi; la suite headless non
+sostituisce l'ispezione delle catture.
+
+`ODIN_PP_SMOKE_ONLY=cyber-scene` seleziona un percorso nativo di dodici atti:
+ingresso nell'officina con WASD, interazione con E, ritorno all'ingresso,
+rifugio da fuori/soglia/dentro/fuori, rilievo, combattimento con una carta
+selezionata da tastiera e giocata con il mouse, officina da una seconda vista.
+I cambi di posizione diretti preparano gli atti separati; i tratti di percorso
+usano l'update normale, le collisioni reali e i comandi di esplorazione.
+Il controllo verifica le celle raggiunte, l'interazione, il tetto nascosto
+all'interno e ripristinato all'esterno, HDR e identità dei sei atlanti.
+Le 26 catture `odin_pp_cyber_scene_*.png` includono 14 fotogrammi intermedi
+dei tratti percorsi. Baseline e risultato sono archiviati separatamente in
+`build/cyber-scene/before/` e `build/cyber-scene/after/`.
+
+`ODIN_PP_SMOKE_ONLY=west-scene` esegue gli stessi dodici atti nel West;
+il driver degli edifici sceglie waypoint percorribili, poi invia WASD tramite
+l'input reale, aggirando anche i prop fra porta e punto esterno. Le catture
+usano il prefisso `odin_pp_west_scene_`. Entrambi i percorsi verificano la
+pittura 1024×1024 con undici livelli mip e l'ID stabile della texture.
+Il percorso `presentation` controlla lo stesso ID durante i resize.
+Gli archivi della seconda fase sono in `build/illustrated-world-step2/`:
+`before/`, `pass1/` e `after/`. Non confondere la baseline West parziale
+(senza edifici) con il percorso finale completo.
+
+Nel controllo del terreno, verificare le campiture continue in esplorazione
+e nelle grotte: nessuna trama a quadri o pannello blu decorativo. I piccoli
+fulmini ocra sono la rappresentazione del terreno elettrico reale; gli altri
+terreni speciali e la griglia di combattimento mantengono le loro indicazioni.
+Le celle del vento Sky usano riccioli pulsanti, senza una griglia decorativa.
+Controllare che il pavimento prosegua sotto le piante senza un rettangolo
+schiarito, che felci e cristalli tocchino terra e che gli architravi poggino
+sulle colonne. Sulle pareti, cercare cuciture puntinate durante il movimento,
+cornici sovrapposte e contorni interni nei tratti continui; i motivi devono
+restare aderenti alla faccia e attenuarsi quando diventano subpixel.
+Confrontare le palette nelle dodici `officina_*.png`, oltre a Cyber, e aprire
+anche le catture native di hub, FPS e platform 3D dopo i cambi ai materiali
+condivisi.
+
 I test di integrazione dell'applicazione vivono in `src/integration`; il ponte
 `src/integration_test.odin` li rende raggiungibili da `-all-packages` senza
 introdurre dipendenze inverse nei package di produzione.
@@ -13,6 +80,12 @@ introdurre dipendenze inverse nei package di produzione.
 [Lo script di verifica](../scripts/check.sh) esegue controllo statico, suite di tutti
 i package e link della demo, sia con assert attivi sia con `-disable-assert`.
 I binari sono temporanei; `ODIN` può indicare un compilatore alternativo.
+Serve anche **Python 3** nel `PATH`: `check.sh` invoca `python3`, mentre
+`check.ps1` invoca `python` e richiede che questo comando sia Python 3.
+Entrambi verificano prima delle suite il manifest e gli hash del pigmento
+officine con `tools/art/build_workshop_stock.py --check`. Il controllo usa
+solo la libreria standard Python e non rigenera gli asset; se sono obsoleti,
+seguire le [istruzioni del generatore](../tools/art/README.md#pigmento-officine-p1).
 
 Il caricamento dei salvataggi decodifica le struct grandi campo per campo:
 il decoder JSON della toolchain fissata accumula altrimenti sullo stack una
@@ -192,3 +265,82 @@ più run riproducibili e misurare:
 
 Root, coni e costi dinamici devono rispondere a un bisogno ripetuto dei
 playtest, non alla sola possibilità tecnica di aggiungerli.
+
+### Verifica del sole e del redesign
+
+[`VERIFICA_REDESIGN_SOLE.txt`](riferimenti/cartoncino-cartoon/VERIFICA_REDESIGN_SOLE.txt)
+distingue sorgenti integrati, verifiche concluse e misure in corso. Una compilazione
+Odin non sostituisce il caricamento GLSL sulla GPU.
+
+Eseguire gli smoke in directory separate: `build/captures/` è relativo alla
+directory di avvio. Creare il link agli asset solo quando non esiste:
+`[ -e assets ] || ln -s /Users/dokkan/Dev/odin_pp/assets assets`.
+Non usare `ln -sf` su un link esistente. Tenere attivo lo schermo durante
+le catture: lo stop può impedire l'apertura della finestra.
+
+Oltre a `palette`, `cartoon`, `costumes`, `presentation`, `cyber-scene` e
+`west-scene`, eseguire lo smoke completo. Verificare uscita regolare,
+`RENDER CHECK` sopra le soglie e assenza di `Expedition sun unavailable`.
+Aprire grotte, complessi, ponti, rete, montagna, rilievi, edifici e scontri.
+Il selettore `sun-fps` esercita la prima persona reale con il sole e il ritorno
+alla vista dall'alto. La verifica A è conclusa sulla build con il fix deck;
+lo smoke completo è passato anche nelle build integrate v2 ed E attiva v3.
+Gli esiti appartengono agli hash dei binari nei rispettivi `run.json`;
+non valgono automaticamente per modifiche successive.
+L'ologramma usa una pipeline indipendente.
+
+Controllare ombre ancorate, assenza di acne, bordo mappa sfumato e tetto
+escluso dai caster all'interno. La dissolvenza alla soglia può conservare
+l'ombra della copertura ancora presente; il criterio funzionale è
+`roof=false` dentro e il ritorno dell'ombra fuori. Le catture ogni 30 frame
+mostrano salti grandi ma non certificano il tremolio fra frame adiacenti.
+Conservare anche verifiche di resize e identità degli atlanti.
+
+Per l'A/B compilare gli stessi sorgenti con e senza
+`-define:EXPEDITION_SUN=false`, separatamente in `-o:none` e `-o:speed`.
+Canvas 1920×1080, vsync disattivata, 60 frame di riscaldamento, 600 campioni
+per officine e scontro; i percorsi in movimento conservano 240 campioni.
+Alternare A,B,B,A,A,B e pubblicare tutte le corse, media/p95/massimo,
+`CPU SUBMISSION` e `CPU WORLD`. Scene 25–26, 39–40 e 195. Il target resta
+p95 ≤ 16,7 ms a 1080p sul M1, da verificare con i risultati.
+
+I sorgenti antecedenti al sole sono stati ritrovati in
+`build/camera-horizon/before/sources`. Il manifest della copia strumentata
+`build/redesign-sole/session-20261103/bench-sources/historical/manifest.json`
+registra origine, hash e sole modifiche di misura. Confrontare storico,
+attuale senza sole e attuale con sole nella stessa sessione.
+`B1-RESULTS.txt` nella directory di sessione contiene le 18 corse della
+baseline conservata, tutte incluse: la regressione persiste senza sole,
+ma questi dati non isolano una causa e non misurano il redesign finale.
+Le medie dei tre p95 non sono percentili dei campioni aggregati. I tratti
+25/26 usano `dt` reale e non garantiscono traiettorie identiche fra build;
+non confonderli con il diagnostico di continuità a passo fisso.
+`B-FINAL-RESULTS.txt` contiene tutte le 42 corse di follow-up, incluse
+le dodici del confronto integrato. Nessun p95 raggiunge 16,67 ms;
+la regressione del tratto montato debug resta aperta e viene indagata con
+sei corse aggiuntive a `dt` fisso, senza eliminare i risultati originali.
+
+Per P1, `python3 tools/art/build_workshop_stock.py --check` verifica
+manifest e hash; `--verify` rigenera il pigmento dalle routine Odin e
+confronta integralmente pixel e roundtrip PNG. La validità del contenuto
+non misura il costo di decode/upload o la pausa del primo caricamento.
+
+Per verificare l'integrazione C–G ricontrollare celle e confini dei blocchi, ownership
+delle cache, budget edifici, fioriere e angoli. Poi confronti palette,
+percorsi Cyber/West e Snow/Jungle/Egypt/Inferno per gli accumuli. Provare E
+anche con tinte permanenti del bioma, flash e attori parzialmente in ombra.
+E al 15% è stata approvata dall'utente ed è attiva di default; il flag
+`-define:EXPEDITION_ACTOR_SHADOW=false` mantiene disponibile il confronto.
+
+`objects` confronta sei tipi × cinque biomi × due rotazioni, con originali
+960×540 e nativi; `objects-fallback` forza la cache fallita sui dodici casi
+Cyber. Il test degli assi verifica entrambi i tappi, anche dopo specchio.
+Strict check e renderer 477/477 con E attiva passano dopo questo fix;
+il quick globale 1885/1885 precede l'aggiunta del nuovo test degli assi.
+
+`cyber-walk` percorre una sola mappa con input reali, senza teletrasporti
+fra waypoint: pressa/interazione, rifugio dentro/fuori, rilievo e scontro
+con passo e carta confermati. La prova v2 termina in 60,58 s simulati,
+37,58 s in movimento, 89,74 s reali dopo primo present e 10,12 s d'avvio.
+È una sessione continua con soste; `cyber-scene` conserva invece i quadri
+con setup separati e da solo non certifica questo percorso.

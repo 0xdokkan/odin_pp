@@ -1,0 +1,268 @@
+ODIN PP — MOONSHOT GRAFICO DEL CARTONCINO CARTOON
+
+Implementa nel gioco realmente eseguibile un salto sostanziale di qualità
+artistica della direzione cartoncino cartoon già avviata. Lavora su renderer,
+asset e presentazione; porta il risultato fino alla verifica nel gioco.
+
+OBIETTIVO ARTISTICO
+
+Voglio un'illustrazione animata nella quale si possa giocare: personaggi,
+architettura, vegetazione, macchinari e terreno devono sembrare progettati
+dalla stessa mano. Forme espressive, campiture luminose, inchiostro deciso,
+ombre colorate e dettagli scelti con cura. Il mondo deve avere la qualità
+visiva di un gioco indie fortemente caratterizzato anche quando è fermo,
+e diventare più vivo e piacevole in movimento.
+
+Il limite attuale da superare è concreto: l'ambiente mostra ancora troppo
+la costruzione da scatole, prismi e motivi ripetuti. Il moonshot deve migliorare
+silhouette, illustrazioni sulle superfici, composizione e animazione.
+Una sola ricolorazione o l'aggiunta di post-processing non basta.
+
+1. RICOSTRUISCI LO STATO REALE E APRI LE IMMAGINI
+
+- Lavora dalla radice del repository. Leggi le istruzioni locali applicabili,
+  controlla branch, worktree e modifiche presenti. Preserva il lavoro esistente,
+  compresi file nuovi non tracciati: la migrazione precedente può non essere
+  ancora stata committata. Non resettare o ricostruire tutto da HEAD.
+- Leggi README.md, docs/architettura.md, docs/sviluppo.md,
+  docs/presentazione.md, docs/verifica.md e tools/art/README.md.
+- Leggi docs/riferimenti/cartoncino-cartoon/PROMPT_PROSSIMA_SESSIONE.txt
+  come contesto della migrazione precedente. Questo nuovo prompt e le
+  correzioni elencate sotto definiscono il lavoro successivo.
+- Apri VISIVAMENTE i tre riferimenti originali:
+  docs/riferimenti/cartoncino-cartoon/01-sprite-forma-finale.png
+  docs/riferimenti/cartoncino-cartoon/02-esplorazione-composizione.png
+  docs/riferimenti/cartoncino-cartoon/03-combattimento-composizione.png
+  Il riferimento 01 prevale per sagoma e contatto col terreno. Le vecchie
+  basi e i sostegni visibili in 02/03 sono superati e non vanno riprodotti.
+- Confrontali con catture NATIVE dell'attuale eseguibile, almeno Cyber,
+  un bioma caldo, uno naturale e uno freddo, oltre al combattimento.
+  build/captures/ contiene le viste dello smoke, ma potrebbero essere vecchie:
+  controllane la provenienza o rigenerale. Archivia una baseline separata
+  prima che i nuovi smoke sovrascrivano i file.
+
+2. CORREZIONI APPROVATE DA CONSERVARE
+
+- Personaggi e nemici: stampa animata dentro una sagoma stabile, ritagliata
+  sul profilo, con inchiostro scuro e margine avorio. Piedi riconoscibili e
+  direttamente appoggiati al terreno. Nessun cavalletto, triangolo, aletta,
+  piedistallo, placca separata o effetto adesivo sospeso.
+- Vegetazione e oggetti disegnati: radici, steli e parte inferiore nascono
+  direttamente dal pavimento. Nessun vassoio sotto le piantine Cyber.
+  Il terreno deve continuare sotto l'oggetto: non schiarire o incorniciare
+  l'intera cella di collisione, ricreando una basetta attraverso lo shader.
+- Terreno uniforme, con piccoli dettagli disegnati nello stile degli sprite.
+  Niente quadratini, quadratoni, scacchiere o griglie usati come texture,
+  e niente vecchi pannelli elettrici blu nel primo bioma.
+- Le indicazioni funzionali del terreno restano comprensibili: fulmini ocra
+  per l'elettricità, piccoli riccioli per il vento, acqua, ghiaccio, lava e
+  altri pericoli riconoscibili. Conserva le loro regole e il loro battito.
+  La griglia tattica e gli indicatori di bersaglio rimangono overlay di gioco.
+- Colori vivi e separati, palette calde armonizzate anche negli altri livelli,
+  rispettando l'identità di neve, spazio, giungla e degli altri biomi.
+- Pareti continue e rifinite. Evita cornici annidate su ogni faccia, rilievi
+  quasi coplanari, cuciture puntinate e dettagli che scintillano muovendosi.
+
+3. DIREZIONE DEL MOONSHOT, IN ORDINE DI IMPORTANZA
+
+A. SILHOUETTE E OGGETTI ILLUSTRATI
+
+Questo è l'intervento principale. Progetta una famiglia di forme intenzionali,
+riconoscibili anche senza texture e senza etichette. Ammorbidisci i profili,
+introduci piccole asimmetrie controllate, scegli proporzioni più espressive.
+Mantieni gli ingombri nelle celle realmente occupate e i percorsi liberi.
+
+Per Cyber, realizza un'officina che sembri abitata: armadi dalle proporzioni
+cartoon, pannelli disegnati, monitor leggibili, bracci industriali con giunti
+chiari, vegetazione con foglie ampie e attrezzature dal ruolo riconoscibile.
+Un cavo disegnato, un'etichetta o una presa ben collocata devono contribuire
+alla lettura dell'oggetto. Non distribuire bulloni, targhe e graffi ovunque.
+
+Crea una piccola libreria curata di moduli e varianti realmente riutilizzabili.
+La variazione deve venire dal disegno e dalla composizione, non da rumore
+casuale, scalature arbitrarie o dallo stesso glifo ripetuto su ogni materiale.
+Gli altri biomi devono avere famiglie proprie: legno e attrezzature West,
+pietra e vegetazione Jungle, forme scolpite Egypt, ghiaccio Snow, eccetera.
+Condividono grammatica e qualità, non semplicemente lo stesso modello tinto.
+
+B. SUPERFICI DISEGNATE E GERARCHIA DEL SEGNO
+
+Le superfici grandi devono portare illustrazioni intenzionali: una venatura
+di legno, pochi giunti di pietra, un riflesso dipinto, una finestra, un fianco
+di macchina. Organizza campitura, ombra e dettaglio in masse leggibili.
+Evita sia il cubo vuoto sia il riempimento uniforme di microdecorazioni.
+
+Contorno principale deciso; segni interni più sottili e meno contrastati;
+bordo avorio contenuto. Il cartoncino deve essere evidente nelle sagome,
+senza trasformare ogni spigolo di un oggetto 3D in una cornice bianca.
+Eventuali irregolarità del tratto devono essere stabili nello spazio:
+non far tremolare il mondo per simulare il disegno a mano.
+
+Scegli fra geometria, shader e texture in base al risultato. Se i motivi
+procedurali non raggiungono la qualità necessaria, produci illustrazioni
+o piccoli atlanti dedicati e integrali nella pipeline. Per eventuali bitmap
+generate o modificate usa le skill e gli strumenti appropriati; per asset
+vettoriali o procedurali esistenti lavora sulle loro sorgenti. Non forzare
+tutto nello shader solo per evitare di realizzare gli asset necessari.
+Un'immagine generata di una scena non sostituisce il renderer del gioco.
+
+C. PALETTE E LUCE COME PARTE DELL'ILLUSTRAZIONE
+
+Definisci per ogni bioma un colore dominante, un contrasto e accenti riservati
+ai punti importanti. Mantieni aree ampie tranquille, così figure, interazioni
+e pericoli emergono. Più vivacità non significa saturare ogni superficie.
+
+Cyber conserva avorio caldo, blu/ciano, corallo, giallo e inchiostro scuro.
+Negli altri biomi armonizza colori caldi, ombre e accenti senza perdere
+l'identità locale. Usa poche fasce d'ombra colorata, luce morbida e piccoli
+riflessi dipinti. Il contatto a terra è breve e aderente alla superficie.
+Luci di macchine e segnali devono avere un punto d'origine riconoscibile.
+
+Evita grana pesante, seppia, plastica lucida, bloom diffuso, sfocatura,
+profondità di campo e ombre fotorealistiche che impastino i disegni.
+Conserva i contratti HDR/riflessi della pipeline, oppure aggiornali con una
+motivazione concreta e con verifiche equivalenti: mai aggirando gli assert.
+
+D. TERRENO E COMPOSIZIONE DEL MONDO
+
+Il pavimento resta una campitura continua con pochi gruppi di piccoli segni:
+ciuffi, foglie, sassolini, crepe brevi o tracce adatte al luogo. Distribuiscili
+con intenzione, lasciando spazio attorno al personaggio e alle interazioni.
+Non reintrodurre chiazze quadrate o una trama ripetuta al centro di ogni cella.
+
+Rendi convincenti i raccordi fra pavimento, muri, vegetazione e oggetti.
+Conserva leggibilità di bordi, dislivelli, rampe, ponti, grotte e pericoli.
+Lavora sulla composizione visiva con i dati della mappa esistente; non
+ridisegnare collisioni, dimensioni o generazione per ottenere uno screenshot.
+
+E. VITA E POLISH IN MOVIMENTO
+
+Aggiungi un livello misurato di animazione ambientale: foglie con radici
+ferme, piccole risposte dei macchinari, monitor, luci e dettagli mobili.
+Tempi e ampiezze devono variare per funzione, senza far oscillare ogni
+oggetto con la stessa sinusoide. La sagoma stabile degli attori resta stabile;
+il loro disegno mantiene anticipo, azione e recupero leggibili.
+
+Effetti di impatto, polvere e scintille devono avere poche forme disegnate
+chiare. Coordinate e frequenza dei dettagli devono reggere sia da fermi sia
+in movimento, alle risoluzioni usate dal gioco. Controlla aliasing, clipping,
+z-fighting, sovrapposizioni e artefatti durante i cambi di direzione.
+
+F. INTERFACCIA COME FINITURA DELLA STESSA DIREZIONE
+
+Rifinisci HUD, icone, annotazioni e carte in armonia con il mondo, mantenendo
+dominante l'area giocabile. Cura spazi, allineamenti, contrasto e sovrapposizioni
+fra etichette. Non ingrandire cornici e banner per dare un'impressione di polish.
+Numeri, testi, portate, intenzioni e risorse derivano sempre dai dati reali.
+Preserva il combattimento continuo a battito e tutte le interazioni esistenti.
+
+4. RICERCA MIRATA, POI IMPLEMENTAZIONE
+
+Consulta online riferimenti visivi ufficiali e apri immagini concrete.
+Punti di partenza, già pertinenti alla direzione:
+- Paper Mario: Il Portale Millenario — campiture, forme e leggibilità:
+  https://www.nintendo.com/en-ca/store/products/paper-mario-the-thousand-year-door-switch/
+- Bug Fables — coerenza fra figure ritagliate e ambiente:
+  https://www.nintendo.com/en-ca/store/products/bug-fables-the-everlasting-sapling-switch/
+- Paper Trail — stampa piatta, colore e composizione:
+  https://www.papertrailgame.com/
+- Palette di riferimento, da adattare al gioco:
+  https://lospec.com/palette-list/resurrect-64
+  https://lospec.com/palette-list/endesga-32
+
+Ricava pochi principi applicabili e documenta le fonti. Non copiare personaggi
+o asset dei giochi di riferimento, né introdurre tutte le loro caratteristiche:
+la priorità resta il linguaggio approvato nei riferimenti locali.
+
+Procedi così:
+1) Identifica i tre difetti visivi più evidenti della baseline e spiega
+   brevemente quali cambiamenti concreti li risolveranno.
+2) Porta una scena Cyber completa a qualità di riferimento: ambiente,
+   vegetazione, oggetti, attori, terreno e combattimento nello stesso luogo.
+3) Verifica subito che il linguaggio funzioni anche su West, Jungle e Snow.
+   Usa questi contrasti per correggere le regole condivise.
+4) Estendi il trattamento a tutti e dodici i biomi, comprese strutture,
+   interni, coperture e oggetti funzionali. Non fermarti alla scena Cyber.
+5) Fai una passata finale di movimento, leggibilità e difetti tecnici.
+
+Procedi autonomamente nelle scelte artistiche e tecniche reversibili entro
+questo ambito. Non fermarti a un piano, a una moodboard o a una demo separata.
+Non richiedere conferma per ogni normale scelta di implementazione.
+
+5. PERCORSI TECNICI DA RICONFERMARE
+
+La versione al momento della stesura usa:
+- src/render/expedition_robot.odin e expedition_cartoon.odin per il robot,
+  le sagome e le animazioni dei sei ruoli Cyber; altri biomi conservano rig
+  e costumi propri. Applica la stessa qualità senza uniformarli tutti al robot.
+- expedition_architecture.odin, expedition_geometry.odin e le famiglie
+  expedition_cyber/ascent/descent/dread.odin per geometrie e cache.
+- expedition_material.odin per contorni, campiture e motivi sulle facce;
+  ink_wall_sheet unisce i tratti continui e print_uv distingue le superfici.
+- expedition_floor.odin, floor_data, terrain, layers e decks per il terreno.
+- expedition_lighting.odin, expedition_post.odin e expedition_shadows.odin
+  per luce, composizione e contatto col suolo.
+- living_card.odin, expedition_paper.odin, expedition_costumes.odin e
+  src/engine/gfx per gli attori; tactical_hud/hand/annotations per la UI.
+- src/application/campaign_smoke.odin e campaign_cartoon_smoke.odin
+  per verificare la presentazione attraverso il percorso nativo.
+
+Non modificare a mano tabelle generate come living_data.odin o flipbook_data.odin:
+intervieni sulla sorgente o sulla pipeline appropriata. Documenta proprietà,
+durata, caricamento e rilascio delle nuove risorse, anche nei renderer prestati.
+Conserva cache e batching; niente generazione di texture o allocazioni
+superflue a ogni frame. Misura gli eventuali costi nuovi sulle mappe grandi.
+
+Preserva simulazione, salvataggi, RNG del gioco, eventi, collisioni,
+navigazione, targeting, ray picking, linea di vista, fog e occlusione.
+La variazione estetica deve essere deterministica e separata dalla simulazione.
+Conserva le identità di hub e minigiochi quando condividono risorse modificate.
+
+6. VERIFICA DEL RISULTATO, NON SOLTANTO DELLA COMPILAZIONE
+
+Controlla i comandi e la toolchain effettivi. Comandi attualmente disponibili:
+
+odin check src -vet -strict-style
+odin test src/render -o:none -out:/tmp/odin-pp-render-tests
+odin build src -o:none -out:build/odin_pp
+ODIN_PP_SMOKE_ONLY=palette ./build/odin_pp --smoke-expedition
+ODIN_PP_SMOKE_ONLY=cartoon ./build/odin_pp --smoke-expedition
+./build/odin_pp --smoke-expedition
+sh scripts/check.sh
+
+Usa i controlli mirati durante lo sviluppo e la suite completa a lavoro stabile.
+Gli ultimi due selettori rapidi coprono rispettivamente le dodici officine
+e i sei ruoli Cyber in tre scene con movimento e IA. Lo smoke completo
+attuale comprende 198 scene, resize e controlli HDR/bloom/riflessi.
+Sono riferimenti di partenza, non numeri da conservare artificialmente.
+
+Apri e valuta le catture prodotte. Confronta prima/dopo con la stessa camera,
+risoluzione e situazione di gioco: esplorazione, interni, combattimento,
+occlusione, terreni rialzati e biomi contrastanti. Verifica le viste di hub,
+FPS e platform 3D se cambi materiali o asset condivisi.
+
+Il risultato deve superare questi criteri:
+- La differenza è evidente alla normale distanza di gioco, non soltanto
+  ingrandendo una texture o scegliendo un'inquadratura favorevole.
+- Oggetti importanti e ruoli si distinguono per silhouette e disegno.
+- I dodici biomi mantengono identità diverse e la stessa qualità di finitura.
+- Le superfici sono curate e stabili; nessuna proliferazione di dettagli,
+  reticoli, bordi tremolanti o superfici sovrapposte per simulare complessità.
+- Piante e figure toccano realmente il terreno, anche su quote e pendenze;
+  nessuna base compare attraverso geometria, carta, ombre o colore della cella.
+- Percorsi, coperture, pericoli e azioni rimangono leggibili durante il gioco.
+- Memoria, cache e prestazioni restano sotto controllo con evidenze reali.
+
+Aggiungi test significativi per nuovi contratti o regressioni, non confronti
+che ripetano soltanto costanti estetiche. Non indebolire verifiche geometriche
+o di gameplay per far passare un asset scorretto. Se l'ambiente impedisce uno
+smoke GPU, dichiara precisamente cosa non è stato verificato.
+
+CONSEGNA
+
+Lascia le modifiche integrate nel progetto, una build aggiornata, catture
+native confrontabili e documentazione di stile/pipeline aggiornata.
+Nel resoconto indica i cambiamenti visivi principali, i test effettivamente
+completati, i riferimenti usati e gli eventuali limiti ancora presenti.
+Non presentare un mockup come prova del gioco e non dichiarare terminata
+la migrazione dopo aver rifinito soltanto terreno, robot o primo bioma.

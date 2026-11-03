@@ -1,0 +1,181 @@
+MONDO ILLUSTRATO — CACHE TERRENO, COMBATTIMENTO E WEST
+31 ottobre 2026
+
+AMBITO
+Seconda fase approvata dopo la scena Cyber: ridurre il costo del terreno,
+liberare spazio nel combattimento e costruire una scena West riconoscibile.
+Le modifiche precedenti sono conservate. Gli altri dieci biomi e il resto
+della roadmap non sono dichiarati completati.
+
+RISULTATO
+- Terreno: pittura delle officine Cyber e West precalcolata, con filtro
+  trilineare e mipmap. Percorsi di usura, rotazioni e precedenza dei siti
+  mantengono il rapporto con gli accessi reali. I raccordi Cyber dei muri
+  continui sono memorizzati nella texture dati anziché cercati per frammento.
+  Materiali e rilievi esistenti conservano quote, collisioni e pericoli.
+- Combattimento: fascia superiore 84 -> 64 pixel canvas e mano 184 -> 160,
+  quindi 44 pixel verticali in più per il mondo. Testi di costo/effetto/raggio
+  conservati. Vita corrente, barra proporzionale e intento condividono una
+  targhetta da 29 pixel per due cifre; massimo numerico nell'ispettore.
+  Nomi soltanto sul nemico ispezionato. Le targhette cercano spazio vicino
+  alla testa usando sagome opache, cappelli e inviluppi dei costumi.
+  In un gruppo estremo senza spazio resta l'ancoraggio sopra il proprietario:
+  gli HP non vengono eliminati, ma non è garantita l'assenza di sovrapposizioni
+  per qualunque composizione possibile. I collegamenti evitano altri corpi.
+- West: sega a telaio originale con volano, cinghia, lama e tronco, quattro
+  pose su supporto stabile da 8 pixel; gruppi di tronchi, banco basso e assi.
+  Polvere consumata, tracce curve interrotte e schegge seguono le postazioni.
+  Due edifici di legno con tetti a falde, imposte, finestre, attrezzi e scorte
+  sulle pareti interne. Nessun mobile solido aggiunto nei passaggi.
+
+MONDO E SALVATAGGI
+Il West precedente non collocava strutture chiuse: la preparazione del primo
+percorso si è fermata cercando una Hut inesistente. Ora il generatore colloca
+una Hut e una Cottage tramite le verifiche esistenti di terreno piano,
+quote, spawn, siti e ingressi. Nessun appiattimento, spostamento dei servizi
+o modifica del loro ingombro. Le nuove impronte sostituiscono soltanto celle
+autorizzate dal posizionamento strutturale, con le collisioni del piano.
+Nel mondo di verifica: officina (62,126), Hut origine (61,145), rotazione 2;
+Cottage origine (81,126), rotazione 1. Porte e servizi sono raggiungibili.
+I vecchi salvataggi ripristinano tile e strutture originali senza rigenerare
+il mondo: i due nuovi edifici appaiono nelle nuove spedizioni.
+
+ITERAZIONI E PROVENIENZA
+Baseline isolata in build/illustrated-world-step2/before/sources; patch
+iniziale conservata in before/starting.patch. Il renderer precedente non
+è stato aggiornato durante il confronto. La baseline West contiene soltanto
+gli atti dell'officina 0–3 (10 PNG): al successivo atto manca l'edificio.
+Il percorso Cyber precedente è conservato in before/cyber-captures/.
+
+La prima verifica West ha attraversato la porta ma si è fermata all'uscita
+contro la roccia in (63,140), fra porta e target valido (63,139). Il driver
+ora trova waypoint percorribili e invia gli stessi comandi WASD: non sposta
+il robot attraverso gli ostacoli. Il mondo è rimasto invariato.
+La vista interna iniziale mostrava pareti spoglie dalla rotazione 2:
+aggiunti disegni anche sulla controfacciata, seconda parete e retro esterno.
+Gli HP iniziali erano troppo larghi e distanti: formato compatto, bande
+opache e inviluppi dei cappelli hanno risolto il gruppo reale di sei nemici.
+Corretto anche il binding della nuova texture terreno: slot mesh NORMAL=2,
+coerente col batch, senza sovrascrivere il riflesso nello slot 3.
+
+Le immagini sono framebuffer nativi, senza ritocco o immagine sostitutiva.
+Il percorso verifica movimento in esplorazione, E nell'officina, visibilità
+del tetto Far/Inside/Far e una carta tramite tastiera e mouse. L'atto chiamato
+scontro_movimento certifica il gioco della carta: non prova che lo spostamento
+in combattimento sia riuscito. Relocazioni preparano soltanto atti separati.
+
+RISORSE
+- Pigmento terreno: 1024×1024 RGBA8 con 11 livelli mip, 5,333 MiB per bioma;
+  massimo due texture per proprietario Expedition_Floor, create al primo uso.
+  CPU temporanea 4 MiB, liberata dopo upload. Distruzione insieme al renderer;
+  nessun upload della pittura durante cammino, interazione o resize.
+- Macchine: hero_print 416×624 e hero_paper 416×312, totale 1,485 MiB GPU;
+  +0,495 MiB rispetto alla sola Cyber. Una maschera West aggiuntiva da 21.632
+  byte. Riutilizzati shader e sei ID degli atlanti complessivi.
+- Annotazioni: otto bande per sagoma cartoon preparate all'upload, circa
+  1,125 KiB CPU; costumi leggono il supporto già in cache. Memoria fissa per
+  riserve e candidati, senza ricostruzione di maschere per frame.
+- Edifici: stampa geometrica nella passata esistente, senza texture nuove;
+  test del budget completo inferiore a 1.800 vertici per edificio West.
+
+VERIFICHE E PRESTAZIONI
+Toolchain Odin dev-2026-10:84bc3fc21, macOS, Raylib, Apple M1.
+- scripts/check.sh: exit 0. Suite completa con assert: 1.877 test passati;
+  senza assert: 1.879 passati; strict e build con/senza assert riusciti.
+  La prima suite precede le ultime correzioni di arredi West e bounds dei
+  costumi, che aggiungono due test e sono incluse nella seconda suite.
+  Log: checks.log. I 12 test mirati UI e i 3 degli edifici sono passati
+  anche con assert dopo queste correzioni.
+- Sorgenti finali: 464 test renderer con assert riusciti, render-final.log.
+  after/source-sha256.txt registra i sorgenti delle catture e delle misure.
+- Percorsi nativi Cyber e West: exit 0, dodici atti e 26 PNG ciascuno in
+  after/cyber/ e after/west/. Verificati ingressi/uscite, tetti, interazione,
+  carta giocata e stabilità delle sei texture più la pittura del terreno.
+  Catture ispezionate: officine, interni, rilievi, gruppi di sei nemici,
+  carte e seconda angolazione. Nessun tag HP sopra cappelli/corpi nel gruppo
+  West verificato; card costi/effetti/raggi senza testo tagliato.
+- after/presentation.log: 27 scene concluse, tre letture HDR riuscite fino
+  a 2560×1440, picco lineare 4,742; occlusione e resize con texture stabili.
+  31 PNG archiviati in after/presentation/.
+- after/palette.log: dodici officine concluse e 13 PNG in after/palette/.
+  Ispezionate anche Jungle, Snow, City e Vietnam; materiali e palette
+  conservano il loro linguaggio precedente.
+- after/costumes.log: 33 scene concluse (11 biomi, sei ruoli, tre stati),
+  231 PNG fra scene e dettagli in after/costumes/. Ispezionati anche Snow,
+  Sky e Gothic: HP sopra corone, aureole e cappelli, carte leggibili durante
+  il movimento e la difesa. Queste verifiche non costituiscono nuovi asset
+  dei costumi, che restano quelli precedenti.
+- I tempi RENDER TIMING dei percorsi visivi non sono benchmark: includono
+  catture, frame limitati e lavoro CPU parallelo. Il confronto prestazionale
+  separato viene eseguito con tutte le compilazioni e suite concluse.
+- I warning dei font riguardano glifi già mancanti. Il warning IMAGE della
+  suite CPU è il caso intenzionale di dati invalidi.
+
+CONFRONTO PRESTAZIONALE
+1920×1080, Apple M1, -o:none, target FPS 0 e vsync disabilitato.
+Misure finali: 60 frame di riscaldamento e 600 campioni per scena, senza
+compilazioni, test CPU o altre prove GPU avviate in parallelo. Intervalli
+fra frame presentati, non timer GPU isolati. I parametri del campionamento
+sono ora configurabili nel solo harness; i valori predefiniti restano 20/120.
+
+Scena / build           media ms   mediana ms   p95 ms   massimo ms
+Cyber precedente           18,731       18,775   23,038       27,018
+Cyber nuova                18,249       18,172   22,935       27,187
+West precedente            13,891       13,893   18,298       21,914
+West nuova                 14,646       14,750   18,384       22,489
+
+Log: before/benchmark-repeat.log e after/benchmark.log. La nuova Cyber
+recupera 0,482 ms medi (2,6%), non i circa 3,4 ms ipotizzati. West costa
+0,755 ms in più (5,4%) con macchina, pigmento e due edifici nuovi. Sono
+risultati modesti: il target di recupero completo resta aperto e nessuna
+delle due scene certifica 60 FPS costanti. Cache geometrica durante i
+campioni: zero rebuild e zero upload.
+
+La prima misura preliminare 18,024 -> 15,507 ms Cyber e 14,815 -> 13,388 ms
+West (before/benchmark.log, pass1/benchmark.log) precede correzioni e scena
+finale; non è il dato da usare per la build consegnata. La prima coppia
+finale breve mostrava forti oscillazioni, fino a 72 ms: è conservata in
+before/benchmark-120-repeat.log e after/benchmark-120.log. Il campionamento
+esteso sopra è stato aggiunto per ridurre il peso di quei picchi.
+
+Costo al primo uso della pittura, misurato separatamente dal regime:
+Cyber 2676,508 ms CPU + 9,423 ms upload/mipmap; West 1081,349 + 6,811 ms.
+Questo introduce una pausa iniziale nella build di sviluppo: la pittura
+non viene ricostruita a ogni frame, ma il caricamento non è gratuito.
+
+Combattimento con sei nemici (stadio 195), coppia breve 20/120:
+precedente 30,281 ms medi, nuova 30,246; submission CPU 9,748 -> 13,973 ms.
+Log conservati come before/ e after/combat-benchmark-120.log. Quel costo
+CPU ha motivato un'ultima ottimizzazione: candidati lontani o peggiori sono
+scartati prima di controllare collisioni. Sei test mirati con assert e
+strict passati; equivalenza esatta su 384 richieste e cluster Cyber reale.
+Le catture sopra precedono soltanto questa ottimizzazione equivalente e
+la parametrizzazione del campionamento; nessun nuovo asset o layout.
+
+La baseline estesa del combattimento è 26,018 ms medi / 24,325 mediana /
+33,141 p95 (600 campioni, before/combat-benchmark.log). La misura finale
+dopo l'ottimizzazione resta da eseguire: due avvii hanno fallito prima di
+aprire la finestra con «Failed to determine Monitor to center Window».
+after/combat-window-unavailable.log conserva l'errore. Non attribuire alla
+versione ottimizzata il tempo della prova precedente.
+
+Eseguibile normale aggiornato: build/odin_pp. Il benchmark non sostituisce
+la build giocabile. Il renderer e i salvataggi sono stati verificati come
+descritto sopra; la misura GPU residua richiede una sessione grafica attiva.
+
+LIMITI
+Questa fase non aggiunge montagne né ridisegna tutti i terreni del mondo.
+I costumi West restano quelli del sistema esistente; qui cambiano ambiente
+e annotazioni. Il miglioramento artistico è locale alle due officine e ai
+rifugi descritti. Campiture dei rilievi, grandi volumi e composizione degli
+altri luoghi restano nella roadmap generale.
+
+RIFERIMENTI
+Confronto principale con i framebuffer prima/dopo del nostro gioco e con
+la direzione approvata nei riferimenti locali. I riferimenti esterni già
+raccolti (Paper Trail, Paper Mario, Bug Fables) restano documentati nella
+verifica Cyber; qui non sono state importate immagini dei giochi citati.
+Per il difetto degli slot texture è stato verificato il sorgente ufficiale
+Raylib 6.0 DrawMesh: https://raw.githubusercontent.com/raysan5/raylib/6.0/src/rmodels.c
+Macchina, prop e illustrazioni West sono originali, generati dalle sorgenti
+grafiche native del progetto.

@@ -1,0 +1,442 @@
+ODIN PP — SECONDO MOONSHOT: UN MONDO ILLUSTRATO, COMPOSTO E RICONOSCIBILE
+
+Implementa nel gioco realmente eseguibile un ulteriore salto sostanziale di
+qualità grafica e di design visivo. Parti dal lavoro esistente: cartoncino
+spesso, stampe pixel art, camera dall'alto e da un lato, dodici biomi,
+architettura attraversabile e tetti che scompaiono entrando.
+
+Non fermarti alla proposta: ricerca, implementa, apri le catture native,
+critica il risultato e itera fino alla verifica nel gioco. Questo prompt
+descrive la direzione complessiva; non presume che sia tutta già realizzata.
+
+STATO PER RIPRENDERE — 31 OTTOBRE 2026
+La prima scena Cyber è stata implementata: terreno dell'officina, pressa
+animata e gruppi di arredi, rifugi Hut/Cottage illustrati, percorso nativo
+con movimento, interazione e combattimento. Prima di proseguire leggi
+VERIFICA_SCENA_CYBER.txt e apri le catture in build/cyber-scene/after/.
+La seconda fase aggiunge cache del terreno Cyber/West, HUD più compatto,
+HP vicini alle sagome e una scena West con sega animata, polvere consumata,
+arredi e due edifici attraversabili. Leggi VERIFICA_MONDO_ILLUSTRATO_STEP2.txt
+e apri build/illustrated-world-step2/after/ prima di riprendere. I nuovi
+edifici West compaiono nelle nuove spedizioni; i vecchi salvataggi restano
+inalterati. Gli altri dieci biomi, gli altri luoghi e il resto della roadmap
+qui sotto restano da trattare. Il precalcolo grafico non aggiunge dislivelli:
+un ulteriore lavoro sulle forme del terreno va progettato e verificato
+separatamente da questo miglioramento dei materiali.
+La misura lunga recupera soltanto 0,482 ms medi in Cyber: il target di circa
+3,4 ms resta aperto. Prima di dichiarare completata l'ottimizzazione rileggi
+anche il costo di primo caricamento e la misura di combattimento rimasta
+sospesa per indisponibilità del monitor, descritti nella verifica Step 2.
+
+OBIETTIVO
+
+Ogni luogo deve sembrare una piccola illustrazione abitabile, riconoscibile
+anche senza un'etichetta. Figure, terreno, macchinari, edifici e vegetazione
+devono appartenere alla stessa mano. La composizione deve far capire dove
+andare, cosa conta e quale storia racconta quel luogo.
+
+Il prossimo salto deve essere evidente alla normale distanza di gioco.
+Servono gerarchia delle forme, terreno progettato alla scala della scena,
+architetture con identità e una migliore relazione fra pieni e vuoti.
+Altri dettagli minuti, bordi più grossi o una nuova palette, da soli,
+non sono una risposta sufficiente a questo obiettivo.
+
+1. RICOSTRUISCI LO STATO REALE E CONSERVA IL LAVORO
+
+- Leggi le istruzioni locali applicabili e controlla branch, worktree e diff.
+  Potrebbe esserci molto lavoro non committato, compresi sorgenti nuovi.
+  Non ripristinare da HEAD, non sovrascrivere e non eliminare quel lavoro.
+- Leggi README.md, docs/architettura.md, docs/sviluppo.md,
+  docs/presentazione.md, docs/verifica.md e tools/art/README.md.
+- Leggi PROMPT_MOONSHOT.txt e PROMPT_PROSSIMA_SESSIONE.txt nella stessa
+  directory come storia del progetto. Questo prompt e le preferenze
+  successive dell'utente prevalgono sulle indicazioni estetiche precedenti.
+- Apri VISIVAMENTE 01-sprite-forma-finale.png,
+  02-esplorazione-composizione.png e 03-combattimento-composizione.png.
+  Per piedi e sagoma prevale 01: basi, cavalletti e sostegni in 02/03
+  sono superati. L'utente vuole ora un margine di cartoncino più largo.
+- Verifica data e provenienza delle catture. Genera e archivia una baseline
+  nativa separata prima di sovrascrivere build/captures/.
+  build/moonshot/ contiene confronti della sessione precedente, non una
+  garanzia che rappresentino la build presente.
+- Apri almeno: officina Cyber; West, Jungle e Snow; edificio fuori, sulla
+  soglia e dentro; un rilievo; un combattimento affollato; un percorso con
+  rampa, ponte o grotta. Guarda anche movimento e rotazione della camera.
+
+STATO DI PARTENZA DA RICONFERMARE
+
+Il primo moonshot ha introdotto 96 disegni per oggetti funzionali e arredi
+delle officine, sagome stabili, profili geometrici dedicati ai biomi,
+stampe sulle pareti e sugli edifici, piccoli gruppi decorativi sul terreno
+e una camera iniziale quasi allineata a un lato della mappa.
+I bordi sono stati ulteriormente aumentati: prop 8 pixel (6 avorio + 2
+inchiostro), robot e ruoli Cyber 7 pixel (5 + 2); costumi non Cyber +60%.
+Le celle degli atlanti sono passate a 104 pixel per conservare il disegno
+e accogliere il bordo senza tagliarlo. Non ridurre di nascosto la figura.
+
+I problemi ancora visibili nelle catture della sessione precedente sono:
+- cortili enormi dominati dal recinto, con un piccolo oggetto interattivo;
+- pareti e portali che conservano la grammatica di barre, cubi e rettangoli;
+- terreno con molto spazio uniforme, chiazze geometriche e rilievi a gradoni;
+- oggetti equivalenti distribuiti a intervalli simili, con poca gerarchia;
+- edifici il cui interno sembra ancora una cavità in un blocco;
+- messaggi, nomi e indicatori che in combattimento possono coprire figure;
+- animazione ambientale essenziale e costumi non Cyber meno unitari dei
+  personaggi Cyber disegnati integralmente.
+Riconferma queste osservazioni sulle immagini nuove, senza ripeterle come
+diagnosi automatica se il codice o le catture sono già cambiati.
+
+2. RICERCA VISIVA ONLINE: È AUTORIZZATA, UTILE E RICHIESTA
+
+È lecito e giusto guardare online per trovare più riferimenti visivi,
+studiare soluzioni e fare paragoni concreti con il gioco che stiamo creando.
+Usa attivamente la ricerca durante il lavoro, anche per risolvere dubbi
+artistici o tecnici cruciali. Non limitarti ai riferimenti già raccolti.
+
+Punti di partenza ufficiali:
+- Paper Mario: Il Portale Millenario
+  https://www.nintendo.com/en-ca/store/products/paper-mario-the-thousand-year-door-switch/
+- Bug Fables
+  https://www.nintendo.com/en-ca/store/products/bug-fables-the-everlasting-sapling-switch/
+- Paper Trail
+  https://www.papertrailgame.com/
+- TUNIC, candidato per studiare organizzazione dei percorsi e dislivelli
+  https://tunicgame.com/
+- Chicory, candidato per studiare segno e organizzazione delle superfici
+  https://chicorygame.com/
+
+Apri immagini e, dove possibile, sequenze di gameplay: leggere la pagina
+del gioco non equivale a osservare la sua direzione artistica. Preferisci
+screenshot, trailer e press kit ufficiali. Annota URL, immagine osservata,
+problema che aiuta a risolvere e principio da adattare. Se un'immagine non
+è accessibile, dichiaralo e cerca una fonte alternativa.
+
+Per ogni riferimento utile rispondi concretamente:
+1) Qual è la massa dominante? Dove cade l'occhio?
+2) Come vengono organizzati percorso, margini e aree tranquille?
+3) Come si distinguono terreno praticabile, ostacoli e dislivelli?
+4) Quanto dettaglio serve alla normale scala di gioco?
+5) Quale di queste scelte possiamo tradurre nel nostro renderer?
+
+Il paragone riguarda questi principi, non la copia di personaggi, texture,
+asset o composizioni. Conserva l'identità cartoncino + pixel art di Odin PP.
+Non importare sfocatura, materiali lucidi o una prospettiva incompatibile
+solo perché funzionano in un altro gioco. Distingui sempre l'osservazione
+del riferimento dalla tua interpretazione per il progetto.
+
+3. PRIORITÀ MASSIMA: COMPORRE LUOGHI, NON SPARGERE OGGETTI
+
+Progetta prima una vera officina Cyber: elemento principale riconoscibile,
+ingresso chiaro, due o tre gruppi subordinati, zona di movimento leggibile.
+La funzione deve emergere dalla forma anche nascondendo il nome OFFICINA.
+
+La macchina principale può diventare una baia di riparazione, una pressa o
+un apparato industriale con parte alta, corpo, strumenti e collegamenti
+visivi. Non basta ingrandire lo sprite esistente. Usa le impronte solide
+e le superfici già disponibili; non creare un gigantesco ostacolo apparente
+sopra un passaggio libero o un nuovo volume senza collisione coerente.
+
+Collega gli elementi in gruppi che abbiano un senso: banco e strumenti,
+materiali in attesa, macchina e uscita del lavoro. Cavi dipinti, usura e
+piccoli segni possono raccontare la relazione. Evita il riempimento uniforme
+con accessori equivalenti. Lascia vuoti intenzionali attorno a protagonista,
+ingresso e interazioni. Alterna scala grande, media e piccola.
+
+Non applicare la stessa officina ricolorata a dodici biomi. Estendi una
+grammatica di composizione, con forme e funzioni proprie dei luoghi.
+Un archivio, una sorgente o una memoria devono avere identità diversa
+anche all'interno dello stesso bioma.
+
+VALORIZZA I LANDMARK GIÀ GIOCABILI
+
+Prima di inventare nuovi monumenti, leggi complex_kinds in
+src/expedition/complex.odin e le identità narrative in expedition/world.odin.
+Esistono già strutture forti da portare al centro della direzione visiva:
+- Cyber / Data_Node: gusci dalle spalle larghe, giunti e nodi industriali;
+  macchina principale e apparati di servizio organizzati per funzione.
+- West / Train_Bridge: orizzontali lunghe, travatura, spalle e segnali;
+  costruzioni lignee con asimmetrie da riparazioni successive.
+- Jungle / Giant_Trees: tronchi grandi, masse lobate, radici e rovine;
+  aperture tranquille incorniciate dalla vegetazione.
+- City / Rooftops: facciate, balconi, tetti e passaggi sovrapposti;
+  identità urbana e musicale, distinta dalla fabbrica Cyber.
+- Egypt / Pyramids: masse rastremate, composizione assiale, accessi e
+  grandi vuoti monumentali; pochi rilievi scolpiti significativi.
+- Vietnam / Bamboo_Bridges: costruzioni leggere, canne legate, ripari
+  allungati, radio e accessi alle gallerie; distinta dalla rovina Jungle.
+- Snow / Crevasse: accumuli compatti sopra tagli netti di ghiaccio;
+  fenditura, percorso battuto e rifugi da spedizione.
+- Inferno / Bone_Bridge: costole e archi riconoscibili, masse fratturate,
+  diagonali verso pochi punti incandescenti; fornaci con bocca e strumenti.
+- Gothic / Ruined_House: una casa riconoscibile anche nel taglio interno,
+  falde, archi, stanze e biblioteca deteriorata; verticali raccolte.
+- Sky / Floating_Island: archi leggeri e intervalli vuoti; isola e ponti
+  sospesi leggibili, marmo e strumenti d'orientamento distinti da Space.
+- Space / Station e Crater_Lift/Hall/Stair: moduli pressurizzati, raccordi
+  e oblò; stazione e crateri reali devono appartenere allo stesso luogo.
+- Secret / Boulder_Hill: collina, masso di Sisifo e memoria come fulcro;
+  poche masse isolate e intervalli quieti, non una distesa di gioielli.
+Sono interpretazioni artistiche da verificare, non nuovi requisiti gameplay.
+Conserva funzione, impronte e percorsi delle strutture esistenti.
+
+4. TERRENO — PARTE CENTRALE DEL MOONSHOT, NON RIFINITURA OPZIONALE
+
+La richiesta di superare la sensazione di terreno piatto è prioritaria.
+Affronta insieme superficie, scala dei segni, dislivelli e composizione.
+Non limitarti ad aggiungere ciuffi, sassolini o rumore allo shader.
+
+A. TRE SCALE DI LETTURA
+- Grande: campiture continue e tranquille che definiscono il luogo.
+- Media: sentieri, usura, accumuli, margini vegetali e raccordi che organizzano
+  il movimento fra ingresso, struttura principale e punti di interesse.
+- Piccola: pochi gruppi di foglie, crepe, tracce, frammenti e ciuffi.
+I segni medi devono seguire la funzione del luogo, non il centro delle celle.
+Il pavimento deve funzionare anche togliendo i dettagli piccoli.
+
+B. DISLIVELLI E VOLUME VISIBILE
+Rendi leggibili i rilievi già presenti: fianchi di terra o roccia illustrati,
+strati di cartoncino selettivi, creste, labbri di neve, rampe e raccordi.
+Riduci l'impressione di pile di cubi mediante profili e superfici continue
+dove la topologia lo permette. Scegli pochi segni larghi per spiegare una
+scarpata; non incorniciare ogni cella con una striscia bianca.
+
+La quota visuale sotto piedi e oggetti deve concordare con quella reale.
+Non inventare gradini, fosse, ponti o pendii soltanto in texture se sembrano
+modificare la navigabilità. Non alzare tutto il mondo per nascondere le aree
+piatte: anche una superficie piana può essere composta bene. Se una soluzione
+richiederebbe modifiche della generazione, delle collisioni o della
+navigazione, documenta il limite e adatta il progetto visivo ai dati esistenti.
+Tali modifiche restano fuori da questo intervento.
+
+C. RACCORDI E CONTATTO
+Integra terreno e oggetti: terra presso una radice, neve che si accumula
+contro un muro, usura davanti a una porta, frammenti alla base di una rovina,
+tracce fra una macchina e il banco. Raggruppa il dettaglio in questi punti,
+lasciando ampie zone calme. Gli oggetti devono nascere dal pavimento.
+Nessun vassoio, piedistallo o rettangolo schiarito sotto la cella di collisione.
+
+D. CONFINI FUNZIONALI
+Acqua, ghiaccio, lava, elettricità e vento mantengono semantica, copertura
+reale, pulsazione e leggibilità. Ammorbidisci visivamente i raccordi senza
+nascondere quale cella danneggia o ostacola. Usa anche forma e segno, oltre
+al colore. I sentieri decorativi non devono sembrare nuovi bonus o hazard.
+La griglia tattica rimane un overlay: niente scacchiere decorative permanenti.
+
+E. TERRENI CON IDENTITÀ
+- Cyber: usura fra postazioni, segni di manutenzione scelti, elettricità ocra
+  leggibile; niente ritorno ai vecchi pannelli blu su ogni cella.
+- West: polvere, poche tracce di ruote, terra contro legno e rocce stratificate.
+- Jungle: margini di foglie, radici e pietra affiorante attorno alle rovine;
+  il corridoio praticabile resta libero e riconoscibile.
+- Egypt: accumuli di sabbia e pietra consumata, incisioni rare presso i luoghi
+  importanti; niente geroglifico identico ripetuto sul pavimento.
+- City: superfici urbane e raccordi credibili con facciate e marciapiedi reali.
+- Vietnam: terra e vegetazione aggregate, legno e fango disegnati con misura.
+- Snow: accumuli, bordi soffici, strati sui fianchi e canali di ghiaccio reali;
+  distinguere bianco della neve, avorio del cartoncino e figure.
+- Inferno: masse di roccia, cenere e crepe direzionali; lava come accento
+  funzionale, non illuminazione diffusa che annulla le forme.
+- Gothic: pietra consumata, crepe e vegetazione raccolta presso le strutture.
+- Sky: bordi e sovrapposizioni dei piani, vento a riccioli e passaggi chiari.
+- Space: superfici e giunti scelti, usura delle postazioni; niente reticolo
+  uniforme di pannelli che cancelli il linguaggio illustrato.
+- Secret: poche forme minerali forti e rapporti cromatici distinti,
+  senza ricoprire ogni superficie di simboli.
+Queste sono direzioni da interpretare e confrontare visivamente, non una
+lista di texture da applicare in serie.
+
+5. ARCHITETTURA, EDIFICI E GRANDI STRUTTURE
+
+Supera la silhouette di barra e cubo. Le famiglie devono distinguersi per
+proporzioni, profilo, vuoti e costruzione: legno e travi nel West; pietre
+spezzate e radici nella Jungle; forme scolpite in Egypt; masse di neve e
+tagli di ghiaccio nello Snow; nicchie e archi in Gothic.
+
+Usa sagome e facce di carta illustrate mantenendo il volume necessario per
+entrare, passarci dietro e salire sui piani. Finestre, travi minute, insegne,
+decorazioni e riflessi possono essere disegno. La geometria deve spiegare
+la forma dell'edificio, il suo ingombro e i passaggi.
+
+Progetta ogni edificio come un insieme: basamento coerente col terreno,
+ingresso, facciata, tetto e almeno un tratto distintivo. I muri continui
+devono condividere il disegno senza mostrare moduli ripetuti e cuciture.
+Evita cornici annidate, superfici quasi coplanari e dettagli scintillanti.
+
+Entrando in uno spazio completamente chiuso, il tetto della struttura deve
+scomparire e mostrare l'interno. Conserva e migliora il comportamento reale:
+fuori, avvicinamento, soglia, dentro, uscita; anche con edifici vicini e piani
+sovrapposti. Niente tetti che lampeggiano sulla soglia o scompaiono a caso
+perché il personaggio passa dietro una casa.
+
+Il taglio deve sembrare intenzionale. Pareti residue, spessore della carta
+e interno devono restare leggibili. Arreda secondo la funzione: zona lavoro,
+scaffale, strumenti, materiali e traccia sul pavimento, con percorso libero.
+Non ridurre l'interno a una buca vuota. Occlusione, trasparenza e tetto sono
+problemi distinti: evita di dissolvere tutto l'edificio quando basta togliere
+la copertura o la sola parete che nasconde il giocatore.
+
+6. GRAMMATICA DEL CARTONCINO E DEGLI SPRITE
+
+- Sagoma stabile, margine avorio evidente e contorno esterno scuro deciso.
+  Mantieni l'aumento di spessore richiesto dall'utente. Dettagli interni
+  più sottili; nessun bordo esterno slavato dal bloom.
+- Pixel art con campiture, ombra e prospettiva dipinte in modo coerente.
+  Conserva la scala del disegno; margini più larghi richiedono padding,
+  non il rimpicciolimento nascosto dell'immagine.
+- Stampa animata dentro il supporto stabile; piedi separati e direttamente
+  sul terreno. Nessuna basetta, aletta, triangolo, cavalletto o carta sotto
+  le suole. Le radici delle piante restano ferme.
+- Controlla antenne, armi e pose estreme; niente clipping o grandi lobi vuoti.
+  Trasparenza, profondità, occlusione e picking seguono la sagoma effettiva.
+- Macchinari e oggetti speciali conservano la priorità. Non trasformare
+  ogni muro o grande volume attraversabile in un singolo billboard.
+- Valuta i nemici non Cyber come figure complete, non soltanto rig con un
+  accessorio diverso. Preserva sei ruoli leggibili e identità del bioma.
+
+7. CAMERA, PALETTE, LUCE E VITA AMBIENTALE
+
+Conserva come punto di partenza la vista dall'alto quasi lungo un lato del
+quadrato, approvata dall'utente. Migliora inquadratura e distanze soltanto
+con confronti nativi equivalenti. Non ottenere una bella immagine usando
+una camera dimostrativa diversa da quella con cui si gioca.
+
+Per ciascun bioma scegli dominante, contrasto e pochi accenti funzionali.
+Le ombre colorate spiegano i volumi e il contatto al suolo. Primo piano,
+area giocabile e fondo possono avere pesi diversi senza introdurre nebbia
+o sfocatura che nascondano informazioni. Biomi vivaci non significa tutte
+le superfici sature allo stesso modo.
+
+Anima secondo funzione: il macchinario prepara, lavora e riposa; un monitor
+ha un ritmo leggibile; vegetazione e piccoli segni reagiscono con misura.
+Non far oscillare tutto con la stessa sinusoide. Gli effetti di impatto
+devono avere poche forme nette, anticipo/azione/recupero comprensibili e
+nessuna ambiguità con il battito reale del combattimento.
+
+8. COMBATTIMENTO E INTERFACCIA COME PARTE DELLA COMPOSIZIONE
+
+Libera il centro visivo. Messaggi narrativi e notifiche non devono coprire
+testa, bersaglio o intenzione. Nomi, HP, intenzioni e punti di interesse
+devono evitare le altre etichette e i corpi importanti; una linea di
+richiamo, se serve, deve far capire a chi appartiene l'informazione.
+
+Rivedi peso e spazi di HUD e mano mantenendo leggibilità e aree cliccabili.
+La carta selezionata può avere priorità, le altre informazioni devono
+restare accessibili. Non nascondere dati reali per pulire lo screenshot.
+Verifica sei nemici, più livelli, un messaggio attivo, movimento, selezione
+e risoluzioni diverse. Non cambiare regole, valori, targeting o ritmo.
+
+Il layout disegnato, le aree cliccabili e lo spazio riservato alla camera
+devono usare gli stessi dati. Inquadra rispetto allo spazio davvero libero,
+compresi pannelli laterali: niente scatti di zoom al semplice hover.
+Controlla mani da 5–8 carte e mano estesa del laboratorio dove applicabile.
+Estendi l'allocatore delle etichette considerando le sagome effettive e il
+nuovo bordo. Selezione, pericolo imminente, percorso e portata devono avere
+una gerarchia distinguibile anche senza affidarsi soltanto al colore.
+
+Aprire graficamente un muro non significa poterci sparare o passare
+attraverso. Coordina dissolvenze e cutaway: si attenua ciò che sta davanti
+all'attore e lo copre realmente, non una macchina soltanto vicina. I pixel
+trasparenti non devono scrivere rettangoli nel buffer di profondità.
+
+9. IMPLEMENTAZIONE, RISORSE E VINCOLI
+
+Riconferma i percorsi: expedition_cartoon/robot/fixture_art/fixture_sprites,
+costume_support/costumes/paper, profiles/biome_forms/ground_art,
+architecture/geometry/cyber/ascent/descent/dread, print/material,
+floor/terrain/layers/decks, structure_expedition, camera, lighting/post,
+tactical_hud/hand/annotations e application/campaign_smoke.
+
+Scegli fra geometria, disegni sorgente, shader e atlanti secondo il risultato.
+Se una superficie non raggiunge la qualità richiesta con motivi analitici,
+crea un'illustrazione dedicata. Per bitmap generate o modificate usa gli
+strumenti e le skill appropriati; per asset vettoriali o procedurali lavora
+sulle sorgenti. Non modificare a mano tabelle generate. Una concept image
+o un mockup non sostituisce l'implementazione nel renderer.
+
+Conserva simulazione, salvataggi, RNG, collisioni, percorsi, linea di vista,
+targeting, fog, piani, picking e semantica degli hazard. La decorazione
+deterministica usa un flusso distinto dalla simulazione. Non ridisegnare
+la mappa o teletrasportare le interazioni per ottenere una cattura bella.
+
+Riusa cache e batching. Niente ricostruzione di texture o allocazioni
+superflue per frame. Documenta memoria, proprietà, upload e rilascio delle
+risorse, compresi i renderer prestati. Preserva i contratti HDR e riflessi;
+non indebolire assert o test per nascondere regressioni. Se il comportamento
+cambia legittimamente, aggiorna il contratto e verifica quello nuovo.
+
+10. SEQUENZA DI LAVORO E SOGLIE DI QUALITÀ
+
+1) Baseline e diagnosi: indica tre problemi concreti nelle catture e i
+   cambiamenti che dovrebbero risolverli. Ricerca visiva mirata.
+2) Componi una scena Cyber completa: terreno, macchina principale, gruppi
+   secondari, edificio, vegetazione, personaggio e spazio di combattimento.
+3) Valutala nella camera normale, anche piccola e senza etichette. Se il
+   recinto domina ancora o la funzione non si capisce, itera qui prima
+   di produrre dodici varianti dello stesso problema.
+4) Controprova subito in Jungle e Snow, poi West: le regole devono reggere
+   vegetazione, freddo e polvere con silhouette realmente diverse.
+5) Estendi con cura a tutti i dodici biomi e ai diversi tipi di luogo.
+6) Passata di movimento, UI, interni, occlusione, rampe e piani sovrapposti.
+7) Test, benchmark comparabili, confronto nativo prima/dopo e documentazione.
+
+Prima di estendere confronta deliberatamente Cyber–Space, Jungle–Vietnam,
+Egypt–Sky e Gothic–Secret. Per ogni coppia devono esserci una differenza di
+silhouette dominante e una di composizione, non soltanto materiale e tint.
+Valuta il percorso ingresso → interazione → uscita, non il solo asset.
+Queste soglie chiedono di iterare il prototipo, non di interrompere il lavoro
+o chiedere approvazione per le normali scelte artistiche.
+
+Procedi autonomamente sulle scelte reversibili entro questo ambito.
+Non chiedere conferma per ogni normale scelta artistica o tecnica.
+Non fermarti dopo la scena Cyber o alla stesura di un piano. Spiega con
+franchezza eventuali limiti residui e non chiamare risolto un difetto che
+resta evidente nelle immagini.
+
+11. VERIFICA NEL GIOCO E CONSEGNA
+
+Riconferma toolchain e comandi; attualmente:
+odin check src -vet -strict-style
+odin test src/render -o:none -out:/tmp/odin-pp-render-tests
+odin build src -o:none -out:build/odin_pp
+ODIN_PP_SMOKE_ONLY=palette ./build/odin_pp --smoke-expedition
+ODIN_PP_SMOKE_ONLY=cartoon ./build/odin_pp --smoke-expedition
+ODIN_PP_SMOKE_ONLY=costumes ./build/odin_pp --smoke-expedition
+ODIN_PP_SMOKE_ONLY=presentation ./build/odin_pp --smoke-expedition
+./build/odin_pp --smoke-expedition
+sh scripts/check.sh
+
+I selettori coprono dodici officine, tre scene Cyber, trentatré scene dei
+costumi e le prime ventisette scene di presentazione. Lo smoke completo
+attuale ha 198 scene. I numeri vanno riconfermati, non conservati a forza.
+Verifica hub, FPS e platform 3D se tocchi risorse condivise.
+
+Apri le immagini prodotte, non affidarti soltanto all'esito degli assert.
+Confronta stessa mappa, stato, camera, risoluzione e scala. Se cambi la camera,
+conserva anche una coppia con camera identica per distinguere i due effetti.
+Usa catture integrali e dettagli nativi, senza abbellimenti fuori dal gioco.
+Controlla la stabilità durante il movimento, non solo il fermo immagine.
+
+Accettazione visiva:
+- Il luogo si riconosce da forme e composizione senza leggere il nome.
+- Il terreno organizza la scena a tre scale e i dislivelli si leggono senza
+  dipendere da una texture rumorosa; niente ritorno a scacchiere o basette.
+- Percorsi, ingressi, interazioni e hazard sono chiari alla scala normale.
+- Edifici e interni sembrano costruiti e abitati; il tetto scompare soltanto
+  quando previsto e torna correttamente uscendo.
+- Sagome, carta e stampa sono coerenti, spesse e nitide, con piedi a terra.
+- Biomi diversi hanno forme diverse; il confronto non si riduce al colore.
+- Nomi, messaggi, carte e intenzioni lasciano leggibili le azioni importanti.
+- Nessun nuovo scintillio, z-fighting, taglio degli atlanti, pop vistoso,
+  disaccordo fra immagine e picking o texture ricreate durante il resize.
+
+Misura tempo di frame e risorse sulle mappe grandi a parità di condizioni:
+risoluzione, build, limite FPS, warmup e scene. Distingui media e p95,
+memoria degli atlanti e payload geometrico. Uno smoke limitato a 60 FPS
+non dimostra che il costo del rendering sia rimasto uguale. Non attribuire
+al renderer tempi raccolti mentre compilazioni o test saturano la macchina.
+
+Consegna l'eseguibile aggiornato, percorsi delle catture e confronti,
+risultati dei controlli, costi misurati e limiti rimasti. Aggiorna i documenti
+di architettura, presentazione, pipeline artistica e verifica dove cambiano
+contratti o workflow. Distingui chiaramente ciò che è implementato da ciò
+che resta una proposta per il futuro.

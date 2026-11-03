@@ -1,0 +1,490 @@
+ODIN PP — VERIFICA REDESIGN SOLE, OMBRE E MURI
+3–4 novembre 2026 — VERIFICA CONCLUSA; TARGET 60 FPS NON RAGGIUNTO
+
+ESITO ATTUALE
+Il redesign è integrato: oggetti riconoscibili al posto dei cubi, finiture
+degli edifici, fioriere e pilastri Cyber, microcorrezioni di officina e
+rifugio, ombre di terreno/deck e attori. L'utente ha approvato E al 15%:
+EXPEDITION_ACTOR_SHADOW=true è ora il default. Carta, inchiostro e feedback
+mantengono il loro trattamento. Camera approvata, nessuna basetta agli attori,
+mappe, collisioni, simulazione e RNG sono conservati.
+
+Gli smoke v2 oggetti/fallback/camminata/full sono conclusi con exit 0;
+anche full, Cyber/West, palette, costumes, actor-shadow e sun-fps v3 con
+E attiva sono conclusi con exit 0.
+La suite renderer dopo il fix degli assi passa 477/477 con E=true.
+La maschera G presso gli hazard è corretta e verificata nelle catture v4.
+P1 cold/cache/fallback, le diagnosi e il confronto finale sono conclusi:
+42/42 processi exit 0, inclusi tutti i dodici finali none/speed. Le scene
+ferme debug migliorano nettamente; release Cyber migliora in tutte le
+corse, West e scontro restano variabili. Nessun p95 raggiunge 16,67ms.
+Anche le sei corse diagnostiche a dt fisso sono concluse: percorso e camera
+coincidono, ma i tempi restano variabili. Il peggioramento osservato nel
+movimento montato debug non è dichiarato risolto né attribuito soltanto
+al percorso. È un limite prestazionale residuo, documentato sotto.
+
+PROVENIENZA E RIPRODUCIBILITÀ
+Tutti i percorsi di evidenza sotto sono relativi a
+build/redesign-sole/session-20261103/, salvo indicazione diversa.
+starting-worktree.patch e starting-hashes.json registrano lo stato iniziale;
+nessun commit eseguito. Copie *-proposal, patch e integration-files.json
+conservano la preparazione delle modifiche; i relativi verbali descrivono
+quelle copie storiche, non il default E o lo stato d'integrazione attuali.
+
+I sorgenti antecedenti al sole sono stati ritrovati in
+build/camera-horizon/before/sources. bench-sources/historical/manifest.json
+registra origine, hash e modifiche della sola strumentazione. I prefissi
+baseline-* indicano lo stato iniziale CON sole prima degli interventi di
+questa sessione; non le immagini storiche senza sole. I run.json delle nuove
+acquisizioni final-v2/v3/v4 registrano hash del binario, selettore, tempo ed
+exit code; le prime baseline e verified-a conservano i log originari.
+
+Audit conclusivo: protected-sources-check.json controlla 318 file protetti
+contro starting-hashes.json, nessuna modifica. final-source-snapshot-check.json
+confronta 820 file con original_sha256 dello snapshot final-v4: nessuna
+differenza dopo il congelamento per i benchmark. Il controllo asset
+python3 tools/art/build_workshop_stock.py --check e git diff --check sono
+puliti. Nessun commit eseguito; il lavoro preesistente resta nel worktree.
+
+CONTROLLI CPU E SMOKE
+- Fase A: renderer 467/467; check.sh completo exit 0, 1880/1880 con assert
+  e 1882/1882 senza assert. Prove anteriori all'integrazione successiva.
+- Integrazione C/D/F/G/P1/F4: check.sh --quick exit 0, 1885/1885 in
+  7m17,7109s (check-integrated-quick.log). Precede il nuovo test degli assi.
+- Dopo chiusura degli assi: strict check con assert e senza assert puliti;
+  renderer 477/477 con EXPEDITION_ACTOR_SHADOW=true in 24,031805s
+  (objects-v2-render-tests.log). E era quindi già esercitata attiva prima
+  della successiva modifica del solo default. Non è un nuovo check globale.
+- final-v2-objects: 60 scene a 960×540 e native; objects-fallback: 12 Cyber.
+  final-v2-cyber-walk e final-v2-full: exit 0. E spenta in queste build.
+- Preview E on/off Cyber/West mostrata e approvata; actor-preview-actor-shadow
+  concluso con exit 0. Sette smoke final-v3 con E di default attiva hanno
+  run.json exit 0: full, cyber-scene, west-scene, palette, costumes,
+  actor-shadow, sun-fps. Condividono il binario SHA256 5e0ab316c4f3ef59…;
+  precedono l'ulteriore correzione G verificata separatamente sotto.
+- Dopo il filtro continuo G: strict check main exit 0; tre smoke final-v4
+  palette, cyber-scene e west-scene con E attiva hanno run.json exit 0.
+  Binario SHA256 20d78167ae3442961bbf11fcb76e5791f3d0986e40913573eca2357d5a329292.
+  Nessun errore GLSL o risorsa sole indisponibile nei log; soli warning font
+  noti. I tempi di questi smoke non sono misure di prestazione.
+
+SOLE, LIVELLI E LIMITI VISIVI
+Terreno e deck CPU vengono preparati prima della chiave della shadow map.
+La prima passata include rilievo, piano superiore, spessore e supporti dei
+ponti, riusando mesh o vertici CPU senza una seconda risorsa GPU. I test
+coprono riuso/invalidazione, camera, revisioni, bioma, bit 63 dei tetti e quote.
+Il nuovo smoke sun-fps esercita la prima persona reale e il ritorno overhead.
+
+La verifica A comprende palette, ruoli/costumi, presentation con HDR/resize,
+Cyber/West, full e sun-fps. Aperti 72 quadri di complessi, 15 reti, 10
+ologrammi, 13 grotte, 8 montagna, 15 rilievi, 8 edifici, 4 targeting e lo
+scontro su due livelli. Dopo il fix deck: 24 quadri ponte/sotto, 12 biomi,
+confrontati con baseline-full, più i quattro quadri sun-fps. Campate e
+sostegni proiettano ombre coerenti su terreno, acqua e fossati; nessun
+nuovo artefatto statico evidente nei campioni. Gli ologrammi restano una
+pipeline indipendente. Indici e note: VISUAL_A_COMPLEX_RETE.txt, *-sheets/.
+
+Policy conservata: l'involucro può dissolversi alla soglia pur mantenendo
+l'ombra del tetto; dentro roof=false rimuove il tetto dai caster, fuori
+roof=true lo ripristina. Piccoli triangoli avorio nei tagli e grandi aloni
+di reveal sotterraneo sono presenti anche nelle immagini storiche.
+Catture distanziate non certificano assenza di shimmer tra frame adiacenti.
+
+C — OGGETTI E CACHE
+Cart, Fountain, Statue, Machine, Ruin e Pen hanno forme e materiali del
+bioma; le Fence hanno pali e traverse. Una mesh per struttura evita la
+duplicazione nei blocchi 8×8. La cache possiede mesh/linee, gestisce upload
+parziali, invalidazione, riflessi, reveal, bordi e caster. Il fallback
+immediato proietta gli stessi oggetti anche con cache forzatamente fallita.
+La quota deriva dalla prima cella occupata, anche quando l'origine Ruin
+è Outside. Le prove CPU coprono tutte le trasformazioni e i 12 biomi,
+impronta di vertici/centroidi, determinismo e ciclo di vita della cache.
+
+Confrontate tutte le 60 coppie prima/dopo: sei tipi, Cyber/West/Snow/Egypt/
+Inferno, due rotazioni. La QA ha trovato un difetto reale: ink_solid non
+chiudeva il lato iniziale dell'asse orizzontale. Ora entrambi i tappi sono
+presenti, ruote scure e mozzi chiari; il nuovo test verifica piani, area,
+colore, normali e winding con quattro rotazioni e specchio. Costo +18
+vertici per asse; tutte le varianti restano entro 3000 vertici per oggetto.
+Riaperti i 40 casi v2 dei tipi interessati e tutti i 12 fallback Cyber:
+forme e ombre coerenti, senza nuove parti mancanti. Il percorso senza
+cache omette alcuni frammenti decorativi del terreno, non la geometria C.
+
+A 960 il carro resta piccolo: cassone/manici sono i segnali principali,
+le ruote occupano pochi pixel; Snow si legge come slitta. Fontana leggibile
+come vasca bassa, statua e macchina distinte dal cubo; rovine spezzate e
+recinti aperti risultano chiari. Nessun ampliamento apparente dell'impronta;
+i vincoli effettivi sono verificati dai test, non dalle sole immagini.
+Prove: qa-objects-comparison/ESITO_VISIVO.txt, final-v2-objects/ e
+final-v2-objects-fallback/. I fogli di confronto usano crop senza resize;
+gli originali 960 e nativi rimangono la prova integrale.
+
+D/F — EDIFICI, FIORIERE E COMPOSIZIONE CYBER
+Edifici generici: contatto scuro 0,025, zoccolo alto 0,12, facce esterne
+arretrate 0,035, copertina 0,10 e pilastri agli angoli convessi. Cyber/West
+aggiungono solo la fascia bassa e conservano le stampe dedicate. Nessuna
+seconda tessitura paperCourses; porte, tetti e dissolvenza conservati.
+Budget separati: stampe dedicate <1800, involucro completo <6000 vertici.
+Conteggi integrati dentro/fuori, compresi gli interni F4:
+  Cyber Hut 1074/1602; Cottage 852/1236.
+  West Hut 1134/1650; Cottage 882/1230.
+  Jungle Hut 948/1182; Cottage 708/870; Temple 3258/3726 nei tre biomi.
+
+F1/F2: fioriere crema con terra, bordo e foglie rialzate entro la cella;
+pilastri Cyber intermedi/terminali blu con post_fill esplicito, angoli avorio.
+F4 riusa i tre accessori dell'officina in gruppi meno simmetrici, sempre
+nelle stesse dieci celle bloccate; pass colore e caster scelgono la stessa
+sagoma. Pressa stampata +6% in larghezza/+2% in altezza; scaffali/rulli
+riducono gli accenti rossi. Nel rifugio attrezzi sulla parete destra,
+armadietto dipinto accanto alla porta e scorte blu/gialle rendono il piccolo
+servizio di riparazione più leggibile. Nessun mobile nelle celle libere,
+nuovo billboard, texture o slot; gli interni aggiungono 54 vertici Hut,
+90 Cottage. Il cortile conserva la scala generale precedente: F4 è una
+microcorrezione, non una ricomposizione complessiva della scena.
+La QA prima/dopo ha aperto officina, soglia/interno/uscita e scontro
+Cyber/West: fioriere, pilastri, stampe, robot, marcatori e percorsi restano
+leggibili; tetto rimosso dentro e policy della soglia conservata. Dettagli
+e originali: VISUAL_F_D_G_F4.txt e qa-post-output/fdg-v4-sheets/.
+
+CAMMINATA REALE F4
+Il vecchio cyber-scene passa fra quadri rigenerati/teletrasportati; non è
+la prova di una passeggiata unica. Il nuovo selettore cyber-walk usa una
+sola mappa e input reali: officina/pressa, interazione E/Escape, rifugio,
+soglia/interno/uscita, rilievo e ingresso naturale in combattimento.
+Nessun teletrasporto fra waypoint, nessun nemico o danno aggiunto dal driver.
+
+final-v2-cyber-walk/run.log: COMPLETE, duration_in_60_90=true,
+seed 12648430, geometry_id=2 costante, undici coppie di catture.
+60,58s simulati: 37,58s in movimento e 23,00s di osservazione/interazione/
+combattimento; 89,74s reali dopo il primo present, avvio separato 10,12s.
+È una sessione continua con soste, non 60 secondi sempre in moto.
+Confermato passo di combattimento (75,105)→(75,104) e carta id=3 via
+input sul bersaglio (75,99). Originali interno/rilievo/scontro riaperti:
+arredo, rimozione tetto, ponte e tre nemici leggibili. La salute evolve
+naturalmente fino a 24/32. Camera e collisioni reali conservate.
+
+E — APPROVATA AL 15%, ATTIVA DI DEFAULT
+Il confronto on/off è stato mostrato all'utente, che ha approvato il 15%.
+Lo shader locale attenua soltanto la stampa colorata: massimo 15% rosso,
+13,5% verde, 10,5% blu. Carta e pigmento inchiostro {20,29,43} preservati;
+flash, glow e tinta dell'abilità ombra esclusi. shadow_allowed esplicito
+precede le tinte permanenti del bioma. La grotta viene controllata per
+attore usando quota/cella e posizione di presentazione; riflessi e quad
+non attore non entrano nel pass. Risorsa posseduta/distrutta dal sole,
+nessuna modifica al programma carta condiviso o a engine/gfx per E.
+La forza è EXPEDITION_ACTOR_SHADOW_STRENGTH=.15; per confronto resta
+possibile -define:EXPEDITION_ACTOR_SHADOW=false. F3 fughe resta esclusa.
+In VISUAL_E_OFF_ON.txt: sei coppie 960×540 Cyber/West presso un muro,
+tre posizioni, sei nemici congelati, camera identica. Cambiano 78–717
+pixel per coppia; alpha identico e zero differenze fuori dagli inviluppi
+rettangolari annotati indipendentemente. È una verifica di localizzazione,
+non una misura dei soli pigmenti né una segmentazione esatta delle sagome.
+Nei campioni effetto tenue e leggibile, senza alone o riquadro; le scene
+ferme da sole non dimostrano flash, grotte o continuità in movimento.
+
+QA v3 mirata con E attiva: aperti 22 originali, due grotte, edificio
+dentro/fuori, scontro e livelli, panoramiche dei dodici biomi e quattro
+sun-fps. Nessuna nuova anomalia evidente di stampa, HUD/carte o tetti;
+ritorno overhead leggibile. I feedback colorati presenti nei quadri non
+certificano ogni fase del flash o assenza di shimmer. Dettagli, file e
+dimensioni in VISUAL_E_V3_FINAL.txt e qa-final-v3/manifest.json.
+
+G — CORRETTA E VERIFICATA IN V4
+Accumuli coerenti col bioma e densità dei segni vicino ai solidi condividono
+una lettura di expedition_sky_crowd con l'AO. Il buco chiaro quadrato sotto
+i prop è corretto e le QA v3/v4 lo confermano. Il filtro binario delle
+quattro celle lasciava inoltre gradini rettangolari presso Electric,
+anche dentro terreno Plain. Ora una membership bilineare continua sfuma
+il permesso prima della riva e vale zero su tutta la cella hazard propria;
+il percorso all-safe riusa i campioni già letti, senza nuove texture/noise.
+Per footprint molto ampie il deposito sfuma con l'antialias; pigmenti e
+scala dei motivi restano invariati.
+
+Audit matematico: 45.760 confronti di bordi near4 con salto massimo zero,
+47.916 campioni di celle hazard e 169.128 di rive dipinte con permesso
+massimo zero. Prova algebrica e dati: qa-post-output/g-deposit-gate-math.json.
+I tre smoke v4 compilano lo shader reale e passano. Aperti quattro fogli
+prima/dopo (16 coppie), più nativi Cyber05, West05, Snow06 e Inferno07:
+i tagli netti attorno al rifugio Cyber sono spariti; rocce, cactus e alberi
+non mostrano il buco chiaro; lava e ghiaccio rimangono leggibili. Fioriere,
+stampe e combattimento nei campioni non mostrano nuove regressioni.
+Le chiazze ampie presso i solidi restano una scelta estetica visibile,
+distinta dai due bug corretti. Nessuna deduzione di prestazioni dagli smoke.
+VISUAL_F_D_G_F4.txt conserva cronologia ed evidenza v1/v3; i confronti finali
+sono in qa-post-output/fdg-v4-sheets/index.html, con originali cliccabili,
+dimensioni e SHA256. Nessuna correzione cromatica delle immagini.
+
+B1 — BASELINE CONSERVATA, RISULTATI CONCLUSI
+B1-RESULTS.txt e benchmark-baseline/ contengono tutte le 18 corse exit 0,
+90 statistiche senza esclusioni. Tre ripetizioni sun/nosun/historical sia
+-o:none sia -o:speed, ordine alternato ABBAAB per i confronti. Canvas
+1920×1080, target_fps=0, vsync=false, 60 frame warmup; 600 campioni per
+Cyber/West/sei nemici, 240 per ciascuno dei due tratti in movimento.
+Sono intervalli dei frame presentati, non query GPU isolate. Nella tabella
+ogni valore è media delle tre corse / media dei tre p95, in ms; la seconda
+colonna statistica NON è un percentile dei campioni aggregati.
+
+Build scena        storico M/P       senza sole M/P     sole M/P
+none  Cyber        24,453/28,511      27,330/31,667      28,685/33,449
+none  West         19,868/25,100      24,831/27,958      25,597/28,574
+none  sei nemici    29,930/36,368      31,618/38,334      33,786/39,274
+speed Cyber        23,042/27,054      27,033/30,001      26,534/28,411
+speed West         18,975/22,715      23,788/26,413      24,567/26,644
+speed sei nemici    25,563/31,650      28,127/33,796      29,946/35,155
+
+Costo medio sun−nosun in none: Cyber +1,355ms, West +0,765ms, sei nemici
++2,169ms. In speed West +0,780ms e sei nemici +1,819ms. Cyber speed include
+una corsa nosun rallentata (30,553ms, contro 25,357/25,189): è conservata;
+il delta medio −0,499ms non dimostra un'accelerazione causata dal sole.
+
+La regressione senza sole è reale nel campione: West +4,963ms none e
++4,812ms speed rispetto allo storico; Cyber +2,877ms none. Non identifica
+la causa: nosun conserva GLSL/branch differenti dallo storico. Le diagnosi
+pavimento/muri/sun-stub e HP sono riportate sotto. Tutti i 90 p95 superano
+16,67ms (minimo 19,758ms), anche nello storico; target 60fps al p95 non
+raggiunto dalla baseline. Il confronto integrato è riportato subito sotto.
+
+Limiti: nessuna telemetria termica/carico driver né campioni grezzi per
+frame. I tratti 25/26 (Secret) usano dt reale: stessi tasti/frame non
+implicano stessa traiettoria, quindi vanno distinti dalle scene statiche.
+Statiche: rebuild/upload misurati 0/0 in 54/54 casi; non sono contatori
+shadow-map, assenti nei log B1. Il confronto finale sotto include anche
+geometry.structures e SUN CACHE total/start/measured dove disponibili.
+
+B FINALE — TUTTE LE CORSE DEL CONFRONTO INTEGRATO
+B-FINAL-RESULTS.txt conclude il set di 42 processi / 114 statistiche di
+follow-up. La parte finale ha 12/12 processi exit 0 e 60/60 statistiche,
+nessuna corsa riuscita esclusa. Le interruzioni archiviate restano separate.
+Il controllo incrociato di tutte le triple con log, CSV e run.json è in
+B-FINAL-VALIDATION.json. Sorgenti/hash e protocollo:
+bench-sources/final-v4/manifest.json, final-v4-benchmark-builds-status.json,
+benchmark-final-v4/plan.json e relativi run.log/run.json.
+
+Prima = sorgenti iniziali con sole, rieseguiti in questo batch (sun);
+dopo = finale approvato con E=true, PCF4, G corretto e tutti gli interventi.
+Non usare B1 come braccio prima del nuovo confronto. Tre ripetizioni per
+variante in ordine ABBAAB per ogni ottimizzazione; none e speed separati.
+1920×1080, target_fps=0, vsync=false, warmup 60; 600 frame statici e 240
+in movimento. Intervalli dei frame presentati, non query GPU isolate.
+
+Scene: 25 montato W+D e 26 a piedi S+D, entrambi Secret con dt reale;
+39 officina Cyber; 40 officina West; 195 scontro Cyber a sei nemici.
+Le triple sotto mantengono r1/r2/r3. Unità ms, punto decimale come nei log.
+
+build scena fase   | mean r1/r2/r3 | p95 r1/r2/r3 | max r1/r2/r3
+none   25 prima | 16.369/20.454/20.636 | 19.006/25.375/25.916 | 26.244/28.881/29.015
+none   25 dopo  | 21.808/19.152/26.745 | 43.331/27.604/34.815 | 61.815/75.485/299.681
+none   26 prima | 19.093/25.045/25.070 | 20.666/30.162/29.974 | 115.876/122.282/122.633
+none   26 dopo  | 23.186/18.426/19.440 | 30.994/20.399/23.427 | 186.556/114.092/114.141
+none   39 prima | 22.703/28.582/28.208 | 24.172/31.923/31.080 | 54.213/65.887/42.017
+none   39 dopo  | 20.341/19.473/19.257 | 23.546/21.133/20.854 | 45.282/26.911/23.265
+none   40 prima | 20.089/25.284/25.107 | 21.112/27.832/27.265 | 23.554/31.501/30.238
+none   40 dopo  | 17.177/16.995/16.867 | 19.142/18.350/18.048 | 25.533/42.287/28.499
+none  195 prima | 28.520/32.659/32.108 | 35.638/36.639/43.781 | 69.164/130.794/74.740
+none  195 dopo  | 21.692/21.513/21.754 | 22.437/21.904/23.158 | 22.970/22.643/34.807
+speed  25 prima | 21.175/19.827/19.990 | 25.860/24.688/24.630 | 27.865/26.154/28.216
+speed  25 dopo  | 20.799/20.609/20.372 | 24.875/25.062/24.680 | 30.062/27.426/31.531
+speed  26 prima | 23.639/23.037/22.985 | 26.972/26.435/27.438 | 29.849/28.340/29.935
+speed  26 dopo  | 22.050/22.283/22.065 | 24.829/26.700/25.044 | 30.128/31.483/29.254
+speed  39 prima | 27.462/26.549/26.499 | 32.110/28.446/28.195 | 93.729/31.821/30.196
+speed  39 dopo  | 23.477/23.068/22.949 | 28.525/27.449/27.435 | 61.788/54.401/32.095
+speed  40 prima | 21.092/24.771/24.661 | 24.464/27.008/26.651 | 37.859/31.816/31.484
+speed  40 dopo  | 24.381/21.890/21.070 | 34.252/27.308/24.370 | 100.286/48.629/26.660
+speed 195 prima | 22.699/29.402/29.727 | 24.131/34.776/35.162 | 47.083/37.176/43.444
+speed 195 dopo  | 29.226/25.402/25.180 | 36.352/31.071/30.260 | 61.555/37.624/33.861
+
+Interpretazione delle scene ferme
+In none, differenza dopo−prima delle medie: Cyber −6,807ms, West −6,480ms,
+scontro −9,443ms. Differenza delle medie dei p95: −7,214/−6,890/−16,186ms.
+Tutte le medie e tutti i p95 finali sono inferiori all'intervallo del
+rispettivo controllo. È un miglioramento consistente in questo batch,
+non l'attribuzione del beneficio a una singola modifica. Il massimo West
+sale comunque da 31,501 a 42,287ms: migliorare il p95 non elimina ogni picco.
+
+In speed Cyber migliora tutte le tre medie (−3,985/−3,481/−3,550ms) e i
+p95; differenza media −3,672ms. West e scontro migliorano soltanto nella
+media aggregata (−1,061/−0,673ms), mentre le medie dei p95 peggiorano
++2,602/+1,205ms. Le prime corse finali sono più lente del controllo:
+West +3,289ms e scontro +6,527ms di media, poi il segno cambia. Il massimo
+West è 100,286ms, contro 37,859ms del controllo. Non c'è un guadagno
+uniforme release in tutte le scene, né una causa della variabilità
+identificata senza telemetria della macchina.
+
+Movimento: risultato originale e controllo a percorso identico
+Stage 25 none peggiora di +3,415ms medio e +11,818ms sulla media dei p95;
+coppie mean +5,439/−1,302/+6,109ms, massimo 299,681ms contro 29,015ms.
+Il finale r1 ha mediana 17,312ms ma p95 43,331ms: non liquidare la coda
+come un solo valore estremo. In speed il quadro è vicino: +0,263ms medio,
+−0,187ms sulla media dei p95. Stage 26: media −2,719ms none/−1,088ms speed,
+ma none conserva un picco 186,556ms e la prima coppia peggiora.
+
+Il driver originale usa dt reale: cambiano durata simulata, posizione,
+AI e momento degli eventi, quindi le righe non sono un replay identico.
+Questo limite non dimostra che la regressione stage 25 sia innocua.
+WALK-FIXED-PROTOCOL.txt e B-WALK-FIXED-RESULTS.txt documentano sei corse
+debug ABBAAB a dt fisso, tutte exit 0. trajectory-audit.json conferma
+identità di seed, stati, camere e hash delle sequenze in tutti i bracci.
+Ogni tratto comprende 60+240 update: cinque secondi simulati.
+
+Controllo fisso, triple r1/r2/r3 in ms:
+scena fase | mean | p95 | max
+25 prima | 20.835/21.348/27.253 | 26.153/26.408/35.245 | 29.699/43.804/104.652
+25 dopo  | 23.266/22.194/22.221 | 30.296/26.712/26.548 | 45.802/29.843/28.476
+26 prima | 24.649/24.889/28.119 | 29.906/30.788/37.191 | 123.003/114.647/206.508
+26 dopo  | 23.889/26.089/24.263 | 28.665/34.555/28.374 | 112.489/128.570/120.567
+
+Stage 25: M 23,145→22,560ms; media-p95 29,269→27,852ms. Tuttavia le
+coppie mean sono +2,431/+0,846/−5,032ms: due peggiorano, la terza baseline
+è lenta anche nella mediana (27,146ms). Non si scarta alcuna corsa e il
+segno aggregato non prova che la regressione originale sia risolta.
+Stage 26: M 25,886→24,747ms; media-p95 32,628→30,531ms, con una coppia
+più lenta e picchi ancora oltre 100ms. Nessun p95 raggiunge 16,67ms.
+
+Stage 25 ha sempre 7 upload e 4 ridisegni sole misurati in entrambi i
+bracci; stage 26 zero per entrambi, senza rebuild. Questi conteggi non
+assegnano la durata dei picchi a un evento. La submission stage 25 sale
+11,579→16,207ms mentre le attese si redistribuiscono: gli scope CPU non
+sono tempi GPU puri e non si sommano. La diagnosi resta inconclusiva su
+un piccolo costo del renderer entro la variabilità della macchina.
+Il controllo breve non certifica tratti più lunghi, release o shimmer;
+non sostituisce né cancella le code del test originale a dt reale.
+
+Budget e limiti della misura
+Nessuna delle 60 righe del confronto, né delle 114 del follow-up, ha
+p95 <=16,67ms. I trenta p95 finali vanno da 18,048 a 43,331ms: il target
+60fps al p95 NON è raggiunto. Il mean_fps da solo non lo certifica.
+M e P sono medie di tre medie/p95, non percentili aggregati. Non ci sono
+campioni grezzi per ricostruire la sequenza dei picchi, né telemetria
+termica/driver. Gli scope CPU annidati includono possibili attese: per
+esempio Cyber riduce il frame pur aumentando wrapped_draw. Non sommare
+scope o inferire lavoro CPU/GPU puro da questo spostamento delle attese.
+Il confronto misura l'intero pacchetto approvato, non i suoi contributi
+isolati; il beneficio HP preesistente non si aggiunge a queste differenze.
+
+Cache e memoria del confronto finale
+Ricostruzioni/upload geometrici nella finestra misurata: 0/0 in tutte
+60 righe, anche in movimento; il warmup resta escluso. Nel finale i 18
+campioni di scena statica hanno zero ridisegni sole misurati. Stage 25
+ridisegna tre volte per ognuna delle sei corse finali (sei includendo
+setup/warmup); stage 26 zero nella misura e tre includendo setup/warmup.
+Nessun counter_reset. Il braccio prima non registra SUN CACHE: n/a, non
+zero. Senza campioni temporali non si collega un preciso picco al ridisegno.
+
+Residenza identica fra ripetizioni e ottimizzazioni. Il contatore finale
+include anche geometry.structures; prima conta i suoi contenitori originali.
+scena       contenitori prima→dopo  vertici prima→dopo  payload mesh byte prima→dopo
+25                 57→57             34362→34362          1237032→1237032
+26                122→122            69828→69828          2513808→2513808
+39 e 195           57→61             51987→71277          1871532→2565972
+40                 59→59             27594→27594           993384→993384
+Cyber linee CPU 122640→117600 byte; altre scene invariate. Payload=vertici×36
+non è VRAM totale: esclude overhead del driver, risorse non contate e
+mirror CPU. I contatori non provano assenza di ogni altro trasferimento.
+
+B — DIAGNOSI CONCLUSE, DISTINTE DAL CONFRONTO FINALE
+Ablazioni: 12/12 processi exit 0, none/debug con sole disabilitato e setup
+diretto Cyber/West. Ripristinare il pacchetto del pavimento storico riduce
+il frame medio West di 6,576ms e la media dei p95 di 6,130ms; tutte e tre
+le medie e tutti i p95 sono inferiori all'intervallo del controllo.
+È il segnale più consistente di un costo sostanziale del pavimento attuale
+in quella scena. Cyber migliora in media di 3,640ms, ma le differenze
+sono −0,289/−2,555/−8,077ms, il primo p95 peggiora e i picchi aumentano:
+non attribuisce l'intera regressione Cyber a una singola causa.
+
+Ripristinare i muri storici riduce i vertici ma non migliora stabilmente
+i frame (+0,454ms Cyber/+0,618ms West medi). Rimuovere il GLSL del sole
+spento produce risultati misti: costo residuo non quantificato con
+affidabilità. Tutte le corse e anomalie sono mantenute. I tre delta non
+si sommano né si trasferiscono a B1: batch/setup e interazioni differiscono.
+Lo scope CPU può includere attese del driver; non localizza da solo il
+lavoro GPU. Old_floor è diagnostico, non una modifica estetica reintegrata.
+Prove complete: B-ABLATION-INTERPRETATION.txt e benchmark-ablation/.
+
+PCF: sei processi none/debug conclusi, tre ripetizioni per filtro in ordine
+ABBAAB. PCF2−PCF4 medio: Cyber +3,174ms, West +0,239ms, scontro −0,174ms;
+nessun beneficio consistente. La corsa Cyber PCF2 lenta è inclusa, così
+come i picchi di entrambi i bracci. Le sei coppie native mostrano piccole
+differenze nei bordi obliqui, senza equivalenza visiva dimostrata.
+Main e finale conservano PCF4; PCF2 resta nella sola copia diagnostica.
+Prove: B-PCF-INTERPRETATION.txt, VISUAL_PCF.txt e benchmark-pcf/.
+
+HP: ottimizzazione GIÀ PRESENTE nei sorgenti iniziali, qui soltanto
+misurata contro il riferimento esaustivo in copia isolata. Dodici processi
+exit 0, incontro Cyber con sei nemici, stesso ingresso diretto per i due
+bracci, 60 frame warmup e 600 campioni. Lo scope surface_labels cala in
+tutte le ripetizioni: media none 4,184→0,979ms; speed 1,197→0,352ms.
+Comprende ricerca, disegno, feedback e possibili attese, non il solo
+algoritmo di posizionamento. World e wrapped_draw lo contengono: non sommare
+i livelli. La media frame scende di 2,380ms none e 0,595ms speed, ma
+alcuni p95 peggiorano e i delta speed per corsa cambiano segno; il guadagno
+di frame non è uniforme. Non aggiungere questo risparmio al redesign:
+baseline e finale usano già entrambi la ricerca ottimizzata.
+Prove: B-HP-INTERPRETATION.txt e benchmark-hp/.
+
+Tutti i dati dei tre esperimenti restano disponibili, senza scartare code
+o anomalie. Ricostruzioni e upload geometrici misurati sono zero in tutte
+le loro scene;
+SUN CACHE è assente nei binari diagnostici, quindi non disponibile, non
+zero. Le medie dei p95 non sono percentili aggregati. Le diagnosi non
+misurano il finale integrato e non sostituiscono una telemetria GPU isolata.
+
+P1 — CARICAMENTO, CACHE E FALLBACK VERIFICATI
+P1 integra due PNG embedded 1024², generati dalle routine Odin autorevoli,
+precaricati dopo roguelike_attach; fallback procedurale nel caricamento.
+Manifest/hash e confronto integrale di 2.097.152 pixel/roundtrip PNG
+verificati nella preparazione. Massimo due texture da 5,333MiB ciascuna,
+ownership conservata; --check fa parte di check.sh/check.ps1.
+Le scorciatoie del pavimento saltano contributi matematicamente nulli.
+
+stock-probe/results.json e stock-probe/result-{none,speed}/run.log: entrambi i processi
+exit 0, usando il loader di produzione estratto. Per Cyber e West,
+embedded e fallback hanno pixel RGBA del livello base identici dopo lettura
+dalla GPU, anche fra none/speed; le texture hanno undici livelli mipmap.
+Verificati riuso della
+stessa texture quando la sorgente diventa invalida, errore senza bake nel
+draw, nessun nuovo tentativo nella cache fallita, fallback consentito nel
+load e successivo riuso. I warning sulle sorgenti invalide sono intenzionali.
+Il confronto GPU e la pittura di riferimento avvengono fuori dai tempi sotto.
+
+Tempi del probe, ms; singola esecuzione per build, non media di tre corse:
+build  bioma   decode PNG  upload+mipmap  frame cold fino a EndDrawing
+none   Cyber      14,068          7,491              132,766
+none   West       13,419          4,053               18,237
+speed  Cyber      16,467          5,655               86,401
+speed  West       13,476          4,168               18,017
+
+Il primo present Cyber costa 132,766/86,401ms: non va sostituito dalla
+somma decode/upload. Include presentazione e possibili attese del primo
+frame del probe 160×90; non è il tempo di caricamento dell'intero gioco
+né una query GPU isolata. Per il fallback forzato, decode/pittura richiede
+Cyber 3284,352/261,130ms e West 1104,700/78,099ms (none/speed), più
+upload/mipmap: il costo procedurale esiste ancora nella sola via di riserva.
+
+P1 elimina la pittura procedurale dal caricamento normale verificato,
+conservando i pixel. Lo confermano anche tutte le sei corse finali del
+gioco, due biomi ciascuna: 12 eventi, procedural_fallback=false sempre.
+Tempi reali di decode/upload del gioco, ms, r1/r2/r3:
+build bioma | decode PNG | upload+mipmap
+none Cyber | 11.764/11.602/12.102 | 8.463/7.273/7.090
+none West  | 14.210/14.540/14.672 | 4.587/3.916/3.878
+speed Cyber| 11.845/11.550/11.845 | 7.941/7.077/7.245
+speed West | 14.483/13.908/13.820 | 3.950/3.919/3.971
+
+Decode+upload insieme è 18,875–20,227ms Cyber none, 18,456–18,797ms West
+none; 18,627–19,786ms Cyber speed e 17,791–18,433ms West speed. Prima la
+sola pittura costava Cyber 3258,045–3336,596ms none/261,002–261,160ms speed,
+West 1083,730–1089,113ms none/77,659–135,945ms speed, più upload.
+Questa rimozione della lunga pittura cold è verificata nel gioco reale;
+non è il tempo totale d'ingresso né il p95 del primo frame. Avviene prima
+delle finestre steady-state e resta distinta dai loro risultati sopra.
+Tutte le triple prima/dopo del cold sono in B-FINAL-RESULTS.txt, sezione 5.
+
+CHIUSURA E LIMITI
+Verifiche concluse: 18 corse B1, 42 del follow-up e 6 del percorso fisso,
+tutte exit 0; probe P1 e smoke documentati sopra. E è attiva al 15%.
+Il target 60 FPS a 1080p non è raggiunto; restano variabilità e picchi nel
+movimento, guadagni release non uniformi, limiti estetici/F4 e temporali
+dichiarati nelle rispettive sezioni. Non sono mascherati come risultati
+positivi o attività ancora in esecuzione. Nessun commit.
+final-integrity-check.json conferma alla chiusura 820 sorgenti identici
+alla snapshot misurata e 318 file protetti invariati; assets/assets assente.

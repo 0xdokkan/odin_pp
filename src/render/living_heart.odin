@@ -8,11 +8,11 @@ import game "../game"
 import grid "../engine/grid"
 import view "../engine/view"
 
-// An enemy's health on the board: a little paper tag over its head, cut and
-// inked like the damage tokens (living_token.odin), with a red pixel heart and
-// the health left over the maximum in the same pixel figures. A seven-pixel
-// intent lives inside the same tag, after the figures: one compact, stable
-// label per enemy, with no floating badge or separate countdown ring.
+// Health and intent share one paper tag. Expeditions keep exact current HP
+// and a proportional red meter beside the intent; the focused inspector
+// retains current/maximum HP. Other boards retain their heart and fraction.
+// Narrow expedition tags fit near the actual head instead of covering the
+// neighbouring figure or requiring a line across the whole group.
 
 // 7 pixels wide, rows top to bottom, bit 6 the leftmost column.
 @(rodata)
@@ -29,11 +29,16 @@ living_heart_text :: proc(health, max_health: i32) -> string {
 	return fmt.tprintf("%*s/%d", digits, current, max(max_health, 1))
 }
 
+@(private)
+living_heart_compact_text :: proc(health,max_health:i32)->string {
+	return fmt.tprintf("%*s",len(fmt.tprintf("%d",max(max_health,1))),fmt.tprintf("%d",max(health,0)))
+}
+
 // In tag pixels: the heart, a pixel of paper, the figures; paper, ink line and
 // cut edge as a token's (living_token_size).
 @(private)
-living_heart_size :: proc(text: string, with_intent := false) -> (width, height: int) {
-	return LIVING_HEART_WIDTH+1+len(text)*6-1+4+2+1+(INTENT_GLYPH_SIZE+4 if with_intent else 0), 7+4+2+1
+living_heart_size :: proc(text: string, with_intent := false,compact:=false) -> (width, height: int) {
+	return (0 if compact else LIVING_HEART_WIDTH+1)+len(text)*6-1+4+2+1+(INTENT_GLYPH_SIZE+4 if with_intent else 0), 7+4+2+1
 }
 
 // One row of a pixel figure as runs of lit pixels; bit `width-1` is the leftmost.
@@ -86,17 +91,24 @@ draw_paper_tag_text :: proc(at: rl.Vector2, left: f32, text: string, pixel: f32,
 
 // The heart's tag with its top left at `at`.
 @(private = "file")
-draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, icon: Intent_Icon, alarm: bool, alpha: f32 = 1) {
-	w, h := living_heart_size(text, true)
+draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, icon: Intent_Icon, alarm: bool, alpha: f32 = 1,health_fraction:f32=-1) {
+	compact:=health_fraction>=0
+	w, h := living_heart_size(text, true,compact)
 	ink := draw_paper_tag(at, w, h, pixel, alpha)
 	red := color_with_opacity(LIVING_TOKEN_DAMAGE, alpha)
-	for row in 0..<7 {
+	if !compact {for row in 0..<7 {
 		draw_pixel_row(LIVING_HEART_GLYPH[row], LIVING_HEART_WIDTH, at.x+3*pixel, at.y+f32(3+row)*pixel, pixel, red)
-	}
-	draw_paper_tag_text(at, f32(3+LIVING_HEART_WIDTH+1), text, pixel, ink)
-	left, _ := living_heart_size(text)
+	}}
+	draw_paper_tag_text(at,3 if compact else f32(3+LIVING_HEART_WIDTH+1),text,pixel,ink)
+	left, _ := living_heart_size(text,compact=compact)
 	rl.DrawRectangleRec({at.x+f32(left-2)*pixel, at.y+3*pixel, pixel, 7*pixel}, color_with_opacity(LIVING_TOKEN_EDGE, alpha))
 	draw_compact_intent({at.x+f32(left)*pixel, at.y+3*pixel}, icon, pixel, alarm, alpha)
+	if health_fraction>=0 {
+		bar:=rl.Rectangle{at.x+3*pixel,at.y+11*pixel,f32(w-7)*pixel,pixel}
+		rl.DrawRectangleRec(bar,color_with_opacity(LIVING_TOKEN_EDGE,alpha))
+		bar.width=math.round(bar.width*clamp(health_fraction,0,1))
+		rl.DrawRectangleRec(bar,red)
+	}
 }
 
 // The top of a living figure's head (world): `rest_height` above its feet,
@@ -105,6 +117,13 @@ draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, icon: Intent
 @(private = "file")
 living_head_point :: proc(renderer: ^Renderer, character: gfx.Flipbook_Character, key: Sprite_Key, position: view.Vec2,
 	entity: game.Entity_Ref) -> rl.Vector3 {
+	if _,head,costume:=tactical_costume_annotation_quad(renderer,key,position,entity);costume {return head}
+	if q,ok:=expedition_cartoon_geometry(renderer,key,position,entity);ok {
+		index,_:=expedition_cartoon_actor(renderer,key)
+		k:=1-f32(renderer.tactical.expedition_material.cartoon.top[index])/CARTOON_CELL
+		bottom,top:=(q.card_points[1]+q.card_points[2])*.5,(q.card_points[0]+q.card_points[3])*.5
+		return bottom+(top-bottom)*k
+	}
 	sheet := &gfx.LIVING_SHEETS[character]
 	p := living_billboard_geometry(renderer, character, key, position, true, entity).card_points
 	bottom, top := (p[1]+p[2])*0.5, (p[0]+p[3])*0.5
@@ -162,9 +181,19 @@ place_living_heart :: proc(layout: ^Tactical_Label_Layout, head: view.Vec2, size
 @(private)
 draw_living_hearts :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
-	for &actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		if !living_heart_shown(renderer, actor) { continue }
-		head, pixel, on_board := tactical_enemy_head(renderer, &actor)
+	// Simulation storage order may change when an enemy dies. Drawing health
+	// in stable entity order prevents unrelated tags from trading lanes then.
+	order:[game.MAX_ENEMIES_PER_ROOM]int
+	count:=min(v.snapshot.enemy_count,len(order))
+	for i in 0..<count {
+		at:=i
+		for at>0 && v.snapshot.enemies[order[at-1]].entity.id>v.snapshot.enemies[i].entity.id {order[at]=order[at-1];at-=1}
+		order[at]=i
+	}
+	for index in order[:count] {
+		actor:=&v.snapshot.enemies[index]
+		if !living_heart_shown(renderer, actor^) { continue }
+		head, pixel, on_board := tactical_enemy_head(renderer, actor)
 		if !on_board { continue }
 		icon := Intent_Icon.None
 		alarm := false
@@ -172,15 +201,27 @@ draw_living_hearts :: proc(renderer: ^Renderer, room: ^game.Room) {
 			enemy := &room.enemies[i]
 			icon, alarm = tactical_intent_icon(room, enemy), enemy.intent.windup
 		}
-		text := living_heart_text(actor.health, actor.max_health)
-		w, h := living_heart_size(text, true)
+		text := living_heart_compact_text(actor.health,actor.max_health) if v.expedition else living_heart_text(actor.health, actor.max_health)
+		w, h := living_heart_size(text,true,v.expedition)
 		size := view.Vec2{f32(w)*pixel, f32(h)*pixel}
-		bounds := place_living_heart(v.labels, head, size)
+		bounds:rl.Rectangle
+		if v.expedition {
+			placed:bool
+			bounds,placed=place_tactical_label_near(v.labels,head,size,tactical_world_bounds(renderer))
+			// Retain readable HP even in an exhausted annotation viewport.
+			// Normal encounters fit the bounded nearest-lane search above.
+			if !placed {bounds=place_living_heart(v.labels,head,size)}
+			end:=rl.Vector2{clamp(head.x,bounds.x+2,bounds.x+bounds.width-2),clamp(head.y,bounds.y+2,bounds.y+bounds.height-2)}
+			if distance:=math.hypot(end.x-head.x,end.y-head.y);distance>6 && distance<=36 && !tactical_label_link_crosses_body(v.labels,to_raylib(head),end,actor.entity) {
+				rl.DrawLineEx(to_raylib(head),end,1,color_with_opacity(EXPEDITION_PAPER_INK,actor.opacity*.65))
+			}
+		} else {bounds=place_living_heart(v.labels,head,size)}
 		if v.labels.heart_count < len(v.labels.hearts) {
 			v.labels.hearts[v.labels.heart_count], v.labels.heart_ids[v.labels.heart_count] = bounds, actor.entity.id
 			v.labels.heart_count += 1
 		}
-		draw_living_heart({bounds.x, bounds.y}, text, pixel, icon, alarm, actor.opacity)
+		draw_living_heart({bounds.x, bounds.y}, text, pixel, icon, alarm, actor.opacity,
+			f32(actor.health)/f32(max(actor.max_health,1)) if v.expedition else -1)
 	}
 }
 

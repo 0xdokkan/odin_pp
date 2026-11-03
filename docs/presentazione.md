@@ -1,9 +1,231 @@
 [← Odin PP](../README.md)
 
+### Cartoncino cartoon nelle spedizioni
+
+La direzione corrente segue i riferimenti in `docs/riferimenti/cartoncino-cartoon/`:
+il primo definisce il taglio delle figure, gli altri la composizione del mondo.
+Il robot ha una grande testa a monitor, corpo blu, giunti corallo e guscio caldo;
+i sei ruoli Cyber hanno sagome proprie, dal granchio basso al robot pesante.
+La stampa è pixel art a filtro nearest, animata sulla sagoma avorio stabile.
+Il taglio finisce alle suole: nessun cavalletto, piedistallo o basetta separata.
+Solo il disegno si restringe nel cambio di direzione; scivolamenti, caduta,
+quote e occlusione continuano a seguire la presentazione esistente.
+
+Pavimento avorio, interni azzurri, pareti blu continue, targhe corallo,
+macchinari gialli e vegetazione verde condividono inchiostro e carta opaca.
+Il terreno è una campitura continua: niente mosaico, scacchiera o fughe
+decorative, né i vecchi pannelli blu. Pochi ciuffi e piccoli segni di sassolini
+sono distribuiti fuori dai centri delle celle. I fulmini ocra indicano ancora
+le celle elettriche e pulsano con il battito; la griglia compare come overlay
+di combattimento. Gli interni si distinguono per il colore del pavimento.
+Negli altri biomi restano materiali, motivi e figure caratteristici, con lo
+stesso trattamento di carta, contorni scuri e luce a campiture.
+Le pareti condividono ora facce continue e bordi solo alle estremità esposte:
+venature, giunti della pietra, finestre, brina e glifi sono disegnati nel
+materiale, senza pile di cornici sottili quasi sovrapposte. I dettagli piccoli
+mantengono il colore e non ricevono un secondo reticolo di bordi chiari.
+Piante, felci, lapidi, obelischi, colonne e armadi partono dal terreno;
+cristalli e blocchi decorativi si appoggiano o si impilano senza intervalli.
+Nessun vassoio sotto la vegetazione e nessuna casella schiarita a simulare
+una base. Il contatto è un'ombra breve e morbida sullo stesso pavimento.
+Anche il vento Sky usa piccoli riccioli disegnati al posto del reticolo.
+Rampe, ponti, grotte e dimensioni degli ambienti derivano ancora dalla mappa.
+L'HUD usa pannelli avorio compatti e valori reali; carte, intenzioni e
+anteprime conservano il combattimento continuo a battito.
+
+L'ambiente conserva render target HDR, bloom, riflessi e profondità condivisa.
+La luce è ora opaca e senza riflesso speculare: il bloom contribuisce poco al
+risultato e i riflessi sono molto attenuati. Gli indicatori luminosi conservano
+energia HDR, verificata dallo smoke GPU; gli attori vengono stampati dopo il
+resolve, con i loro colori originali. Hub e minigiochi conservano le proprie scene.
+
+Il passaggio cromatico usa inchiostro blu notte (`#141D2B`), blu (`#1374C2`),
+ciano (`#33B8EB`), corallo (`#F2423D`) e giallo (`#FFBE23`). Il contorno scuro
+domina il sottile taglio avorio; pannelli, foglie e armadi ricevono campiture
+ampie e segni stampati, senza rumore casuale. Le ombre hanno tre toni con una
+dominante fredda, invece di desaturare ogni oggetto verso il grigio.
+
+Oltre alle immagini approvate, sono stati consultati i materiali ufficiali di
+[Paper Mario: Il Portale Millenario](https://www.nintendo.com/en-ca/store/products/paper-mario-the-thousand-year-door-switch/)
+e [Bug Fables](https://www.nintendo.com/en-ca/store/products/bug-fables-the-everlasting-sapling-switch/).
+La lettura artistica adottata è la separazione netta delle campiture, la
+gerarchia fra contorno e dettagli interni e l'uso di ombre colorate.
+Nessun loro asset viene distribuito o caricato dal gioco.
+La successiva pulizia dei materiali prende come riferimento anche
+[Paper Trail](https://www.papertrailgame.com/), che descrive una direzione
+ispirata a stampa, acquerello e personaggi ritagliati: qui il criterio adottato
+è usare segni piatti e campiture leggibili al posto di rilievi decorativi minuti.
+
+Per la revisione delle palette sono stati consultati anche
+[Resurrect 64 di Kerrie Lake](https://lospec.com/palette-list/resurrect-64)
+e [ENDESGA 32](https://lospec.com/palette-list/endesga-32).
+I colori runtime sono adattati al contrasto fra attori, architettura e terreno:
+
+| Bioma | Campiture e accenti |
+| --- | --- |
+| Cyber | Avorio, ciano, blu, corallo e giallo |
+| West | Ocra, legno arancio e terracotta |
+| Jungle | Verde caldo, pietra giada, legno miele |
+| City | Malva, rosa pesca e turchese |
+| Egypt | Sabbia dorata, crema e turchese |
+| Vietnam | Oliva, bambù miele e verde foglia |
+| Snow | Neve avorio, azzurro e accenti ambra |
+| Inferno | Terracotta, basalto prugna e brace arancio |
+| Gothic | Lavanda, legno rosato e luci ambra |
+| Sky | Crema, lilla e oro |
+| Space | Viola, pervinca e turchese |
+| Secret | Prugna, rosa antico e oro |
+
+### Sole, ombre e muri costruiti
+
+Il mondo riceve una luce direzionale comune: architettura, rilievi, ponti,
+edifici e arredi ritagliati proiettano ombre fredde dal bordo morbido.
+L'occlusione del cielo scurisce i contatti secondo le impronte reali dei
+solidi. Dentro un edificio il tetto rimosso smette di proiettare ombra;
+sulla soglia l'involucro può dissolversi per leggibilità e conservare
+l'ombra. Grotte e stanze sotto la roccia mantengono le lampade. Gli attori
+conservano colori stampati e disco sotto i piedi.
+
+Il resolve HDR aumenta la saturazione di 1,10 e separa luci calde e ombre
+fredde; la vignetta di 0,17 chiude leggermente i bordi della spedizione.
+Il terreno combina velature lente e fibra della carta. Le regioni speciali
+hanno un bordo a ritaglio; il centro di ogni cella conserva il terreno
+funzionale, con pericoli e griglia leggibili. Nell'officina Cyber guide
+corallo, anelli, cornice gialla della pressa, prese blu e corsie seguono gli
+accessi e i banchi. Nel West la polvere delle corsie è più contenuta.
+
+I muri continui hanno zoccolo, corpo più snello, copertina e pilastri
+periodici, terminali o d'angolo. I corsi stampati seguono il bioma: pannelli
+Cyber, assi West, pietra Jungle/Egypt, mattoni City/Gothic, bambù Vietnam,
+blocchi Snow, basalto Inferno, marmo Sky, pannelli Space e sfaccettature
+Secret. I neon Cyber restano piccoli accenti. Camera approvata, suole senza
+basetta e regole di gioco restano quelle precedenti.
+
+#### Redesign del 3 novembre 2026
+
+Le forme integrate distinguono carro, fontana, statua, macchina, rovina
+e recinto, con materiali del bioma.
+Confrontati tutti i sei tipi in cinque biomi e due rotazioni a 960×540;
+il carro resta piccolo e si riconosce soprattutto da cassone e manici.
+Gli edifici riprendono zoccolo e bordi dei muri. Le fioriere Cyber sono
+vasche crema vere, con terra scura
+e foglie radicate nella terra, nelle celle già occupate. I pilastri intermedi
+e terminali diventano blu schiarito; gli angoli restano avorio.
+
+Gli accumuli seguono i solidi: sabbia West/Egypt, muschio
+Jungle/Gothic/Vietnam, neve Snow, cenere Inferno, polvere City/Cyber/Space
+e accenti del materiale Sky/Secret. La stessa maschera concentra i piccoli
+segni vicino ai muri e lascia quiete le aree aperte. La maschera G corretta
+e verificata nelle catture v4 conserva hazard e rive leggibili, eliminando
+i tagli quadrati sotto i prop e i gradini presso i pericoli.
+
+F4 include una microcorrezione del disegno della pressa Cyber: larghezza
+aumentata del 6% e altezza del 2%, mantenendo cella, densità del disegno e
+atlante. Gli accessori esistenti formano gruppi meno simmetrici, nelle
+stesse celle occupate; attrezzi, scorte e armadietto dipinto rendono più
+chiaro il piccolo servizio di riparazione del rifugio. La camminata reale
+officina/rifugio/rilievo/scontro dura 60,58 secondi simulati con soste,
+di cui 37,58 in movimento, con entrata/uscita e carta giocate tramite input.
+
+E è attiva dopo confronto on/off e approvazione dell'utente: attenuazione
+massima di circa il 15% dei pigmenti, con dominante fredda e carta,
+inchiostro e flash preservati.
+Le fughe decorative F3 non sono attivate. La microcorrezione F4 non
+costituisce una ricomposizione generale dell'officina. I benchmark finali
+mostrano miglioramenti nelle scene ferme ma non raggiungono 60 fps al p95;
+resta aperta la diagnosi del cammino montato debug. Gli esiti sono nel rapporto
+[`VERIFICA_REDESIGN_SOLE.txt`](riferimenti/cartoncino-cartoon/VERIFICA_REDESIGN_SOLE.txt).
+
+### Moonshot: forme e stampa dell'ambiente
+
+La libreria di profili concavi sostituisce i volumi anonimi nei punti importanti:
+armadi con spalle asimmetriche, monitor con guscio inclinato, banchi con vano
+inferiore e attrezzature riconoscibili. Cyber alterna cartucce e strumenti,
+bobine e pannelli da lavoro; i muri hanno finestre d'ispezione e poche etichette,
+con campiture libere fra loro. Le piante sono gruppi di foglie larghe con steli
+radicati, senza vassoio. Il contorno segue la sagoma; i dettagli interni hanno
+un contrasto minore e il taglio avorio delle facce è più contenuto.
+
+Gli altri biomi hanno arredi propri: banchi e seghe West, pietre scolpite e
+foglie Jungle, strumenti City, altari e tavolette Egypt, casse e radio Vietnam,
+ghiaccio Snow, fornaci Inferno, libri Gothic, leggii Sky, strumenti Space e
+gemme Secret. Mesa, cactus, obelischi, lapidi e rocce innevate hanno profili
+dedicati. Le celle occupate e i percorsi sono quelli della mappa originale.
+
+Le stampe sulle pareti compongono campi di più celle: venature allungate con
+un nodo, giunti sfalsati e sigilli nella pietra, finestre City, collari di bambù,
+riflessi larghi sul ghiaccio, crepe nella lava, nicchie Gothic e oblò Space.
+Sono disegni vettoriali analitici registrati nello spazio, senza rumore animato.
+La scelta di applicarli soltanto alle pareti evita lo stesso simbolo su foglie,
+macchinari e strumenti. I bordi esterni delle regioni di terreno speciale sono
+arrotondati, mantenendo celle, connessioni, colori funzionali e battito.
+
+Macchinari delle officine e sei tipi di oggetti funzionali sono ora stampe
+pixel art su sagome: 96 disegni, con prospettiva dipinta su fronte, fianco e
+piano superiore. Due pose muovono piccoli segnali interni senza cambiare il
+ritaglio. Il bordo avorio largo e l’inchiostro esterno distinguono il supporto
+dalla stampa. Le costruzioni attraversabili mantengono volume, facciate e
+tetti illustrati; entrando, il tetto scompare secondo la visibilità di gioco.
+
+La camera iniziale guarda dall’alto quasi perpendicolarmente a un lato della
+mappa (yaw 80°, elevazione circa 43,5°). Il dock dei comandi lascia più mondo
+visibile; icone di stato avorio e inchiostro conservano contrasto sui biomi chiari.
+Le decorazioni del terreno sono piccoli gruppi deterministici ancorati anche
+alle rampe. Non cambiano ingombri, percorsi o interazioni.
+
+I riferimenti ufficiali sopra sono stati riaperti insieme alle tre immagini
+locali. Dalle immagini concrete di Paper Mario si adotta la gerarchia delle
+masse; da Bug Fables la continuità fra contorno delle figure e ambiente; da
+Paper Trail la composizione di grandi campiture con disegni scelti. Queste
+sono interpretazioni per questo renderer, non asset dei giochi citati.
+
+### Scena Cyber: officina, terreno e rifugi
+
+La prima scena completa del mondo illustrato è Cyber. Il centro
+dell'officina è una pressa di riparazione alta, con spalle corallo, vano di
+lavoro, manometro e pistone: quattro pose ne mostrano riposo, preparazione,
+pressione e ritorno dentro una sagoma di cartoncino immutabile. Ai lati,
+materiali in attesa, convogliatori bassi e scaffali alti distinguono le zone
+di lavoro nelle celle già occupate. Il punto di interazione resta quello
+dell'officina; i nuovi disegni non aggiungono postazioni utilizzabili.
+Il bordo avorio spesso con contorno scuro rimane quello approvato.
+
+Il cortile dell'officina condivide il fondo avorio con l'esterno: il precedente
+rettangolo azzurro lascia spazio a corsie consumate, tracce interrotte e archi
+di svolta presso i banchi. Questi segni seguono ingressi e orientamento reali
+del luogo. I fianchi dei dislivelli Cyber mostrano strati di terra e una
+cresta chiara, sulle superfici già presenti. Quote, rampe, pericoli e
+percorsi praticabili restano quelli della mappa.
+
+Capanna e casetta Cyber (`Hut`, `Cottage`) hanno una composizione dedicata:
+tetto con spalle piegate e feritoie stampate, facciate con finestre tecniche,
+segnali gialli ai lati della vera porta. Entrando si vedono console, banco,
+attrezzi e scaffali illustrati sulle pareti interne, con il corridoio libero.
+Il tetto e i suoi dettagli scompaiono insieme; uscita, dissolvenza sulla
+soglia e scurimento esterno seguono la policy di visibilità già esistente.
+Le costruzioni mantengono volume e impronta, senza mobili solidi collocati
+nelle celle attraversabili o supporti sotto i piedi del personaggio.
+
+Il West prosegue questa direzione con una sega a telaio animata, volano e
+tronco, gruppi di assi e banchi bassi. La polvere disegna percorsi consumati
+fra accessi e postazioni, con poche schegge vicino ai banchi. Nelle nuove
+spedizioni compaiono due rifugi di legno, con tetti a falde, imposte verdi,
+attrezzi e scorte disegnati sulle pareti interne. Il tetto scompare entrando;
+i vecchi salvataggi conservano il mondo che contenevano.
+
+Negli scontri la fascia superiore scende da 84 a 64 pixel canvas e la mano
+da 184 a 160: 44 pixel in più per il mondo. Costi, effetti e portate delle
+carte mantengono il corpo del testo; cambiano altezza e spazio illustrato.
+I nomi compaiono per il nemico ispezionato; vita e intento restano visibili.
+
+La composizione specifica degli altri dieci biomi, i loro edifici e terreni
+restano lavoro successivo descritto nel
+[prompt del mondo illustrato](riferimenti/cartoncino-cartoon/PROMPT_MOONSHOT_MONDO_ILLUSTRATO.txt).
+
 ### Luce della portata delle carte
 
 Selezionando una carta, la portata illumina le superfici del pavimento in blu:
-la resina conserva ombre, incisioni e fughe. Un bordo continuo delimita il
+il pavimento conserva ombre e piccoli segni stampati. Un bordo continuo delimita il
 perimetro, con un alone sfumato verso l’interno e una pulsazione lenta.
 L’area interessata dal puntatore è ambra; il bersaglio e la destinazione di
 movimento hanno angoli luminosi color menta. Rosso indica una giocata non
@@ -110,7 +332,7 @@ nascosti.
 ### Strutture e trasparenza degli edifici
 
 Ogni edificio è disegnato in tre parti: l'**involucro** (muri, colonnato e tetto), l'**interno**
-(il pavimento, sempre presente) e il **contorno a terra** (una linea al neon lungo l'impronta,
+(il pavimento, sempre presente) e il **contorno a terra** (una linea d'inchiostro nelle spedizioni lungo l'impronta,
 con una croce sulla porta, sempre presente). Quanto è pieno l'involucro dipende da dove si trova
 il robot, ed è calcolato dalla funzione pura `game.structure_visibility`
 ([structure_view.odin](../src/game/structure_view.odin)): intero da 5 caselle in su; sempre più
@@ -551,6 +773,12 @@ freccia di Feretro vola come il dardo.
 La vita dei nemici è un **cartellino di carta** sopra la testa, tagliato e
 inchiostrato come i segnalini: un cuore rosso, `12/18` (la vita sul massimo)
 e l'intento nelle stesse dimensioni a pixel ([living_heart.odin](../src/render/living_heart.odin)).
+Nelle spedizioni usa invece la vita corrente, una barra proporzionale e
+l'intento: un cartellino da 29 pixel per HP a due cifre. Il massimo numerico
+resta nell'ispettore. Cerca uno spazio vicino alla testa, evitando sagome,
+cappelli e altri cartellini; nei gruppi estremi torna all'ancoraggio sopra
+il proprietario. Le regole di ancoraggio fisso descritte sotto restano per
+le altre viste.
 È ancorato al centro sopra la testa e segue la posizione presentata della carta,
 compresi movimento e sollevamento del Lazzo. Il tremolio e i frame del disegno
 non spostano il cartellino. Non cerca altre righe o colonne quando il player,

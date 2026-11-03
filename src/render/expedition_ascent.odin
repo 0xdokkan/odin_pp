@@ -14,11 +14,11 @@ Ascent_Material :: struct {body,cap,trim,dark,accent,secondary:rl.Color}
 @(private)
 ascent_material :: proc(b:campaign.Biome)->(m:Ascent_Material,ok:bool) {
 	#partial switch b {
-	case .City:return {{34,30,48,255},{59,54,73,255},{84,79,97,255},{12,16,29,255},{240,60,161,254},{65,207,226,254}},true
-	case .Snow:return {{41,59,75,255},{111,133,146,255},{87,112,132,255},{20,34,48,255},{117,214,242,254},{222,185,119,254}},true
-	case .Sky:return {{107,112,133,255},{137,140,146,255},{156,119,58,255},{45,52,76,255},{240,211,140,254},{231,157,202,254}},true
-	case .Space:return {{29,29,51,255},{63,67,93,255},{91,105,127,255},{10,13,28,255},{126,96,242,254},{63,172,248,254}},true
-	case .Secret:return {{19,19,29,255},{40,39,52,255},{133,100,43,255},{7,9,17,255},{208,174,92,254},{169,194,238,254}},true
+	case .City:return {{126,91,169,255},{202,141,196,255},{55,158,182,255},{27,30,57,255},{250,77,151,254},{66,218,231,254}},true
+	case .Snow:return {{98,162,202,255},{242,240,219,255},{162,206,218,255},{29,65,98,255},{128,222,245,254},{245,185,92,254}},true
+	case .Sky:return {{174,163,214,255},{255,238,201,255},{235,177,65,255},{68,73,119,255},{255,217,136,254},{250,155,189,254}},true
+	case .Space:return {{91,70,165,255},{172,145,225,255},{74,185,207,255},{27,31,65,255},{170,119,249,254},{67,193,245,254}},true
+	case .Secret:return {{86,68,115,255},{165,132,165,255},{240,187,65,255},{28,25,46,255},{249,205,104,254},{187,204,245,254}},true
 	case:return {},false
 	}
 }
@@ -40,20 +40,23 @@ ascent_panel :: proc(pass:Ink_Pass,base:rl.Vector3,yaw,height,width:f32,m:Ascent
 // Layered, irregular five-sided rocks with a distinct upper material.
 @(private)
 ascent_rock :: proc(pass:Ink_Pass,p:rl.Vector3,radius,height,phase:f32,m:Ascent_Material,h:u32,snow:bool=false) {
-	a,b,c:[5]rl.Vector3
-	for i in 0..<5 {
-		angle:=phase+f32(i)*math.TAU/5
-		r:=radius*(.82+.035*f32((h>>u32(i*4))%5))
-		o:=rl.Vector3{math.cos(angle)*r,0,math.sin(angle)*r}
-		a[i]=p+o;b[i]=p+o*.88+{.03*radius,height*.63,-.02*radius}
-		c[i]=p+o*.27+{-.06*radius,height,.08*radius}
+	// A snow bank has broad rounded shoulders; a meteor has a broken rim.
+	// These four authored rings stay inside the existing blocked footprint.
+	rings:[4][8]rl.Vector3
+	radii:=[4]f32{.80,1,.84,.40};levels:=[4]f32{0,.30,.78,1}
+	for k in 0..<4 {
+		for i in 0..<8 {
+			angle:=phase+f32(i)*math.TAU/8
+			r:=radius*radii[k]
+			y:=height*levels[k]
+			if !snow {r*=.84+.04*f32((h>>u32(i*3))%4);if k==2 {y*=.88+.05*f32(i%3)}}
+			rings[k][i]=p+{math.cos(angle)*r,y,math.sin(angle)*r}
+		}
 	}
-	ink_solid(pass,a[:],b[:],m.body,m.body,{},shade=.12)
-	ink_solid(pass,b[:],c[:],m.cap,m.cap,{},shade=.13)
-	if snow {
-		for i in 0..<5 {a[i]=c[i];b[i]=c[i]+{0,.055,0}}
-		ink_solid(pass,a[:],b[:],m.cap,m.cap,{})
-	} else {ink_line(pass,b[1],c[1],ink_scale(m.accent,.5))}
+	ink_solid(pass,rings[0][:],rings[1][:],m.body,m.body,{},shade=.08)
+	ink_solid(pass,rings[1][:],rings[2][:],m.body,m.cap,{},shade=.10)
+	ink_solid(pass,rings[2][:],rings[3][:],m.cap,m.cap,{},shade=.04)
+	if !snow {ink_line(pass,rings[1][1],rings[2][1],ink_scale(m.accent,.5))}
 }
 
 @(private)
@@ -69,14 +72,15 @@ ascent_crystal :: proc(pass:Ink_Pass,p:rl.Vector3,radius,height,yaw:f32,m:Ascent
 // projecting sign, all inside the blocked square rather than across a lane.
 @(private)
 ascent_city_building :: proc(pass:Ink_Pass,p:rl.Vector3,height:f32,h:u32,m:Ascent_Material) {
-	ink_box(pass,p,{.46,.45},height,0,m.body,m.cap,{})
-	ink_box(pass,p+{0,height,0},{.48,.47},.09,0,m.trim,m.cap,{})
+	profile:=[8]rl.Vector2{{-.44,0},{-.46,.76},{-.39,.91},{-.27,1},{.28,1},{.43,.94},{.46,.76},{.44,0}}
+	ink_profile(pass,p,profile[:],{1,height},.88,0,m.body,m.cap,EXPEDITION_PAPER_INK)
+	ink_chamfer_box(pass,p+{0,height,0},{.34,.40},.09,0,m.trim,m.cap,{},.09)
 	ink_box(pass,p+{-.16,height+.09,-.10},{.18,.17},.26,0,m.dark,m.trim,{})
 	ink_box(pass,p+{.25,height+.09,.18},{.09,.13},.13,0,m.trim,m.cap,{})
 	for side in 0..<2 {
 		yaw:=f32(side)*math.PI/2
 		for row in 0..<3 {
-			y:=.25+f32(row)*(height-.5)/3
+			y:=.22+f32(row)*(height-.60)/3
 			for col in 0..<2 {
 				x:=f32(col)*.39-.20
 				ink_box(pass,cyber_point(p,{x,y,.453},yaw),{.13,.003},.22,yaw,m.dark,m.dark,{})
@@ -89,23 +93,23 @@ ascent_city_building :: proc(pass:Ink_Pass,p:rl.Vector3,height:f32,h:u32,m:Ascen
 
 @(private)
 ascent_column :: proc(pass:Ink_Pass,p:rl.Vector3,height,yaw:f32,m:Ascent_Material) {
-	ink_box(pass,p,{.46,.46},.13,yaw,m.body,m.cap,{})
-	ink_box(pass,p+{0,.13,0},{.35,.35},.10,yaw,m.trim,m.trim,{})
-	ink_frustum(pass,p+{0,.23,0},.27,.235,max(height-.47,.10),8,yaw+math.PI/8,m.body,m.cap,{},shade=.08)
-	ink_box(pass,p+{0,height-.24,0},{.35,.35},.12,yaw,m.trim,m.trim,{})
-	ink_box(pass,p+{0,height-.12,0},{.46,.46},.12,yaw,m.cap,m.cap,{})
+	// A flared bell capital joins the shaft with one curved shoulder.
+	ink_frustum(pass,p,.29,.22,max(height-.29,.10),8,yaw+math.PI/8,m.body,m.cap,{},shade=.08)
+	ink_frustum(pass,p+{0,height-.29,0},.22,.32,.12,8,yaw+math.PI/8,m.trim,m.cap,{})
+	ink_frustum(pass,p+{0,height-.17,0},.32,.46,.10,8,yaw+math.PI/8,m.trim,m.cap,{})
+	ink_frustum(pass,p+{0,height-.07,0},.46,.43,.07,8,yaw+math.PI/8,m.cap,m.cap,{})
 }
 
 @(private)
 ascent_cube :: proc(pass:Ink_Pass,p:rl.Vector3,half,height,yaw:f32,m:Ascent_Material) {
-	ink_box(pass,p,{half,half},height,yaw,m.body,m.cap,{})
-	ink_box(pass,p+{0,height*.18,0},{half+.008,half+.008},.045,yaw,m.trim,m.trim,{})
-	ink_box(pass,p+{0,height-.07,0},{half+.008,half+.008},.045,yaw,m.trim,m.trim,{})
-	ascent_mark(pass,p,{-half*.55,height*.54,half+.01},{half*.55,height*.54,half+.01},yaw,m.accent)
+	// The Secret route uses cut jewel caskets with a lifted shoulder.
+	profile:=[8]rl.Vector2{{-.72,0},{-1,.24},{-.91,.74},{-.50,1},{.51,1},{.93,.75},{1,.24},{.70,0}}
+	ink_profile(pass,p,profile[:],{half,height},half*1.62,yaw,m.body,m.cap,EXPEDITION_PAPER_INK)
+	jewel:=[4]rl.Vector2{{-half*.40,height*.48},{0,height*.80},{half*.41,height*.48},{0,height*.26}}
+	biome_print_face(pass,p,jewel[:],yaw,half*1.62,ink_scale(m.trim,.69))
+	ascent_mark(pass,p,{-half*.48,height*.54,half*.82},{half*.48,height*.54,half*.82},yaw,m.accent)
 }
 
-// The boulder on top of its hill (expedition/complex.odin, the Memoria's mark 'O'): Sisyphus' stone as the mount remembers
-// it, grey and faceted, gold in its seams; a little higher than a cell, and wider in its middle than at its foot.
 @(private)
 draw_expedition_boulder :: proc(pass:Ink_Pass,cell:grid.Position) {
 	p:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5}
@@ -143,19 +147,16 @@ draw_expedition_ascent_outdoor :: proc(pass:Ink_Pass,w:^world.World,cell:grid.Po
 		ascent_rock(pass,p+{-.28,0,.28},.16,.38,phase+.7,m,h>>4,true)
 	case .Sky:
 		if h%3==0 {
-			ink_box(pass,p,{.45,.45},.20,0,m.body,m.cap,{})
-			ascent_crystal(pass,p+{0,.66,0},.31,1.1,phase,m)
-			for side in ([2]f32{-1,1}) {ink_box(pass,p+{side*.36,.20,0},{.055,.20},.47,0,m.trim,m.trim,{})}
+			ascent_crystal(pass,p,.31,1.35,phase,m)
 		} else {ascent_column(pass,p,1.15+f32(h%5)*.33,0,m)}
 	case .Space:
 		ascent_rock(pass,p+{-.08,0,-.06},.38,.67+f32(h%3)*.15,phase,m,h)
-		ascent_crystal(pass,p+{.20,.06,.21},.22,1.02+f32((h>>3)%4)*.25,phase,m)
-		ascent_crystal(pass,p+{-.27,.04,.28},.13,.64,phase+.7,m)
+		ascent_crystal(pass,p+{.20,0,.21},.22,1.02+f32((h>>3)%4)*.25,phase,m)
+		ascent_crystal(pass,p+{-.27,0,.28},.13,.64,phase+.7,m)
 	case .Secret:
-		ink_box(pass,p,{.45,.45},.14,0,m.body,m.trim,{})
-		ascent_cube(pass,p+{0,.14,0},.31,.74,math.PI/4,m)
-		ascent_cube(pass,p+{0,1.12,0},.24,.48,0,m)
-		if h%2==0 {ink_box(pass,p+{0,1.81,0},{.115,.115},.23,math.PI/4,m.trim,m.cap,{})}
+		ascent_cube(pass,p,.31,.74,math.PI/4,m)
+		ascent_cube(pass,p+{0,.74,0},.24,.48,0,m)
+		if h%2==0 {ink_box(pass,p+{0,1.22,0},{.115,.115},.23,math.PI/4,m.trim,m.cap,{})}
 	}
 	return true
 }
@@ -164,53 +165,19 @@ draw_expedition_ascent_outdoor :: proc(pass:Ink_Pass,w:^world.World,cell:grid.Po
 draw_expedition_ascent_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,site:^world.Site,cell:grid.Position,design:world.Site_Cell)->bool {
 	m,ok:=ascent_material(w.biome);if !ok {return false}
 	p:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5};height:=expedition_site_wall_height(design)
-	h:=expedition_cell_hash(cell,u32(w.biome));yaw:=f32(site.orientation%4)*math.PI/2
+	// The lintel rests at 1.88; its supports must meet it, as on the other
+	// routes, instead of leaving a visible gap above the compressed wall.
+	if abs(design.wall_height-2.2)<.01 {height=2.12}
+	yaw:=f32(site.orientation%4)*math.PI/2
 	if w.biome==.Sky && (design.wall_height>=2.19 || (abs(design.local.x)+abs(design.local.y))%4==0) {
 		ascent_column(pass,p,max(height,.85),yaw,m);return true
 	}
-	ink_box(pass,p,{.495,.495},height,0,m.body,m.cap,{})
-	#partial switch w.biome {
-	case .City:
-		ink_box(pass,p+{0,height,0},{.498,.498},.08,0,m.trim,m.cap,{})
-		if h%4==0 {ink_box(pass,p+{0,height+.08,0},{.24,.29},.19,0,m.dark,m.trim,{})}
-	case .Snow:
-		ink_box(pass,p+{0,height-.09,0},{.498,.498},.15,0,m.cap,m.cap,{})
-		ink_box(pass,p,{.498,.498},.16,0,m.trim,m.trim,{})
-	case .Sky:
-		ink_box(pass,p+{0,height-.14,0},{.498,.498},.08,0,m.trim,m.trim,{})
-		ink_box(pass,p+{0,height-.06,0},{.498,.498},.10,0,m.cap,m.cap,{})
-	case .Space:
-		ink_box(pass,p+{0,height-.10,0},{.46,.46},.16,0,m.trim,m.cap,{})
-	case .Secret:
-		ink_box(pass,p+{0,height-.10,0},{.498,.498},.06,0,m.trim,m.trim,{})
-		ink_box(pass,p+{0,.16,0},{.498,.498},.035,0,m.trim,m.trim,{})
+	if site.kind==.Workshop && design.wall_height<1.1 && !design.fixture {
+		draw_biome_workstation(pass,p,yaw,w.biome,height,design.local.x);return true
 	}
-	for direction in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
-		if expedition_wall_joined(room,site,game.add_position(cell,direction),height) {continue}
-		face:=math.atan2(f32(-direction.x),f32(direction.y))
-		#partial switch w.biome {
-		case .City:
-			for row in 0..<2 {
-				y:=.19+f32(row)*height*.36
-				ink_box(pass,cyber_point(p,{0,y,.496},face),{.32,.002},height*.24,face,m.dark,m.dark,{})
-				ascent_mark(pass,p,{-.24,y+.06,.499},{.20,y+.06,.499},face,m.secondary if h%3==0 else ink_scale(m.accent,.55))
-			}
-		case .Snow:
-			for row in 0..<2 {ink_box(pass,cyber_point(p,{0,.24+f32(row)*height*.30,.496},face),{.42,.002},.07,face,m.trim,m.trim,{})}
-			if h%4==0 {ascent_mark(pass,p,{-.12,.17,.499},{.14,height-.18,.499},face,m.accent)}
-		case .Sky:
-			ink_box(pass,cyber_point(p,{0,.20,.496},face),{.33,.002},max(height-.44,.12),face,m.dark,m.dark,{})
-			ascent_mark(pass,p,{-.21,height-.20,.499},{.21,height-.20,.499},face,ink_scale(m.accent,.6))
-		case .Space:
-			ink_box(pass,cyber_point(p,{0,.22,.496},face),{.29,.002},max(height-.45,.12),face,m.dark,m.dark,{})
-			ascent_mark(pass,p,{-.23,.30,.499},{.23,.30,.499},face,m.secondary)
-			ascent_mark(pass,p,{-.23,.30,.499},{-.23,height-.25,.499},face,ink_scale(m.accent,.65))
-		case .Secret:
-			ink_box(pass,cyber_point(p,{0,.25,.496},face),{.27,.002},max(height-.52,.10),face,m.dark,m.dark,{})
-			ascent_mark(pass,p,{-.14,height*.46,.499},{0,height*.63,.499},face,m.accent)
-			ascent_mark(pass,p,{0,height*.63,.499},{.14,height*.46,.499},face,m.accent)
-		}
-	}
+	ink_wall_sheet(pass,room,site,cell,height,m.body,m.cap,half=.4999,outline=false)
+	// Broad windows, frost marks and glyphs are printed by the material,
+	// not inset boxes whose nearly coincident faces shimmer at distance.
 	return true
 }
 
@@ -273,8 +240,8 @@ ascent_telescope :: proc(pass:Ink_Pass,p:rl.Vector3,yaw:f32,m:Ascent_Material,di
 		cyber_link(pass,cyber_point(p,{.16,1.14,0},yaw),cyber_point(p,{.25,1.32,0},yaw),{.018,.018},m.trim,m.cap)
 	} else {
 		a:=cyber_point(p,{-.24,.94,-.10},yaw);b:=cyber_point(p,{.24,1.31,.10},yaw)
-		cyber_link(pass,a,b,{.13,.12},m.body,m.trim)
-		cyber_link(pass,b,cyber_point(p,{.27,1.333,.112},yaw),{.145,.135},m.dark,m.dark)
+		descent_axle(pass,a,b,.14,m.body,m.trim)
+		descent_axle(pass,b,cyber_point(p,{.27,1.333,.112},yaw),.15,m.dark,m.dark)
 		ascent_mark(pass,p,{-.15,1.07,.01},{.15,1.30,.13},yaw,m.secondary)
 	}
 	ink_box(pass,cyber_point(p,{-.25,.34,.29},yaw),{.14,.05},.22,yaw,m.dark,m.cap,{})

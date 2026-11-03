@@ -172,7 +172,7 @@ test_expedition_lights_keep_actual_edge_segments_and_reserve_live_slots :: proc(
 	for emitter, i in m.edges.emitters[:24] {
 		testing.expect_value(t, l.start[i].xyz, emitter.a)
 		testing.expect_value(t, l.end[i].xyz, emitter.b)
-		testing.expect_value(t, l.color[i].xyz, emitter.radiance)
+		testing.expect_value(t, l.color[i].xyz, emitter.radiance*EXPEDITION_NEON_SHARE)
 		testing.expect(t, l.start[i].w > 0 && l.color[i].z > 1)
 	}
 	testing.expect(t, lighting_test_at(l, {4.5, .65, 4.5}) >= 24)
@@ -245,7 +245,7 @@ test_expedition_lights_clear_stale_snapshot_and_allow_uninitialized_material :: 
 }
 
 @(test)
-test_expedition_surface_profiles_are_finite_and_materially_distinct :: proc(t: ^testing.T) {
+test_expedition_paper_coating_is_shared_and_gpu_inputs_are_finite :: proc(t: ^testing.T) {
 	profiles: [campaign.Biome]Expedition_Surface_Profile
 	for biome in campaign.Biome {
 		p := expedition_biome_surface(biome)
@@ -255,13 +255,9 @@ test_expedition_surface_profiles_are_finite_and_materially_distinct :: proc(t: ^
 		testing.expect(t, p.reflection >= 0 && p.reflection <= 1)
 		testing.expect(t, p.exposure >= .5 && p.exposure <= 2)
 	}
-	// Sand/vegetation should not resolve as the same mirror as ice or the
-	// secret polished surface; this protects visible artistic distinctions.
-	testing.expect(t, profiles[.West].roughness-profiles[.Snow].roughness > .25)
-	testing.expect(t, profiles[.Jungle].roughness-profiles[.City].roughness > .15)
-	testing.expect(t, profiles[.Snow].reflection-profiles[.West].reflection > .25)
-	testing.expect(t, profiles[.Secret].roughness < profiles[.Cyber].roughness)
-	testing.expect(t, profiles[.Secret].reflection > profiles[.Cyber].reflection)
+	// Biome identity is printed colour/motifs, not a different polished
+	// substrate. Every layer and biome must resolve through the same stock.
+	for biome in campaign.Biome {testing.expect_value(t,profiles[biome],profiles[.Cyber])}
 }
 
 @(test)

@@ -54,7 +54,7 @@ test_expedition_floor_cache_all_biomes_preserve_gameplay_tiles_and_terrain :: pr
 @(test)
 test_expedition_floor_contact_shadows_follow_actual_walls_and_stable_slabs :: proc(t:^testing.T) {
 	data,ok:=level.create(32,32,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
-	w:=world.World{biome=.Cyber,site_count=1}
+	w:=world.World{biome=.West,site_count=1}
 	w.sites[0]={kind=.Archive,position={x = 16, y = 16},layout_version=world.SITE_LAYOUT_VERSION}
 	room:=game.Room{level_data=&data};cache:Expedition_Floor_Data;defer destroy_expedition_floor_data(&cache)
 	_=level.set_tile(&data,{x = 7, y = 8},{.Wall});_=level.set_tile(&data,{x = 8, y = 7},{.Wall})

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source_sha256": "a513dd622651d82669e29ba21746b7b5a58a7758be9a4a155c0cf2aed4c40168",
+  "generator_sha256": "06fcfbdb778b8061d8975a9d16dccfdb9c052939777c39336db2289efdf2a709",
+  "width": 1024,
+  "height": 1024,
+  "format": "RGBA8 sRGB pigment",
+  "png_sha256": {
+    "cyber.png": "abe7e02fea53bc67f491a902992f7e81c42c3aed6cd87efdca3298f38512b919",
+    "west.png": "d6a6a31dc957f2da6d9f335891c532b8afe7cc99889403b44b4dc5026d07fc5c"
+  },
+  "pixels_sha256": {
+    "cyber": "7fe43962d91314eabae7b2c003e6e5cb36cdd6cf87fb4f7523deb71457fde438",
+    "west": "910a931a7dcd0953af7f6bdf6b2a2149439b1f3158f282b205a3584cbd8648be"
+  }
+}

@@ -7,9 +7,10 @@ import grid "../engine/grid"
 import level "../level"
 
 // Exact packed integer texels (one texture fetch per floor fragment):
-// R: tile in bits 0..2, neighbouring solid walls in bits 3..6.
+// R: tile in bits 0..2, neighbouring solid walls in bits 3..6, Cyber/West workshop in bit 7.
 // G: terrain in bits 0..3, terrain-patch boundaries in bits 4..7.
-// B: authored surface in bits 0..3 (EXPEDITION_FLOOR_ROCK: a cave's massif), stable slab variation in bits 4..7.
+// B: authored surface in bits 0..3; bits 4..7 store continuous-wall contact
+//    in Cyber, otherwise the reserved stable slab variation.
 // A: void boundaries in bits 0..3, platform boundaries in bits 4..7.
 // Boundary directions are west, east, north, south. Dynamic state stays
 // in uniforms; all adjacency is computed only after a geometry change.
@@ -41,6 +42,7 @@ expedition_floor_site_keys :: proc(w:^world.World)->(keys:[world.MAX_SITES]Exped
 
 // The surface code of a cave's massif's top (expedition/cave.odin): bare rock, past every site surface.
 EXPEDITION_FLOOR_ROCK :: u8(15)
+EXPEDITION_FLOOR_CYBER_WORKSHOP :: u8(128)
 #assert(int(max(world.Site_Surface))<int(EXPEDITION_FLOOR_ROCK))
 
 @(private)
@@ -86,7 +88,12 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 		for y in max(0,minimum.y)..=min(height-1,maximum.y) {
 			for x in max(0,minimum.x)..=min(width-1,maximum.x) {
 				design:=world.site_cell(site,{x = x, y = y})
-				if design.inside {cache.pixels[y*width+x].b=u8(design.surface)}
+				if design.inside {
+					pixel:=&cache.pixels[y*width+x]
+					pixel.b=u8(design.surface)
+					pixel.r&=~EXPEDITION_FLOOR_CYBER_WORKSHOP
+					if (w.biome==.Cyber || w.biome==.West) && site.kind==.Workshop {pixel.r|=EXPEDITION_FLOOR_CYBER_WORKSHOP}
+				}
 			}
 		}
 	}
@@ -105,6 +112,18 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 		}
 		pixel.b|=expedition_floor_slab_variant({x = x, y = y})<<4
 	}}
+	// Cyber contact needs a run of at least three walls. Compute after all
+	// adjacency bits are ready; the shader reuses its existing single texel.
+	if w.biome==.Cyber {
+		for y in 0..<height {for x in 0..<width {
+			pixel:=&cache.pixels[y*width+x];continuous:u8
+			if (pixel.r&8)!=0 && x>0 && (cache.pixels[y*width+x-1].r&96)==96 {continuous|=1}
+			if (pixel.r&16)!=0 && x+1<width && (cache.pixels[y*width+x+1].r&96)==96 {continuous|=2}
+			if (pixel.r&32)!=0 && y>0 && (cache.pixels[(y-1)*width+x].r&24)==24 {continuous|=4}
+			if (pixel.r&64)!=0 && y+1<height && (cache.pixels[(y+1)*width+x].r&24)==24 {continuous|=8}
+			pixel.b=(pixel.b&15)|(continuous<<4)
+		}}
+	}
 	cache.ready=true;cache.rebuilds+=1
 	return true
 }

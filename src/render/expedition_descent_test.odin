@@ -57,7 +57,7 @@ test_descent_outdoor_is_bounded_static_and_has_sparse_real_emitters :: proc(t:^t
 			for v in a.vertices {inside=inside && descent_test_in_cell(v.position,cell) && v.position.y<2.8}
 			for line in a.lines {inside=inside && descent_test_in_cell(line.a,cell) && descent_test_in_cell(line.b,cell)}
 			testing.expect(t,inside)
-			testing.expect(t,len(a.vertices)<900 && len(a.lines)<=4)
+			testing.expect(t,len(a.vertices)<900 && biome_test_light_lines(a.lines[:])<=4 && len(a.lines)<=64)
 			variants[len(a.vertices)%61]=true
 		}
 		count:=0;for present in variants {if present {count+=1}}
@@ -121,7 +121,7 @@ test_descent_fixtures_match_rotated_layout_and_leave_trial_tunnel_walkable :: pr
 			cell:=grid.Position{x = int(math.floor(v.position.x)), y = int(math.floor(v.position.z))}
 			d:=world.site_cell(&site,cell);inside=inside && d.fixture && d.wall && v.position.y>=0
 		}
-		testing.expect(t,inside && len(a.vertices)<1500 && len(a.lines)<24,fmt.tprintf("%v %v rotation%d inside%v vertices%d",biome,kind,orientation,inside,len(a.vertices)))
+		testing.expect(t,inside && len(a.vertices)<1500 && biome_test_light_lines(a.lines[:])<24 && len(a.lines)<=64,fmt.tprintf("%v %v rotation%d inside%v vertices%d",biome,kind,orientation,inside,len(a.vertices)))
 		if kind==.Trial || kind==.Tunnel {for line in a.lines {testing.expect(t,line.a.y<=.025 && line.b.y<=.025)}}
 	}}}
 }

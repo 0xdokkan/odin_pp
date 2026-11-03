@@ -38,6 +38,7 @@ costume_horns :: proc(m:^Expedition_Paper,c:rl.Color) {
 }
 
 expedition_enemy_costume_art :: proc(b:campaign.Biome,role:game.Enemy_Archetype,time:f32)->(m:Expedition_Paper) {
+	m.cutout=true
 	ink:=EXPEDITION_PAPER_INK;paper:=EXPEDITION_PAPER_EDGE;c:=expedition_color(b);boss:=role==.Demolitionist
 	switch b {
 	case .Cyber:
@@ -151,6 +152,7 @@ expedition_enemy_costume_art :: proc(b:campaign.Biome,role:game.Enemy_Archetype,
 @(private)
 draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.Enemy_Archetype,position:view.Vec2,entity:game.Entity_Ref,time:f32,opacity:f32=1) {
 	if role>=.Count || opacity<=0 {return}
+	if b==.Cyber {return} // Whole animated Cyber figures own their printed equipment.
 	key:=sprite_key_for_enemy(role);at,lift:=living_card_position(renderer,entity,key,position)
 	height:f32=1.2
 	if character,ok:=flipbook_character(key);ok {height=gfx.LIVING_SHEETS[character].world_height}
@@ -165,7 +167,9 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 	art:=expedition_enemy_costume_art(b,role,time)
 	right:=flipbook_camera_right(renderer);normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	base:=rl.Vector3{at.x+.5,.035+lift,at.y+.5}+normal*.065
-	draw_expedition_paper(renderer,&art,base,height,mirror,opacity,turn_width)
+	if support:=expedition_costume_support(renderer.tactical.expedition_material,b,role);support!=nil {
+		draw_expedition_costume_sheet(right,support,&art,base,height,mirror,opacity,turn_width)
+	} else {draw_expedition_cutout(right,&art,base,height,mirror,opacity,turn_width,border_scale=EXPEDITION_COSTUME_BORDER_SCALE)}
 }
 
 @(private)

@@ -56,7 +56,11 @@ tactical_orbit_camera :: proc(orbit: Tactical_Orbit, target: rl.Vector3, perspec
 }
 
 tactical_world_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
-	return {12, TACTICAL_HUD_HEIGHT, renderer.canvas_width-24, renderer.canvas_height-TACTICAL_HUD_HEIGHT-TACTICAL_HAND_HEIGHT-8}
+	top:=tactical_hud_height(renderer)
+	if renderer.tactical.expedition && renderer.tactical.snapshot!=nil && renderer.tactical.snapshot.phase!=.Combat {
+		return {12,top,renderer.canvas_width-24,renderer.canvas_height-top-60}
+	}
+	return {12,top,renderer.canvas_width-24,renderer.canvas_height-top-tactical_hand_height(renderer)-8}
 }
 tactical_map_button_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return tactical_map_controls_bounds(renderer)
@@ -123,6 +127,12 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	snapshot := renderer.tactical.snapshot
 	// The Pinball's ball has its own shadow, and no stand (pinball.odin).
 	draw_pinball_shadow(renderer)
+	// Expedition cards meet the drawn floor directly. Target markers are
+	// gameplay overlays; no cylinder, slot or plinth belongs to an actor.
+	if renderer.tactical.expedition {
+		if tactical_shadow_showing(renderer) { draw_tactical_shadow_pool(renderer) }
+		return
+	}
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }

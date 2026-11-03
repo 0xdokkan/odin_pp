@@ -7,6 +7,11 @@ import game "../game"
 EXPEDITION_COMBAT_FRAME_LIMIT :: f32(6)
 EXPEDITION_COMBAT_FRAME_RADIUS :: f32(12)
 
+// Elevated side view: the board remains readable while illustrated fronts
+// occupy more of the image. Config overrides exist for matched-camera QA.
+EXPEDITION_CAMERA_YAW :: #config(EXPEDITION_CAMERA_YAW,f32(1.3962634))
+EXPEDITION_CAMERA_PITCH :: #config(EXPEDITION_CAMERA_PITCH,f32(.76))
+
 // Translate the fixed camera along the ground toward its viewer. This raises
 // nearby fighters above the hand without changing yaw, pitch, scale, or the
 // ray used by picking. The first two points protect the player's whole body

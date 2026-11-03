@@ -6,8 +6,8 @@ import level "../level"
 // STRUCTURES IN THE EXPEDITIONS (Fase 6 of docs/piano-griglia.md): buildings and complex
 // objects belong to a biome's fixed geography, like its islands and its sites: where they
 // stand comes from the biome, never from the run's seed, so the same biome has the same
-// ones at every run. For now only the first biome (Robotica cibernetica) has them, as the
-// test biome the user chose. The generic parts (plans, turns, placement checks) are in
+// ones at every run. Cyber keeps its original composition; West adds one
+// workshop-side hut and one store cottage. The generic placement checks are in
 // level/structure.odin; this only says which structures go where.
 
 MAX_WORLD_STRUCTURES :: 24
@@ -27,6 +27,14 @@ CYBER_STRUCTURES :: [?]Structure_Spot{
 	{.Cart, 24, 56, 0, false}, {.Fountain, 36, 62, 0, false}, {.Statue, 29, 58, 0, false}, {.Machine, 40, 44, 0, false},
 	{.Ruin, 34, 74, 0, false}, {.Cottage, 48, 36, 3, true}, {.Hut, 52, 60, 2, false}, {.Temple, 62, 40, 0, true},
 	{.Cottage, 58, 78, 1, false}, {.Cart, 70, 56, 0, false},
+}
+
+// The workshop is at (39%,79%). Its protected layout remains untouched:
+// the hut is beyond its southern margin, facing north, and the store is
+// beyond its eastern margin, facing west. The ordinary bounded search finds
+// flat, free ground without clearing cover or moving existing services.
+WEST_STRUCTURES :: [?]Structure_Spot{
+	{.Hut,39,91,2,false}, {.Cottage,51,79,1,false},
 }
 
 // The farthest, in cells, a structure is moved from its wanted place to find a free one.
@@ -58,8 +66,10 @@ structure_keep_clear :: proc(user: rawptr, cell: grid.Position) -> bool {
 // Places the structures wanted in biome `w.biome` on `data`, recording each in the world.
 @(private)
 place_structures :: proc(w: ^World, data: ^level.Level) {
-	spots := CYBER_STRUCTURES
-	if w.biome != .Cyber { return }
+	if w.biome != .Cyber && w.biome != .West { return }
+	cyber_spots,west_spots:=CYBER_STRUCTURES,WEST_STRUCTURES
+	spots:=cyber_spots[:]
+	if w.biome==.West {spots=west_spots[:]}
 	size := w.side_length
 	for spot in spots {
 		if w.structure_count >= MAX_WORLD_STRUCTURES { break }

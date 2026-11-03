@@ -2,7 +2,8 @@
 
 Roguelike di esplorazione e deck building: dodici biomi aperti, combattimenti
 continui a battito, uno zaino fisico da estrarre e una galassia di ricordi.
-Il mondo è geometrico e al neon; carte e personaggi sono di cartoncino.
+Le spedizioni sono un mondo di cartoncino cartoon: terreno disegnato, bordi
+avorio, colori luminosi e personaggi animati dentro sagome ritagliate.
 La campagna offre tre salvataggi, un deposito, dodici cabinati e quattro
 giochi del casinò con i crediti raccolti nelle spedizioni.
 
@@ -110,6 +111,8 @@ Gli script usano output temporanei e controllano tutti i package raggiungibili.
 I controlli completi includono le configurazioni con e senza assert e il link
 nativo. Su Windows usare `scripts/check.ps1`. Dettagli e comandi mirati sono
 in [Verifica](docs/verifica.md).
+Serve anche Python 3 nel `PATH` (`python3` per lo script shell, `python`
+per PowerShell) per controllare il manifest e gli hash del pigmento officine.
 
 Le modifiche strutturali devono preservare regole, ordine degli eventi e RNG.
 Il confine fra simulazione e presentazione resta esplicito; nuove proprietà
