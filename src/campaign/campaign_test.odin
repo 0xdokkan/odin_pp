@@ -29,7 +29,8 @@ test_lab_only_cards_never_enter_the_campaign :: proc(t: ^testing.T) {
 		lab += 1
 		testing.expect(t, !c.discovered[id] && !discover(&c, id) && !c.discovered[id] && !card_in_pool(&c, id))
 	}
-	testing.expect_value(t, lab, 9)
+	// The IA (docs/piano-ia.md) too: the user's choice keeps it in the lab.
+	testing.expect_value(t, lab, 10)
 	// Every card of the collection still comes to light one at a time; the lab's, the retired ones and those only an
 	// upgrade makes never do (docs/registro-carte.md).
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {

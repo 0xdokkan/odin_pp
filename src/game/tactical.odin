@@ -64,6 +64,8 @@ Tactical_State :: struct {
 	facing: Move_Direction,
 	placement_direction: Move_Direction,
 	dinosaur_remaining: f32,
+	// IA (ia.odin): the advisor's world seconds left.
+	ia_remaining: f32,
 	dinosaur_power: i32,
 	dodge_recovery: int,
 	metrics: Tactical_Metrics,
@@ -186,6 +188,7 @@ tactical_reset_room_clock :: proc(s: ^Tactical_State) {
 	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
 	s.dinosaur_remaining, s.dinosaur_power = 0, 0
+	s.ia_remaining = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.energy_fraction, s.encounter_beats = 0, 0

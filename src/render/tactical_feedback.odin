@@ -478,6 +478,8 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 	// The grandpa's Q, over him; his going.
 	case .Napoli_Nonno_Cured: label = fmt.ctprintf("NONNO +%d", event.amount); color = {92, 220, 151, 255}
 	case .Napoli_Nonno_Left: label, color = "IL NONNO SE NE VA", NAPOLI_LABEL_COLOR
+	// IA: its seconds, over the player.
+	case .IA_Begun: label, color = ia_begun_label(event), IA_COLOR
 	case:
 	}
 	if label != nil {
@@ -491,6 +493,22 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 		count += 1
 	}
 	return
+}
+
+// IA (game/ia.odin, docs/piano-ia.md): the advisor's one colour, a cyan the board uses for nothing else, and
+// its seconds said over the player as they begin.
+IA_COLOR :: rl.Color{90, 230, 255, 255}
+
+ia_begun_label :: proc(event: game.Game_Event) -> cstring {
+	return fmt.ctprintf("IA %ds", event.amount)
+}
+
+// The IA's chip under VITA while its seconds run (IA 28s), provisional until the plan's Fase 8; behind the eyes of a
+// view its seconds stand still and it says so (IA FERMA).
+ia_chip :: proc(room: ^game.Room, short: bool) -> (text: cstring, shown: bool) {
+	if room == nil || room.player == nil || room.phase != .Combat || room.player.tactical.ia_remaining <= 0 { return }
+	if game.tactical_first_person_active(room) { return "IA FERMA" if !short else "IA --", true }
+	return fmt.ctprintf("IA %ds", int(room.player.tactical.ia_remaining+0.999)), true
 }
 
 // BENVENUTI A NAPOLI (game/napoli.odin): the face the d4 picked and its number,

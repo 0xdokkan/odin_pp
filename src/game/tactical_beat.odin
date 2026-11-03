@@ -154,6 +154,9 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 			case .Table, .Purse: effect.amount = critical_boost(effect.amount)
 			case .Nonno: effect.amount += NAPOLI_NONNO_CRITICAL_HEALTH
 			}
+		// IA: five seconds more (docs/piano-ia.md).
+		case .IA:
+			effect.amount += IA_CRITICAL_SECONDS
 		case .Marley:
 			effect.duration += MARLEY_CRITICAL_SECONDS
 		case .Deploy_Device:

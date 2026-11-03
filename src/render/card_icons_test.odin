@@ -9,14 +9,14 @@ import game "../game"
 // Ombra, the cards of Phase 2, the Lazzo, the Canna da Pesca, the Pinball, the
 // First Person Shooter, Bomb Marley, Inondazione, the Cannone, the Cannone
 // laser, the Buco nero, the Dinosauro, the three first person weapons and
-// Benvenuti a Napoli have their own icons there, every
+// Benvenuti a Napoli and the IA have their own icons there, every
 // other card keeps its painted one, and the painted cells are cut where they
 // always were.
 @(test)
 test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T) {
 	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod,
 		.Pinball, .First_Person, .Marley_Party, .Flood_Wave, .Field_Cannon, .Laser_Cannon, .Devouring_Hole, .Dino_Ride,
-		.First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Napoli}
+		.First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Napoli, .IA}
 	for id, index in added { testing.expect_value(t, gothic_card_icon(id), 16+index) }
 	for id in game.Card_Id {
 		own := id == .Count

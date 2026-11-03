@@ -662,6 +662,8 @@ card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0, take := 0
 		case .Open_Black_Hole: events += {.Object_Spawned, .Black_Hole_Tick}
 		case .Ride: events += {.Ride_Begun}
 		case .Napoli: events += {.Napoli_Begun}
+		// IA: its seconds begin (the advisor's hints are the film of the plan's last phase).
+		case .IA: events += {.IA_Begun}
 		}
 	}
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump

@@ -141,6 +141,8 @@ tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 	tactical_pinball_tick(room, elapsed)
 	// The First Person Shooter's seconds are the world's (first_person.odin).
 	tactical_first_person_tick(room, elapsed)
+	// The IA's seconds, but not behind the eyes (ia.odin).
+	tactical_ia_tick(room, elapsed)
 	// The archers' arrows and the bombers' bombs fly on them (enemy_arrow.odin,
 	// enemy_bomb.odin); world commands fly them out.
 	tactical_flight_tick(room, elapsed)

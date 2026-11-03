@@ -24,7 +24,8 @@ GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 // Destino, 22: Lama Velenosa, 23: Lazzo, 24: Canna da Pesca, 25: Pinball,
 // 26: First Person Shooter, 27: Bomb Marley, 28: Inondazione, 29: Cannone, 30:
 // Cannone laser, 31: Buco nero, 32: Dinosauro, 33: First Person Brawler, 34: First
-// Person Fencer, 35: First Person Archer, 36: Benvenuti a Napoli; 37-39 are free).
+// Person Fencer, 35: First Person Archer, 36: Benvenuti a Napoli, 37: IA; 38-39 are
+// free).
 CARD_ICON_COLUMNS :: 4
 CARD_ICON_ROWS :: 10
 CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS

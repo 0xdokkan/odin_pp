@@ -103,12 +103,48 @@ test_mechanics_lab_has_an_arena_of_lifts :: proc(t: ^testing.T) {
 	in_hall := false
 	for foe in room.enemies { in_hall = in_hall || foe.position.layer == -1 }
 	testing.expect(t, in_hall)
-	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Lifts), run_session.Mechanics_Lab_Arena.Flat)
+	// After the lifts the IA's arena (docs/piano-ia.md), the last; then the flat one again.
+	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Lifts), run_session.Mechanics_Lab_Arena.IA)
+	testing.expect_value(t, run_session.mechanics_lab_next_arena(.IA), run_session.Mechanics_Lab_Arena.Flat)
 }
 
 // The arena of the lifts lives a minute of play as the game has it: the foes free, the lab's arrivals, the player
 // still. Nothing breaks the foes' beat (a foe off a lift with no intent once stopped the game), and the foe in the hall
 // comes out of it, up the shaft.
+// The IA's arena (docs/piano-ia.md, Fase 0): its board (a short wall, a pillar, two low walls, three covers), the four
+// foes that plan (a chaser, an archer, a brute, a bomber) and its own deck, all of it in hand with the IA.
+@(test)
+test_mechanics_lab_has_an_arena_for_the_ia :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .IA)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	testing.expect_value(t, player.position, grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2})
+	tile :: proc(data: ^level.Level, x, y: int) -> level.Tile_Kind {
+		found, _ := level.tile_at(data, {x = x, y = y})
+		return found.kind
+	}
+	for x in 14..=16 { testing.expect_value(t, tile(&data, x, 4), level.Tile_Kind.Wall) }
+	testing.expect_value(t, tile(&data, 6, 11), level.Tile_Kind.Wall)
+	for x in 5..=8 { testing.expect_value(t, tile(&data, x, 6), level.Tile_Kind.Fence) }
+	for y in 9..=12 { testing.expect_value(t, tile(&data, 17, y), level.Tile_Kind.Fence) }
+	testing.expect_value(t, len(room.obstacles), 3)
+	archetypes: bit_set[game.Enemy_Archetype]
+	for foe in room.enemies { archetypes += {foe.archetype} }
+	testing.expect_value(t, len(room.enemies), 4)
+	testing.expect_value(t, archetypes, bit_set[game.Enemy_Archetype]{.Chaser, .Archer, .Brute, .Bomber})
+	deck := run_session.MECHANICS_LAB_IA_DECK
+	testing.expect_value(t, player.deck.hand_count, len(deck))
+	for id in deck {
+		held := false
+		for card in player.deck.hand[:player.deck.hand_count] { held = held || card.definition_id == id }
+		testing.expectf(t, held, "%v in the IA's hand", id)
+	}
+}
+
 @(test)
 test_mechanics_lab_lifts_live_a_minute_of_play :: proc(t: ^testing.T) {
 	data: level.Level

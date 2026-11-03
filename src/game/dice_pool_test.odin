@@ -119,6 +119,8 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 		if id == .Field_Cannon { top = CANNON_MAX_UPGRADE_LEVEL }
 		if id == .Laser_Cannon { top = LASER_MAX_UPGRADE_LEVEL }
 		if id == .Devouring_Hole { top = BLACK_HOLE_MAX_UPGRADE_LEVEL }
+		// The IA's seconds grow five times, as the views' do (docs/piano-ia.md).
+		if id == .IA { top = IA_MAX_UPGRADE_LEVEL }
 		testing.expect_value(t, card_max_upgrade_level(id), top)
 		for level in i32(-1)..=MAX_CARD_UPGRADE_LEVEL {
 			expected := i32(0)

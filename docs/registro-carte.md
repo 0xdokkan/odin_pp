@@ -6,6 +6,22 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — Carta nuova: IA (solo laboratorio)
+
+Commit **«Piano IA, Fase 0 fatta: la carta e i suoi secondi»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 0).
+
+| Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
+|---|---|---:|---:|---|---:|---|
+| IA | `IA` | rara | 2 | su di sé, lancio leggero (`time_cost` 1; sulla carta 0,26 s): per 30 secondi del mondo (+3 a potenziamento, fino a 5 potenziamenti; +5 sulla giocata critica) la IA consiglia la mossa migliore. I secondi si fermano quando il mondo è fermo e dentro le viste; giocata di nuovo, i secondi ripartono dal pieno | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «IA» del laboratorio, nel suo mazzo |
+
+- **Fase 0:** la carta e i suoi secondi (nel giocatore, `Tactical_State.ia_remaining`: la stanza non cresce); i consigli
+  arrivano con le fasi dopo. Scritta «IA 30s» sopra il Viandante e segnalino ciano sotto VITA («IA 28s», «IA FERMA» nelle
+  viste).
+- Prezzo nel negozio 8, prezzo in spedizione 50. Scelta dell'utente: resta solo nel laboratorio anche a fine piano.
+- Icona provvisoria (cella 37 dell'atlante): un cervello di circuiti semplice, pieghe a sinistra e piste ciano a destra;
+  sigla `IA`. Suono provvisorio fatto da codice (`card_ia`, tools/audio/sfx_ia.py): la carta che scatta, un ronzio che
+  sale, due bip, un accordo pulito. Gli altri 245 suoni sono identici byte per byte.
+
 ## 2026-11-02 — Carta nuova: Benvenuti a Napoli (solo laboratorio)
 
 Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** sul ramo `piano-napoli`

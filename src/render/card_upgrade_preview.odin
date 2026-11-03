@@ -58,6 +58,8 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		case .Ride: label = "SECONDI"
 		// BENVENUTI A NAPOLI: the club's seconds (its other numbers grow too, docs/piano-napoli.md).
 		case .Napoli: label = "BASTONE SECONDI"
+		// IA: its seconds of advice.
+		case .IA: label = "SECONDI"
 		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)

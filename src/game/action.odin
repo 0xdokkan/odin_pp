@@ -126,6 +126,8 @@ Effect_Kind :: enum {
 	// BENVENUTI A NAPOLI: the d4's face `charges` (1-4), its number `amount`, the card's
 	// upgrade level `duration` (napoli.odin).
 	Napoli,
+	// IA: `amount` world seconds of the advisor (ia.odin).
+	IA,
 }
 
 Effect :: struct {
@@ -540,6 +542,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	case .Napoli:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.charges >= 1 && effect.charges <= 4 && effect.duration >= 0 &&
 		       napoli_can_begin(room)
+	case .IA:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && ia_can_begin(room)
 	}
 	return false
 }
@@ -910,6 +914,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 		assert(mounted)
 	case .Napoli:
 		begun := begin_napoli(room, effect, report)
+		assert(begun)
+	case .IA:
+		begun := begin_ia(room, effect.amount, report)
 		assert(begun)
 	case .First_Person:
 		weapon, _ := first_person_effect_weapon(effect.charges)

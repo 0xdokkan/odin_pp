@@ -105,6 +105,8 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	case .Dino_Ride: return fmt.ctprintf("D4: UN DINO PER %ds", a), "RAPTOR STEGO DILO GIGA"
 	// BENVENUTI A NAPOLI (game/napoli.odin): the d4's four faces.
 	case .Napoli: return fmt.ctprintf("D4: BASTONE %ds / TAVOLA", a), "BORSELLINO / NONNO"
+	// IA (game/ia.odin): its seconds of advice.
+	case .IA: return fmt.ctprintf("%ds: LA MOSSA MIGLIORE", a), "PASSO / COLPO / CARTA"
 	case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 	case .Firebomb: return fmt.ctprintf("%d DANNI NEL %dX%d", a, d.targeting.radius*2+1, d.targeting.radius*2+1), "ACCENDE I BARILI"
 	case .Calculated_Risk: return fmt.ctprintf("PESCA %d", a), fmt.ctprintf("SCARTA %d", b)
@@ -181,6 +183,7 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance) -> (first, second: cs
 	case .Devouring_Hole: return fmt.ctprintf("BUCO %d", a), fmt.ctprintf("%ds", game.BLACK_HOLE_SECONDS), true
 	case .Dino_Ride: return fmt.ctprintf("D4 %ds", a), "UN DINO", true
 	case .Napoli: return "D4 NAPOLI", "4 SORPRESE", true
+	case .IA: return fmt.ctprintf("IA %ds", a), "CONSIGLI", true
 	}
 	return
 }

@@ -89,6 +89,8 @@ Card_Id :: enum {
 	First_Person_Archer,
 	// BENVENUTI A NAPOLI: a d4 picks the club, the table, the purse or the grandpa (napoli.odin), lab only.
 	Napoli,
+	// IA: for its seconds the advisor shows the best move (ia.odin, docs/piano-ia.md), lab only.
+	IA,
 	Count,
 }
 
@@ -1309,6 +1311,16 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effects = {{kind = .Napoli, target = .Player, base_amount = NAPOLI_CLUB_SECONDS, amount_per_upgrade = NAPOLI_CLUB_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.IA = {
+		upgrade_limit = IA_MAX_UPGRADE_LEVEL, time_cost = 1, traits = {.Lab_Only},
+		// IA (docs/piano-ia.md): IA_SECONDS world seconds (+3 an upgrade, +5 on the tick) in which the advisor shows
+		// the best move; played again, they start again from the full (ia.odin). Lab only until the plan's last phase.
+		id = .IA, name = "IA", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Self},
+		effects = {{kind = .IA, target = .Player, base_amount = IA_SECONDS, amount_per_upgrade = IA_SECONDS_PER_UPGRADE}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1463,6 +1475,9 @@ card_effect_template_is_valid :: proc(
 		       template.duration > 0 && card_amount_template_is_valid(template)
 	case .Ride, .Napoli:
 		return template.target == .Player && definition.targeting.rule == .Self && definition.dice_count > 0 && card_amount_template_is_valid(template)
+	// The IA's seconds, on the player.
+	case .IA:
+		return template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
 	// A cell aimed at: the wave's way.
 	case .Flood_Wave:
 		return template.target == .Player && definition.targeting.rule == .Cell && definition.targeting.shape == .Single &&
@@ -1668,6 +1683,8 @@ instantiate_card_effect :: proc(
 	// The club's until the d4 says (resolve_napoli_card).
 	case .Napoli:
 		return napoli_effect(.Club, card_effect_amount(template, instance.upgrade_level), instance.upgrade_level), true
+	case .IA:
+		return ia_effect(card_effect_amount(template, instance.upgrade_level)), true
 	}
 	return {}, false
 }

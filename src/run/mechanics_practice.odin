@@ -34,8 +34,10 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 // one with the catalog of structures, and the one with the Snow biome's spiral
 // mountain, the one with a cave's rooms, and the one with layers (F3 goes from one to the next). Right after the
 // flat one, the first person cards' (docs/piano-prima-persona.md, Fase 1): pillars, niches and slanted walls to
-// shoot off, low covers, a corridor of five cells, an archer up on a rise and a brute, with its own deck.
-Mechanics_Lab_Arena :: enum { Flat, First_Person, Heights, Structures, Mountain, Cave, Layers, Lifts }
+// shoot off, low covers, a corridor of five cells, an archer up on a rise and a brute, with its own deck. Last, the IA's
+// (docs/piano-ia.md, Fase 0): low walls, covers, a short wall and a pillar, the four foes that plan, and ordinary cards
+// for the advisor to weigh.
+Mechanics_Lab_Arena :: enum { Flat, First_Person, Heights, Structures, Mountain, Cave, Layers, Lifts, IA }
 
 // The first person arena's deck: First Person Shooter, the cards of the other weapons as they come (First Person
 // Brawler, Fase 2; the sword's and the bow's, Fasi 4 e 6), Benvenuti a Napoli (docs/piano-napoli.md: its club and its
@@ -53,6 +55,29 @@ MECHANICS_LAB_FIRST_PERSON_DECK :: [6]game.Card_Id{.First_Person, .First_Person_
 MECHANICS_LAB_FIRST_PERSON_COVERS :: [3]grid.Position{{x = 8, y = 9}, {x = 14, y = 9}, {x = 11, y = 12}}
 MECHANICS_LAB_FIRST_PERSON_ARCHER :: grid.Position{x = 11, y = 2}
 MECHANICS_LAB_FIRST_PERSON_BRUTE :: grid.Position{x = 17, y = 9}
+
+// The IA's arena (docs/piano-ia.md, Fase 0), on the 23x17 board with the player at (11,8): its deck, the IA and
+// ordinary cards the advisor can weigh, all of them in hand; its board:
+// - a short wall at x 14..16, y 4, and a pillar at (6,11);
+// - low walls (the step stops, the sight goes over) at x 5..8, y 6, and at x 17, y 9..12;
+// - three covers (MECHANICS_LAB_IA_COVERS);
+// - a chaser, an archer, a brute and a bomber (MECHANICS_LAB_IA_FOES).
+MECHANICS_LAB_IA_DECK :: [8]game.Card_Id{.IA, .Strike, .Guard, .Firebomb, .Dash, .Shove, .Arc_Bolt, .Heavy_Blow}
+MECHANICS_LAB_IA_COVERS :: [3]grid.Position{{x = 9, y = 10}, {x = 13, y = 6}, {x = 15, y = 11}}
+MECHANICS_LAB_IA_FOES :: [4]game.Enemy_Spawn{
+	{position = {x = 4, y = 4}, health = 12, attack = 2, archetype = .Chaser},
+	{position = {x = 19, y = 3}, health = 10, attack = 2, archetype = .Archer},
+	{position = {x = 11, y = 14}, health = 18, attack = 3, archetype = .Brute},
+	{position = {x = 19, y = 13}, health = 12, attack = 2, archetype = .Bomber},
+}
+
+mechanics_lab_ia_board :: proc(data: ^level.Level) -> bool {
+	for x in 14..=16 { if !level.set_tile(data, {x = x, y = 4}, {kind = .Wall}) { return false } }
+	if !level.set_tile(data, {x = 6, y = 11}, {kind = .Wall}) { return false }
+	for x in 5..=8 { if !level.set_tile(data, {x = x, y = 6}, {kind = .Fence}) { return false } }
+	for y in 9..=12 { if !level.set_tile(data, {x = 17, y = y}, {kind = .Fence}) { return false } }
+	return true
+}
 
 mechanics_lab_first_person :: proc(data: ^level.Level) -> bool {
 	walls: [dynamic]grid.Position
@@ -159,6 +184,10 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat, retouched := true
 		level.destroy(&data)
 		return {}, false
 	}
+	if arena == .IA && !mechanics_lab_ia_board(&data) {
+		level.destroy(&data)
+		return {}, false
+	}
 	if arena == .Layers && !mechanics_lab_layers(&data) {
 		level.destroy(&data)
 		return {}, false
@@ -253,9 +282,11 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	if !built { return }
 	game.finish_deck_combat(&player.deck)
 	// The first person arena has its own deck, all of it in hand too (but for the Canna da Pesca).
-	lab_deck, first_person_deck := MECHANICS_LAB_DECK, MECHANICS_LAB_FIRST_PERSON_DECK
+	lab_deck, first_person_deck, ia_deck := MECHANICS_LAB_DECK, MECHANICS_LAB_FIRST_PERSON_DECK, MECHANICS_LAB_IA_DECK
 	deck, rules := lab_deck[:], MECHANICS_LAB_RULES
 	if which == .First_Person { deck, rules.hand_size = first_person_deck[:], len(first_person_deck)-1 }
+	// The IA's arena: its whole deck in hand.
+	if which == .IA { deck, rules.hand_size = ia_deck[:], len(ia_deck) }
 	if !game.initialize_empty_deck(&player.deck, rules, MECHANICS_LAB_DECK_SEED) { level.destroy(&arena); return }
 	for id in deck {
 		if _, added := game.add_owned_card(&player.deck, id); !added { level.destroy(&arena); return }
@@ -308,8 +339,10 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 		spawns[1].health = 18
 		spawns[2].position = {x = 17, y = 19}
 	}
-	covers := MECHANICS_LAB_FIRST_PERSON_COVERS
-	room, ok = game.create_room(data, player, {enemies = spawns[:], obstacles = covers[:] if which == .First_Person else nil})
+	covers, ia_covers, ia_foes := MECHANICS_LAB_FIRST_PERSON_COVERS, MECHANICS_LAB_IA_COVERS, MECHANICS_LAB_IA_FOES
+	content := game.Room_Content{enemies = spawns[:], obstacles = covers[:] if which == .First_Person else nil}
+	if which == .IA { content.enemies, content.obstacles = ia_foes[:], ia_covers[:] }
+	room, ok = game.create_room(data, player, content)
 	if !ok { return }
 	room.endless = true
 	// No fog: every arrival is in plain sight. Each action lasts its cost in

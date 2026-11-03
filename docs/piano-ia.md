@@ -150,6 +150,15 @@ Note sulle decisioni:
 | La IA intanto | **Si ferma, come nelle viste:** niente consigli, e i suoi secondi si fermano finché dura il lanciafiamme. La IA però conosce la carta, per consigliare quando giocarla (regola per sempre) |
 | Cosa ferma la fiamma | **Muri e coperture** la fermano; passa sopra i **muretti bassi**, come la vista. **Accende anche barili e terreno:** i barili esplodono, il ghiaccio si scioglie, a terra resta il fuoco dell'Incendio |
 
+### Come si eseguono le fasi (3 novembre 2026)
+
+| Domanda | Risposta |
+|---|---|
+| Le domande d'inizio fase | **Valgono le proposte scritte nel piano**; Claude chiede solo se una prova mostra che una proposta non funziona |
+| Fra una fase e l'altra | **Ci si ferma dopo ogni fase** e si aspetta il via dell'utente |
+| Movimento Ombra (Fase 7) | **La IA consiglia i passi dell'ombra** |
+| Alla fine (Fase 15) | **Le quattro carte restano nel laboratorio**: niente offerte, negozi o collezione; la fase fa il resto (film, salvataggi, verifica completa) |
+
 ## La regola per sempre: la IA conosce tutto il gioco
 
 Decisa dall'utente il 3 novembre 2026 (le sue parole sono nell'appendice A). Vale **da quando la IA esiste nel
@@ -205,7 +214,7 @@ comunque nel momento in cui i rami si uniscono.
 
 | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|
-| 0 | Base: la carta, i suoi secondi, l'arena del laboratorio; punto di partenza | — | Da fare | — |
+| 0 | Base: la carta, i suoi secondi, l'arena del laboratorio; punto di partenza | — | Fatta | vedi Esito |
 | 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Da fare | — |
 | 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Da fare | — |
 | 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Da fare | — |
@@ -629,6 +638,52 @@ l'atto `ia`.
 
 **Fatto quando:** nel laboratorio la carta si gioca e il conto alla rovescia scende solo col mondo e fuori dalle viste;
 i test sono verdi.
+
+### Esito (3 novembre 2026)
+
+Le proposte della fase valgono tutte (scelta dell'utente): lancio di 0,26 s, i secondi che ripartono dal pieno, l'arena
+«IA», il conto alla rovescia provvisorio, sigla `IA`.
+
+1. **Punto di partenza:** le misure di Napoli sullo stesso commit `6ea365b` (1893 test, 2562 catture, 165 suoni,
+   1,535 ms a immagine). Nessuna verifica completa ora.
+2. **La carta** ([ia.odin](../src/game/ia.odin)): `Card_Id.IA`, «IA», rara, 2 energia, prezzo 8, peso 60, `Lab_Only`,
+   mira `Self`, `time_cost` 1, 5 potenziamenti; 50 in spedizione. Un effetto nuovo `.IA` (i secondi nell'`amount`) e un
+   evento nuovo `IA_Begun`. Non serve un `resolve_ia_card` a parte: la carta non ha dadi, quindi passa dalla strada di
+   tutte le carte (`apply_effect` chiama `begin_ia`). La critica aggiunge 5 s (`tactical_critical_scale`).
+3. **I secondi** stanno nel giocatore, `Tactical_State.ia_remaining`: la stanza resta di **9208 byte**. Scorrono in
+   `tactical_advance_clock` (`tactical_ia_tick`), quindi sono fermi durante lanci, dadi, scene e difesa a tasti; sono
+   fermi anche dentro le viste (`tactical_first_person_active`); la fine del combattimento li azzera
+   (`tactical_reset_room_clock`). Giocata di nuovo, la carta li riporta al pieno. `ia_active` dice se la IA è accesa.
+4. **Il disegno:** la scritta ciano «IA 30s» sopra il Viandante quando la carta parte (`ia_begun_label`, colore
+   `IA_COLOR` `{90, 230, 255}`) e un segnalino sotto VITA, «IA 28s», che dentro una vista dice «IA FERMA» (`ia_chip`).
+   Descrizione della carta: «30s: LA MOSSA MIGLIORE / PASSO / COLPO / CARTA».
+5. **Provvisori:** icona nella cella 37 dell'atlante (un cervello di circuiti semplice: pieghe a sinistra, piste ciano
+   a destra), le altre icone ferme al loro posto (`build_card_icons.py --check`); suono `card_ia` da codice
+   ([sfx_ia.py](../tools/audio/sfx_ia.py): la carta che scatta, un ronzio che sale, due bip, un accordo pulito), gli
+   altri 245 suoni identici byte per byte.
+6. **Laboratorio:** l'arena **«IA»**, ultima nel giro di `F3` (`Mechanics_Lab_Arena.IA`,
+   [mechanics_practice.odin](../src/run/mechanics_practice.odin)): un muro corto, un pilastro, due muretti, tre
+   coperture, un inseguitore, un arciere, un bruto e un bombarolo, e il mazzo IA, Strike, Guard, Firebomb, Dash, Shove,
+   Arc Bolt, Heavy Blow tutto in mano. Nell'editor delle mappe la sua cartella è `ia`. Atto nuovo `mechanics_lab_ia`
+   ([mechanics_lab_ia.odin](../src/devtools/mechanics_lab_ia.odin), `ODIN_PP_LAB_ONLY=ia`, per ultimo nella prova
+   completa): l'arena, la carta giocata, 30 s e la scritta, i secondi che scendono col mondo, fermi in una vista dell'AK
+   aperta dalle regole (mentre i secondi della vista scendono), di nuovo in corsa dopo. Catture `odin_pp_ia_arena.png`,
+   `odin_pp_mechanics_lab_card_IA.png`, `odin_pp_living_ia_card_NN.png`, `odin_pp_ia_card_view.png`.
+7. **Test nuovi** ([ia_test.odin](../src/game/ia_test.odin)): carta rara del laboratorio da 2 energia; i secondi coi
+   potenziamenti e sul tick; giocata di nuovo riparte dal pieno; i secondi solo col mondo (fermi nella vista e nella
+   difesa a tasti, azzerati a fine combattimento); la stanza di 9208 byte. Test nuovo dell'arena
+   (`test_mechanics_lab_has_an_arena_for_the_ia`). Aggiornati i test che contano le carte del laboratorio (da 9 a 10),
+   i potenziamenti massimi, le icone dell'atlante e il giro delle arene.
+8. **Registro:** voce nuova in [registro-carte.md](registro-carte.md); [avvio.md](avvio.md) spiega l'arena e l'atto.
+
+Verifiche (solo quello che la fase tocca):
+- `odin check src -vet -strict-style` pulito.
+- Tutti i test una volta (per trovare quelli da aggiornare): 1898, di cui 4 da aggiornare per la carta nuova e 6 di
+  disegno delle altezze e della camera che falliscono solo quando i test girano in parallelo (il progetto li fa
+  girare uno alla volta). Poi i 16 test toccati, uno alla volta: tutti verdi.
+- Atto `ia` del laboratorio nella finestra vera: verde.
+- Non fatti, come da regola: la verifica completa, la prova completa del laboratorio, il benchmark (la fase non tocca il
+  fotogramma fuori dal laboratorio).
 
 ## Fase 1 — La copia di prova e il simulatore
 

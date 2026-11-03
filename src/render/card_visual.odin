@@ -151,6 +151,10 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 	// Neapolitan cadence (tools/audio/sfx_napoli.py) until its Fase 6.
 	.Napoli = {icon = 36, short_name = "BAN", accent = .Gold, sound = .Card_Napoli, narrow_name = "Napoli",
 		fill = {58, 40, 52, 245}, outline = {240, 150, 80, 255}},
+	// IA (docs/piano-ia.md): icon and sound provisional until its Fase 8 (a circuit eye, then the circuit brain the
+	// user chose); its colour the advisor's cyan.
+	.IA = {icon = 37, short_name = "IA", accent = .Blue, sound = .Card_Ia, narrow_name = "IA",
+		fill = {16, 44, 58, 245}, outline = {90, 230, 255, 255}},
 	.Count = {icon = 0, short_name = "", accent = .Red,
 		fill = {45, 49, 52, 245}, outline = {105, 116, 116, 255}},
 }

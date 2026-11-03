@@ -79,6 +79,8 @@ PRESENTATION_RIDE_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
 PRESENTATION_STOMP_DURATION :: f32(0.35)*PRESENTATION_TIME_SCALE
 // BENVENUTI A NAPOLI: the face the d4 picked, said over the player.
 PRESENTATION_NAPOLI_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
+// IA: its seconds, said over the player.
+PRESENTATION_IA_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
 // The grandpa's visit with the table or the purse: the world stands still for
 // it, as for the dice (cast_playback.odin; docs/piano-napoli.md, Fase 1).
 PRESENTATION_NAPOLI_VISIT_DURATION :: f32(2.0)
@@ -187,6 +189,8 @@ Presentation_Cue_Kind :: enum {
 	// The grandpa's Q, and his going at no health (game/napoli_nonno.odin).
 	Napoli_Nonno_Cured,
 	Napoli_Nonno_Left,
+	// IA (game/ia.odin): the advisor's seconds begin, said over the player.
+	IA_Begun,
 }
 
 Presentation_Actor :: struct {
@@ -695,6 +699,8 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Napoli_Nonno_Cured
 	case .Napoli_Nonno_Left:
 		return .Napoli_Nonno_Left
+	case .IA_Begun:
+		return .IA_Begun
 	}
 	unreachable()
 }
@@ -819,6 +825,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_HEAL_DURATION
 	case .Napoli_Nonno_Left:
 		return PRESENTATION_NAPOLI_CLEAR_DURATION
+	case .IA_Begun:
+		return PRESENTATION_IA_DURATION
 	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
 		return PRESENTATION_NOTICE_DURATION
 	}
@@ -1443,6 +1451,9 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	case .Napoli_Nonno_Left:
 		if event.target != game.PLAYER_ENTITY { timeline.update_failures += 1 }
 		timeline.view.nonno = {}
+	// IA: the player's own card.
+	case .IA_Begun:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .IA { timeline.update_failures += 1 }
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1503,7 +1514,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
 	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
 	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun,
-	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left:
+	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left, .IA_Begun:
 	// A foe swallowed by the hole spins down it toward the hole's centre.
 	case .Black_Hole_Swallowed:
 		if has_actor {
