@@ -215,7 +215,7 @@ comunque nel momento in cui i rami si uniscono.
 | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|
 | 0 | Base: la carta, i suoi secondi, l'arena del laboratorio; punto di partenza | — | Fatta | vedi Esito |
-| 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Da fare | — |
+| 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Fatta | vedi Esito |
 | 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Da fare | — |
 | 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Da fare | — |
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Da fare | — |
@@ -729,6 +729,64 @@ Check della fase: `odin check`; i test nuovi del pacchetto `advisor`; i test del
 
 **Fatto quando:** la copia e il gioco vero restano uguali mossa per mossa; la stanza vera non cambia mai; le misure
 sono scritte nell'Esito.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase (scelta dell'utente), con una sola differenza, spiegata al punto 3.
+
+1. **Il pacchetto [advisor](../src/advisor/)**, che non disegna e non suona:
+   - **la fotografia** (`Snapshot`, `snapshot_take`): la stanza vera copiata tutta, nella memoria della fotografia; la
+     stanza vera viene solo letta;
+   - **la copia di prova** (`Rehearsal`): `rehearsal_begin` copia una volta livello, pozze e campo delle distanze;
+     `rehearsal_room` rifà la stanza per ogni prova (stanza, giocatore, nemici, trappole, ostacoli, oggetti, bottino) e
+     ricopia livello e pozze **solo se la prova di prima li ha cambiati**. Il registro degli eventi è uno suo, che
+     nessuno legge.
+   - Ogni copia ha la sua memoria (un'arena di `core:mem/virtual`); mentre una prova gira, `context.allocator` e
+     `context.temp_allocator` sono quella memoria.
+2. **Il contatore delle pozze**: `Ground_State.pool_writes`, nei 4 byte liberi in fondo alla struttura, che sale a ogni
+   scrittura delle pozze (e anche quando il laboratorio le pulisce). La stanza resta di **9208 byte**.
+3. **Il simulatore** ([simulate.odin](../src/advisor/simulate.odin)): `play` fa una mossa (passo, schivata, attesa,
+   carta, riordino) con le stesse procedure e nello stesso ordine di `run.execute_gameplay_command`, senza reclamare il
+   tick; `frame_room` è un fotogramma del controllore senza tasti premuti (battiti, Lazzo, Pinball, frecce e bombe in
+   volo, fine della finestra); `run_until_free` fa scorrere il mondo finché il Viandante può agire. La differenza
+   rispetto alla proposta: **la difesa a tasti nella copia, per ora, fa come chi non preme niente** (`Defense_Policy.None`),
+   perché solo così la copia e il gioco vero si possono confrontare mossa per mossa. La difesa migliore (con la parata a
+   metà) arriva nella Fase 2, quando la ricerca sceglie le mosse.
+4. **Il confronto profondo** ([compare.odin](../src/advisor/compare.odin), `rooms_equal`): due stanze campo per campo,
+   giocatore e livello compresi, che dice il primo campo diverso. Lo usano i test.
+5. **Il primo controllo della regola per sempre:** `COPIED_FIELDS` elenca i 22 campi che puntano altrove (puntatori,
+   liste, tabelle) in stanza, giocatore, nemici, oggetti, trappole, bottino, ostacoli e livello. Il test
+   `test_advisor_copy_knows_every_field_that_points` li ritrova con `core:reflect` e fallisce appena il gioco ne ha uno in
+   più (o uno in meno).
+
+Test nuovi ([advisor_copy_test.odin](../src/integration/advisor_copy_test.odin)), tutti verdi:
+- **isolamento:** mille prove di tre mosse a caso sulle copie; la stanza vera è uguale campo per campo, il suo registro
+  degli eventi intatto, e la memoria del gioco non è stata chiesta nemmeno una volta (un allocatore che conta);
+- **determinismo:** 20 partite di 12 mosse, giocate due volte dalla stessa fotografia: uguali;
+- **ricopie:** una pozza versata e un muro alzato nella copia; alla prova dopo livello e pozze sono di nuovo quelli
+  della fotografia (una ricopia ciascuno), e la stanza vera non ha visto niente;
+- **equivalenza:** **200 partite di 15 mosse a caso** (100 col ritmo del laboratorio, 100 col gioco come si gioca, senza
+  finestra), giocate dal gioco vero (`run.execute_gameplay_command` e i fotogrammi del controllore) e dalla copia:
+  dopo ogni mossa le due stanze sono uguali campo per campo e hanno scritto gli stessi eventi.
+
+**Misure** (build ottimizzata come quella del gioco, `-o:speed`):
+
+| Dove | Fotografia | Copia per una prova | Un secondo del mondo simulato | Secondi simulati al secondo da un core |
+|---|---:|---:|---:|---:|
+| Arena IA (4 nemici) | 0,005 ms | 0,0004 ms | 0,05 ms | circa 19 000 |
+| Arena delle strutture (3 nemici) | 0,004 ms | 0,0003 ms | 0,10 ms | circa 9 700 |
+| Spedizione Spazio, 224×224 con gli strati (4 nemici) | 0,20 ms | 0,0005 ms | 2,2 ms | circa 460 |
+
+In parole semplici: nelle arene una prova costa pochissimo e la ricerca avrà decine di migliaia di nodi al secondo. Nella
+spedizione grande un secondo simulato costa circa 40 volte di più, perché ogni volta che i nemici ripianificano il
+gioco ricalcola il loro campo delle distanze (una finestra di 81×81 caselle per 4 strati) e chiede memoria nuova per
+farlo. È il punto da curare nella Fase 7 («mappe grandi»). Anche la fotografia della spedizione grande (0,2 ms) andrà
+fatta solo quando livello e pozze cambiano davvero, come dice il piano (Fase 4).
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; i 6 test nuovi verdi; tutta la
+suite una volta (per le pozze toccate): 1905 test, verdi tranne 3 test di disegno che falliscono solo quando i test
+girano in parallelo e passano uno alla volta. Non fatti: laboratorio (niente da vedere ancora), benchmark, verifica
+completa.
 
 ## Fase 2 — La ricerca: passi, colpi a mano, schivate, attesa
 

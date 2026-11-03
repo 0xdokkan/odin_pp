@@ -47,6 +47,9 @@ Ground_State :: struct {
 	fires: [MAX_GROUND_FIRES]Ground_Fire,
 	fire_count: int,
 	next_fire_id: u32,
+	// How many times the pools were written (place_ground): the advisor's copy of the room copies them again only when
+	// this changed (docs/piano-ia.md). It sits in the bytes the struct had to spare: the room does not grow.
+	pool_writes: u32,
 }
 
 
@@ -240,6 +243,7 @@ place_ground :: proc(room: ^Room, kind: Status_Kind, cell: grid.Position, amount
 		index, _ := ground_index(room, at)
 		room.ground.pool[index] = amount
 	}
+	room.ground.pool_writes += 1
 	// The anchor is free; the cells filled with it may hold enemies.
 	for at in filled[1:] {
 		if enemy_index, found := enemy_index_at(room, at); found {
@@ -314,6 +318,6 @@ grow_ground_fires :: proc(room: ^Room, pulse: ^Pulse_Report) {
 clear_ground :: proc(room: ^Room) {
 	if room == nil { return }
 	for &value in room.ground.pool { value = 0 }
-	pool := room.ground.pool
-	room.ground = {pool = pool}
+	pool, writes := room.ground.pool, room.ground.pool_writes
+	room.ground = {pool = pool, pool_writes = writes+1}
 }
