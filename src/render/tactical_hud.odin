@@ -157,7 +157,7 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 			chips.accents[index] = DINO_AURA[int(renderer.tactical.snapshot.ride.kind)]
 			chips.texts[index], _ = ride_chip(renderer, short)
 		} else if ia && index == bites+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0) {
-			chips.accents[index] = IA_COLOR
+			chips.accents[index] = ia_chip_color(room)
 			chips.texts[index], _ = ia_chip(room, short)
 		} else {
 			status := ordered.items[index if index < bites else index-extras]

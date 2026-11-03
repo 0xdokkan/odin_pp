@@ -1,14 +1,13 @@
-"""Family `ia`: the IA card (docs/piano-ia.md, SOUND_SPEC.md).
+"""Family `ia`: the IA card (docs/piano-ia.md, Fase 8; SOUND_SPEC.md).
 
-Fase 0 of the plan gives the card a provisional sound of its own (every card
-has one: render/lab_sounds_test.odin); its real sounds are its Fase 8. The
-recipe is dry and synthesized here (the build adds the stone hall); it reuses
-the `cards_arms` family's paper flick and adds an electronic power-on:
+The card's four sounds, dry and synthesized here (the build adds the stone hall); `card_ia` reuses the `cards_arms`
+family's paper flick and adds an electronic power-on:
 
-- a hum that rises (two detuned sines gliding up an octave, a little square
-  edge for the circuit's buzz);
-- two short beeps a fifth apart;
-- a clean chord (C major added ninth, soft sines) that rings out.
+- `card_ia`, the power-on: a hum that rises (two detuned sines gliding up an octave, a little square edge for the
+  circuit's buzz), two short beeps a fifth apart, a clean chord (C major added ninth, soft sines) that rings out;
+- `ia_tick`, the advice changes: one very light tick, high and short, to be heard often without tiring;
+- `ia_warn`, the warning: two short notes falling a minor third, a touch of square edge so that it cuts through;
+- `ia_off`, the power-off: the chord's two top notes falling away and a hum sinking an octave.
 
 Every recipe keeps its peak at -1.5 dBFS or lower before the build's ceiling.
 The marks are the recipe's own key moments in seconds; 0.0 is the first sound.
@@ -51,3 +50,42 @@ def card_ia(seed):
         (0.76, _norm(chord), 0.6),
     ])
     return _finish(_limit(x, 0.7), D, fade_out=0.25)
+
+
+@sound("ia_tick", loudness=-30, wet=0.1, rt60=0.4, marks=(0.0,),
+       note="one light high tick of a circuit, 35 ms and a little air: the advice has changed")
+def ia_tick(seed):
+    D = 0.12
+    length = 0.035
+    tick = sine(_hz(100), length) + 0.4 * sine(_hz(107), length)
+    tick = tick * env_perc(length, attack=0.001, decay=0.03, curve=4.0)
+    return _finish(_limit(place(D, [(0.0, _norm(tick), 0.6)]), 0.8), D, fade_out=0.02)
+
+
+@sound("ia_warn", loudness=-22, wet=0.12, rt60=0.5, marks=(0.0, 0.13),
+       note="two short notes falling a minor third (E6 to C#6), a little square edge: a move that costs life")
+def ia_warn(seed):
+    D = 0.42
+
+    def note(midi):
+        length = 0.11
+        tone = sine(_hz(midi), length) + 0.22 * square(_hz(midi), length) + 0.2 * sine(_hz(midi) * 2, length)
+        return _norm(lowpass(tone, 5200, 2) * env_perc(length, attack=0.003, decay=0.095, curve=2.2))
+
+    return _finish(_limit(place(D, [(0.0, note(88), 0.6), (0.13, note(85), 0.6)]), 0.75), D, fade_out=0.08)
+
+
+@sound("ia_off", loudness=-24, wet=0.2, rt60=0.9, marks=(0.0, 0.14, 0.3),
+       note="the power-on undone: two beeps falling a fifth (0, 0.14), then a hum sinking an octave and dying by 0.9")
+def ia_off(seed):
+    D = 1.05
+    fall = 0.62
+    path = glide(220.0, 110.0, fall)
+    hum = sine(path, fall) + 0.6 * sine(path * 0.996, fall) + 0.1 * square(path * 2, fall)
+    hum = lowpass(hum, 1800, 2) * env_perc(fall, attack=0.02, decay=0.6, curve=2.2)
+    x = place(D, [
+        (0.0, _norm(_beep(91, 0.09)), 0.42),
+        (0.14, _norm(_beep(84, 0.09)), 0.42),
+        (0.3, _norm(hum), 0.42),
+    ])
+    return _finish(_limit(x, 0.7), D, fade_out=0.2)

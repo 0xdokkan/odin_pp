@@ -6,6 +6,16 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — IA: aspetto e suoni (solo laboratorio)
+
+Commit **«Piano IA, Fase 8 fatta: aspetto e suoni»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 8). Regole e numeri
+della carta non cambiano. Icona nuova nella stessa cella 37 dell'atlante, al posto di quella provvisoria: un cervello di
+circuiti su fondo scuro, due lobi, pieghe curve a sinistra e piste ciano con nodi bianchi a destra. Il segnalino sotto VITA
+lampeggia negli ultimi 5 secondi; una scia ciano passa sul tabellone all'accensione e torna indietro allo spegnimento.
+Suoni da codice (`tools/audio/sfx_ia.py`), solo nel laboratorio come quelli delle altre carte: `card_ia` c'era già,
+nuovi `ia_tick` (il consiglio cambia, al massimo uno ogni 0,3 s), `ia_warn` (l'avviso), `ia_off` (lo spegnimento). Gli altri
+246 suoni sono identici byte per byte.
+
 ## 2026-11-03 — IA: i casi speciali (solo laboratorio)
 
 Commit **«Piano IA, Fase 7 fatta: i casi speciali»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 7). La carta non

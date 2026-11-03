@@ -120,7 +120,7 @@ del bruto sulla vita del nonno e il nonno che se ne va a vita zero (`odin_pp_nap
 (mazzata, boing, fruscio, stelline, tasca, posate, monete, ciabatte, risata) e, col bastone e col nonno, suona la
 tarantella (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
 dopo tutti gli altri, prima della IA.
-Con `ODIN_PP_LAB_ONLY=ia` gira solo l'atto della carta IA ([piano](piano-ia.md), Fasi 0, 2-7), nell'arena «IA»: l'arena
+Con `ODIN_PP_LAB_ONLY=ia` gira solo l'atto della carta IA ([piano](piano-ia.md), Fasi 0, 2-8), nell'arena «IA»: l'arena
 (`odin_pp_ia_arena.png`) e la carta in mano; giocata, la scritta «IA 30s» sopra il Viandante e il segnalino sotto VITA
 che conta i secondi col mondo (`odin_pp_living_ia_card_NN.png`); dentro una vista i secondi si fermano e il segnalino dice
 «IA FERMA» (`odin_pp_ia_card_view.png`), finita la vista ripartono. Poi i nemici si muovono e il Viandante segue i
@@ -131,7 +131,9 @@ consigliata con la cornice ciano nella mano e il segno sulla casella del bersagl
 (`odin_pp_ia_wait_NN.png`); poi una scena sotto il fendente del bruto con la difesa a tasti, la cornice sul tasto giusto
 (`odin_pp_ia_defend_NN.png`), e una in cui il Viandante rimescola la mano invece di uscire e compare l'avviso rosso
 (`odin_pp_ia_warning_NN.png`); la stessa scena con la partita a 0, 50 e 100% (`odin_pp_ia_progress_NN.png`); infine l'Ombra giocata
-sotto il fendente, il consiglio sui passi dell'ombra e l'uscita (`odin_pp_ia_shadow_NN.png`).
+sotto il fendente, il consiglio sui passi dell'ombra e l'uscita (`odin_pp_ia_shadow_NN.png`); e la fine dei suoi
+secondi: il segnalino che lampeggia, la scia che torna indietro, lo spegnimento (`odin_pp_ia_end_NN.png`). L'atto
+controlla che tutti e quattro i suoni della carta abbiano suonato.
 Nell'arena, con la carta IA in mano o attiva, **F11** imposta quanto manca alla fine della partita (0, 50, 100%): la
 riga del cartello lo dice. Nello smoke completo gira per ultimo. Con anche `ODIN_PP_LAB_TIMING=1` l'atto misura
 invece i fotogrammi, senza IA e con la IA che cerca sul suo thread, in quattro corse in ordine incrociato (senza, con,

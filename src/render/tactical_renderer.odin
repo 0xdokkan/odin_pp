@@ -30,8 +30,9 @@ expedition_benchmark_elapsed :: proc(stamp:^f64)->f64 {
 
 Tactical_View :: struct {
 	art: Gothic_Art,
-	// The IA's advice, set by its pilot every frame (advisor_view.odin).
+	// The IA's advice, set by its pilot every frame, and its sweep over the board (advisor_view.odin).
 	advice: Advice_View,
+	advice_sweep: Advice_Sweep,
 	perspective, no_fog: bool,
 	refocus_enabled: bool,
 	camera: rl.Camera3D,
@@ -760,6 +761,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_voxel_threats(renderer, room)
 	draw_intent_ground(renderer, room)
 	draw_advice_floor(renderer, room, active_card)
+	draw_advice_sweep(renderer, room)
 	draw_enemy_arrow_courses(renderer, room)
 	draw_enemy_bomb_floor(renderer, room)
 	draw_marley_floor(renderer, room)

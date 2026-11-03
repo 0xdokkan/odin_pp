@@ -222,7 +222,7 @@ comunque nel momento in cui i rami si uniscono.
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Fatta | vedi Esito |
 | 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Fatta | vedi Esito |
 | 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Fatta | vedi Esito |
-| 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Da fare | — |
+| 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Fatta | vedi Esito |
 | 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
 | 10 | Nido di ragni: aspetto e suoni | 9 | Da fare | — |
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Da fare | — |
@@ -1528,6 +1528,40 @@ Passi:
 Check della fase: i test dei suoni e delle icone; l'atto `ia`.
 
 **Fatto quando:** l'utente approva icona e suoni.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase. Sui suoni nel gioco vero la risposta c'era già: le quattro carte restano nel laboratorio
+(scelta dell'utente), quindi i suoni restano lì come quelli delle altre carte.
+
+1. **L'icona** (cella 37 dell'atlante, la stessa della Fase 0): ridisegnata. Quella provvisoria sembrava una palla a
+   pois. Ora è un cervello di circuiti su fondo scuro: sagoma a due lobi, pieghe curve a sinistra, piste ciano con nodi
+   bianchi a destra, il gambo d'acciaio. Le altre icone non si spostano di un pixel (`--check` e i test dell'atlante).
+2. **Il conto alla rovescia:** il segnalino «IA 28s» sotto VITA lampeggia, due volte al secondo, negli ultimi 5 secondi.
+3. **L'accensione e lo spegnimento:** una scia ciano passa sul tabellone da ovest a est quando la carta parte, e torna da
+   est a ovest quando i suoi secondi finiscono. Si vede solo sulle caselle che il giocatore vede. Nelle viste, dove i
+   secondi si fermano soltanto, la scia non parte.
+4. **I suoni da codice** ([sfx_ia.py](../tools/audio/sfx_ia.py)):
+   - `card_ia`, l'accensione: quella della Fase 0, un ronzio che sale, due bip, un accordo pulito;
+   - `ia_tick`, nuovo: un tic leggerissimo quando il consiglio cambia, mai più di uno ogni 0,3 s. Col consiglio fermo
+     della Fase 5 suona una volta per azione, non di continuo;
+   - `ia_warn`, nuovo: due note brevi che scendono, per l'avviso rosso;
+   - `ia_off`, nuovo: due bip che scendono e un ronzio che si spegne.
+
+   Gli altri 246 suoni sono identici byte per byte: git vede solo i tre file nuovi.
+
+**Test:** il lampeggio solo negli ultimi 5 secondi e la scia che attraversa il tabellone nei due versi e finisce nel suo
+tempo ([advisor_view_test.odin](../src/integration/advisor_view_test.odin)); i test dei suoni e delle icone; tutti quelli
+delle fasi prima. **60 test verdi**, tutti nella stessa corsa, le 1000 situazioni comprese (0 rifiuti); nel torneo la IA
+perde 0 vita e uccide 158 nemici.
+
+**Laboratorio:** l'atto `ia` ha una scena finale: i secondi che finiscono, il segnalino che lampeggia, la scia che torna,
+lo spegnimento (`odin_pp_ia_end_NN.png`). L'atto controlla che ogni suono abbia suonato: accensione 1, tic 51, avviso 1,
+spegnimento 1.
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 60 test verdi; `--check`
+dell'atlante; l'atto `ia`. Non fatti: benchmark (la scia dura 0,7 s e solo quando la carta parte o finisce), verifica
+completa. **Restano l'ascolto e l'approvazione dell'utente:** nessuna prova automatica può dire se un suono è bello.
 
 ## Fase 9 — Nido di ragni: regole e prototipo; la IA lo conosce
 

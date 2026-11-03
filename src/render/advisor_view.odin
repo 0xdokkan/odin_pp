@@ -38,6 +38,14 @@ Advice_View :: struct {
 	warning_left: f32,
 }
 
+// THE SWEEP (Fase 8): a cyan band across the board when the card starts, back the other way when its seconds end.
+// Seen only on the cells the player sees.
+Advice_Sweep :: struct { left: f32, off: bool }
+
+ADVICE_SWEEP_SECONDS :: f32(0.7)
+ADVICE_SWEEP_REACH :: 13
+ADVICE_SWEEP_TRAIL :: 4
+
 ADVICE_WARNING_SECONDS :: f32(0.5)
 ADVICE_WARNING_COLOR :: rl.Color{235, 64, 52, 255}
 
@@ -149,6 +157,35 @@ draw_advice_floor :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u3
 		hand := advice.age*2
 		rl.DrawCylinderEx({center.x, center.y+0.02, center.z}, {center.x+math.cos(hand)*0.22, center.y+0.02, center.z+math.sin(hand)*0.22}, 0.02, 0.02, 6, IA_COLOR)
 		rl.DrawCylinderEx({center.x, center.y+0.02, center.z}, {center.x, center.y+0.02, center.z-0.14}, 0.025, 0.025, 6, IA_COLOR)
+	}
+}
+
+advice_begin_sweep :: proc(renderer: ^Renderer, off: bool) { renderer.tactical.advice_sweep = {left = ADVICE_SWEEP_SECONDS, off = off} }
+
+advice_tick_sweep :: proc(renderer: ^Renderer, dt: f32) {
+	sweep := &renderer.tactical.advice_sweep
+	sweep.left = max(f32(0), sweep.left-max(dt, 0))
+}
+
+// The band's column at this moment: west to east as the card starts, east to west as it ends.
+advice_sweep_column :: proc(sweep: Advice_Sweep, center: int) -> int {
+	done := 1-sweep.left/ADVICE_SWEEP_SECONDS
+	span := f32(2*ADVICE_SWEEP_REACH+ADVICE_SWEEP_TRAIL)
+	return center+ADVICE_SWEEP_REACH-int(done*span) if sweep.off else center-ADVICE_SWEEP_REACH+int(done*span)
+}
+
+draw_advice_sweep :: proc(renderer: ^Renderer, room: ^game.Room) {
+	sweep := renderer.tactical.advice_sweep
+	if sweep.left <= 0 { return }
+	p := room.player.position
+	front := advice_sweep_column(sweep, p.x)
+	for y in p.y-ADVICE_SWEEP_REACH..=p.y+ADVICE_SWEEP_REACH {
+		for k in 0..<ADVICE_SWEEP_TRAIL {
+			cell := grid.Position{x = front+k if sweep.off else front-k, y = y, layer = p.layer}
+			if !tactical_render_visible(renderer, cell) { continue }
+			alpha := u8(150-34*k)
+			rl.DrawPlane(advice_ground(cell), {0.96, 0.96}, {IA_COLOR.r, IA_COLOR.g, IA_COLOR.b, alpha})
+		}
 	}
 }
 

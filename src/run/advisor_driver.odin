@@ -42,6 +42,8 @@ Advisor_Pilot :: struct {
 	// player's cell (`danger`, a new one since the advice was held); and an advice that can no longer be done (the foe
 	// dead, the card gone, the cell taken, the player moved by a blow) gives way too.
 	acted: bool,
+	// Whether the card's seconds were running last frame (the sweep, the power-off).
+	running: bool,
 	// The action's new root is taken (once: then the pilot waits for its advice).
 	acted_rooted: bool,
 	held_danger: u64,
@@ -85,14 +87,25 @@ advisor_pilot_open :: proc() -> ^Advisor_Pilot {
 drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	shown := render.Advice_View{}
 	defer renderer.tactical.advice = shown
+	render.advice_tick_sweep(renderer, dt)
 	if room == nil || room.player == nil || room.phase != .Combat { advisor_pilot_release(); return }
 	if !game.ia_active(room) {
-		if advisor_pilot != nil { advisor_pilot.shown, advisor_pilot.root, advisor_pilot.acted = {}, 0, false }
+		if p := advisor_pilot; p != nil {
+			p.shown, p.root, p.acted = {}, 0, false
+			// The seconds over (not a view, where they only stand still): the sweep back, the power-off.
+			if p.running && room.player.tactical.ia_remaining <= 0 {
+				p.running = false
+				render.advice_begin_sweep(renderer, true)
+				render.advice_sound(renderer, .Ia_Off)
+			}
+		}
 		return
 	}
 	if advisor_pilot == nil { advisor_pilot = advisor_pilot_open() }
 	p := advisor_pilot
 	if p == nil { return }
+	if !p.running { p.running = true; render.advice_begin_sweep(renderer, false) }
+	warning_left := p.warning_left
 	fingerprint := advisor.discrete_fingerprint(room)
 	// The game's state changed (the progress, a heal, the sleepers): a new root too.
 	game_context := advisor_game_context
@@ -142,7 +155,14 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	case fresh.valid && !advisor.advice_possible(room, p.shown, p.held_at):
 		advisor_hold(p, room, fresh, danger)
 	}
-	if p.shown.kind != before.kind || p.shown.cell != before.cell || p.shown.move != before.move { p.shown_age = 0 } else { p.shown_age += dt }
+	if p.shown.kind != before.kind || p.shown.cell != before.cell || p.shown.move != before.move {
+		p.shown_age = 0
+		// A light tick when the advice changes, never more than one every 0.3 s.
+		if p.shown.valid { render.advice_sound(renderer, .Ia_Tick, 0.3) }
+	} else {
+		p.shown_age += dt
+	}
+	if p.warning_left > warning_left { render.advice_sound(renderer, .Ia_Warn) }
 	if p.shown.valid { shown = advisor_view(room, p.shown) }
 	shown.age = p.shown_age
 	shown.warning, shown.warning_left = p.warning, p.warning_left

@@ -503,8 +503,19 @@ ia_begun_label :: proc(event: game.Game_Event) -> cstring {
 	return fmt.ctprintf("IA %ds", event.amount)
 }
 
-// The IA's chip under VITA while its seconds run (IA 28s), provisional until the plan's Fase 8; behind the eyes of a
-// view its seconds stand still and it says so (IA FERMA).
+// The last seconds of the IA: its chip blinks, twice a second (docs/piano-ia.md, Fase 8).
+IA_BLINK_SECONDS :: f32(5)
+IA_COLOR_DIM :: rl.Color{36, 92, 106, 255}
+
+ia_chip_color :: proc(room: ^game.Room) -> rl.Color {
+	if room == nil || room.player == nil || game.tactical_first_person_active(room) { return IA_COLOR }
+	left := room.player.tactical.ia_remaining
+	if left <= 0 || left > IA_BLINK_SECONDS { return IA_COLOR }
+	return IA_COLOR if int(left*4)%2 == 1 else IA_COLOR_DIM
+}
+
+// The IA's chip under VITA while its seconds run (IA 28s); behind the eyes of a view its seconds stand still and it
+// says so (IA FERMA).
 ia_chip :: proc(room: ^game.Room, short: bool) -> (text: cstring, shown: bool) {
 	if room == nil || room.player == nil || room.phase != .Combat || room.player.tactical.ia_remaining <= 0 { return }
 	if game.tactical_first_person_active(room) { return "IA FERMA" if !short else "IA --", true }

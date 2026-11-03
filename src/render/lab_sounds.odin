@@ -828,6 +828,15 @@ lab_watch_room :: proc(s: ^Lab_Sounds, room: ^game.Room, now: f64) {
 }
 
 // The scene plays what is due (volume: the player's effects volume).
+// The IA's own sounds (Fase 8), said by its pilot, in the lab like the other cards': `gap` seconds at least between two.
+advice_sound :: proc(renderer: ^Renderer, sfx: audio.Lab_Sfx, gap: f64 = 0) {
+	s := renderer.tactical.lab_sounds
+	if s == nil { return }
+	now := renderer.sprite_assets.elapsed
+	if gap > 0 && s.played[sfx] > 0 && now-s.last_played[sfx] < gap { return }
+	lab_sound_queue(s, sfx, now)
+}
+
 play_lab_sounds :: proc(renderer: ^Renderer, bank: ^audio.Lab_Bank, volume: f32) {
 	if renderer == nil || renderer.tactical.lab_sounds == nil { return }
 	s := renderer.tactical.lab_sounds

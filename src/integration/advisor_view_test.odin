@@ -186,3 +186,37 @@ test_advisor_pilot_changes_its_mind_for_a_blow :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, changed)
 }
+
+// THE LOOK (Fase 8): the chip blinks in the last five seconds and only then; the sweep crosses the board one way as the
+// card starts, the other as it ends, and is over in its time.
+@(test)
+test_advisor_chip_blinks_and_the_sweep_crosses :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := view_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	room.player.tactical.ia_remaining = 20
+	testing.expect(t, render.ia_chip_color(&room) == render.IA_COLOR)
+	seen: [2]bool
+	for left := f32(4.95); left > 0; left -= 0.05 {
+		room.player.tactical.ia_remaining = left
+		color := render.ia_chip_color(&room)
+		if color == render.IA_COLOR { seen[0] = true }
+		if color == render.IA_COLOR_DIM { seen[1] = true }
+	}
+	testing.expect(t, seen[0] && seen[1])
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	render.advice_begin_sweep(renderer, false)
+	on_start := render.advice_sweep_column(renderer.tactical.advice_sweep, 10)
+	render.advice_tick_sweep(renderer, render.ADVICE_SWEEP_SECONDS*0.5)
+	on_middle := render.advice_sweep_column(renderer.tactical.advice_sweep, 10)
+	testing.expect(t, on_middle > on_start)
+	render.advice_begin_sweep(renderer, true)
+	off_start := render.advice_sweep_column(renderer.tactical.advice_sweep, 10)
+	render.advice_tick_sweep(renderer, render.ADVICE_SWEEP_SECONDS*0.5)
+	testing.expect(t, render.advice_sweep_column(renderer.tactical.advice_sweep, 10) < off_start)
+	render.advice_tick_sweep(renderer, render.ADVICE_SWEEP_SECONDS)
+	testing.expect_value(t, renderer.tactical.advice_sweep.left, f32(0))
+}

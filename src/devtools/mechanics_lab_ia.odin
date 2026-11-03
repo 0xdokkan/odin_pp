@@ -9,6 +9,7 @@ import "core:time"
 import rl "vendor:raylib"
 import advisor "../advisor"
 import app "../engine/app"
+import audio "../engine/audio"
 import artifacts "artifacts"
 import game "../game"
 import level "../level"
@@ -90,7 +91,8 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 	if !mechanics_lab_ia_defend(window, renderer, room, data, controller, cards, buffer) { return false }
 	if !mechanics_lab_ia_warning(window, renderer, room, data, controller, cards, buffer) { return false }
 	if !mechanics_lab_ia_progress(window, renderer, room, data, controller, cards, buffer) { return false }
-	return mechanics_lab_ia_shadow(window, renderer, room, data, controller, cards, buffer)
+	if !mechanics_lab_ia_shadow(window, renderer, room, data, controller, cards, buffer) { return false }
+	return mechanics_lab_ia_end(window, renderer, room, data, controller, cards, buffer)
 }
 
 // The foes free, the player follows the IA's advice for twenty seconds of the world, or until its seconds are over.
@@ -372,5 +374,40 @@ mechanics_lab_ia_shadow :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	artifacts.screenshot("odin_pp_ia_shadow_01.png")
 	if !shown || game.tactical_shadow_active(room) { fmt.eprintln("mechanics lab: no advice in the shadow, or the shadow never ended"); return false }
 	fmt.eprintf("mechanics lab IA shadow: %d steps of the shadow advised and walked, the player rose at %v\n", steps, room.player.position)
+	return true
+}
+
+// THE END OF ITS SECONDS (Fase 8): six seconds left, the chip blinks through the last five (odin_pp_ia_end_00.png and
+// _01, a quarter of a second apart); at zero the sweep runs back over the board and the power-off sounds
+// (odin_pp_ia_end_02.png). Then every sound of the IA has been heard in the act: the power-on, the tick, the warning,
+// the power-off.
+@(private = "file")
+mechanics_lab_ia_end :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	if !mechanics_lab_ia_scene(window, renderer, room, data, controller, cards, buffer, true) { return false }
+	for &foe in room.enemies { mechanics_lab_hold(room, foe.id) }
+	room.player.tactical.ia_remaining = 6
+	bright, dim := false, false
+	for _ in 0..<420 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if room.qte.kind != .None { room.qte = {} }
+		color := render.ia_chip_color(room)
+		if room.player.tactical.ia_remaining < render.IA_BLINK_SECONDS && room.player.tactical.ia_remaining > 0 {
+			if color == render.IA_COLOR && !bright { bright = true; artifacts.screenshot("odin_pp_ia_end_00.png") }
+			if color == render.IA_COLOR_DIM && !dim { dim = true; artifacts.screenshot("odin_pp_ia_end_01.png") }
+		}
+		if room.player.tactical.ia_remaining <= 0 { break }
+	}
+	if !bright || !dim { fmt.eprintln("mechanics lab: the IA's chip did not blink in its last seconds"); return false }
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+	if renderer.tactical.advice_sweep.left <= 0 || !renderer.tactical.advice_sweep.off { fmt.eprintln("mechanics lab: no sweep back at the end of the IA's seconds"); return false }
+	artifacts.screenshot("odin_pp_ia_end_02.png")
+	for _ in 0..<40 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+	sounds := renderer.tactical.lab_sounds
+	if sounds == nil { fmt.eprintln("mechanics lab: no sounds to count"); return false }
+	for sfx in ([4]audio.Lab_Sfx{.Card_Ia, .Ia_Tick, .Ia_Warn, .Ia_Off}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: the IA's sound", sfx, "never sounded"); return false }
+	}
+	fmt.eprintf("mechanics lab IA sounds: power-on %d, tick %d, warning %d, power-off %d\n", sounds.played[.Card_Ia], sounds.played[.Ia_Tick], sounds.played[.Ia_Warn], sounds.played[.Ia_Off])
 	return true
 }

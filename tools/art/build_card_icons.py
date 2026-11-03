@@ -87,10 +87,10 @@ docs/piano-napoli.md adds a tenth row (its Fase 0):
              Somma and the Gran Cono with lava in its crater, a pine-shaped
              plume of smoke above it.
 
-docs/piano-ia.md adds to it (its Fase 0):
+docs/piano-ia.md adds to it (its Fasi 0 and 8):
 
-    cell 37  IA (provisional): a brain of circuits, folds on the left, cyan
-             traces with white nodes on the right, a steel stem.
+    cell 37  IA: a brain of circuits on a dark ground, curved folds on the
+             left, cyan traces with white nodes on the right, a steel stem.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -892,37 +892,36 @@ assert all(len(row) == 28 for row in NONNO) and len(NONNO) == 28
 
 ICONS.update({36: NONNO})
 
-# docs/piano-ia.md, Fase 0: the IA card's provisional icon, a brain of circuits (the user's choice for its
-# Fase 8, drawn simply here): the left half in folds of light, the right half in cyan traces with white nodes,
-# a steel stem under it.
+# docs/piano-ia.md, Fase 8: the IA card's icon, a brain of circuits (the user's choice) on a dark ground: two
+# lobes, the left half in curved folds of light, the right half in cyan traces with white nodes, a steel stem under it.
 IA_BRAIN = (
     "............................",
     "............................",
     "............................",
-    "............KKKK............",
-    ".........KKKcKCCKKK.........",
-    ".......KKccccKCCCCCKK.......",
-    "......KccKcccKCyXXXXXK......",
-    ".....KcucucccKCCCXCCCCK.....",
-    "....KKccccccKKCCCXCCCCCK....",
-    "...KcccccccccKCCCXCCCCCCK...",
-    "...KcccccKcccKCyXyXXXXyCK...",
-    "...KucuccccucKCCCCCCXCCCK...",
-    "..KccKccccccKKCCCCCCXCCCCK..",
-    "..KccccccccccKCCCCCCXCCCCK..",
-    "..KcccccKccccKCCyXXXyXXyCK..",
-    "...KcuccucuccKCCCCXCCCCCK...",
-    "...KcccccKcccKCCCCXCCCCCK...",
-    "...KcccccccccKCCCCXCCCCCK...",
-    "....KccKcccccKCyXXyXXyCK....",
-    ".....KcuccccuKCCCCCCCCK.....",
-    "......KcccccKKCCCCCCCK......",
-    ".......KKccccKCCCCCKK.......",
-    ".........KKKcKCCKKK.........",
-    "............KmmK............",
+    ".........KKKK..KKKK.........",
+    ".......KKCCCCKKCCCCKK.......",
+    ".....KKCCuuCCKKCyXXXCKK.....",
+    "....KCCuCCCuCKKCCCXCCCCK....",
+    "...KCCuCCuuCCKKCCCXCCyXCK...",
+    "...KCuCCuCCuCKKCyXXXCXCCK...",
+    "..KCCuCCCuCCCKKCCCXCCXCCCK..",
+    "..KCuCCuuCCuCKKCCCXCCyXXCK..",
+    "..KCuCuCCuCCCKKCyXyCCCCXCK..",
+    "..KCCuCCCuuCCKKCCCXXXXCXCK..",
+    "..KCuuCuCCCuCKKCCCCCCXCXCK..",
+    "..KCCCuCCuCCCKKCyXXXXyCyCK..",
+    "...KCuCCuuCuCKKCCCXCCCCCK...",
+    "...KCCuCCCCuCKKCCCXCCyCCK...",
+    "....KCCuuCuCCKKCCCyXXXXK....",
+    ".....KKCCuCCCKKCCCCCCKK.....",
+    ".......KKCCCCKKCCCCKK.......",
+    ".........KKKKKKKKKK.........",
     "............KmmK............",
     "............KmmK............",
     "............KKKK............",
+    "............................",
+    "............................",
+    "............................",
     "............................",
 )
 assert all(len(row) == 28 for row in IA_BRAIN) and len(IA_BRAIN) == 28
