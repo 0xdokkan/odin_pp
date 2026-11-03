@@ -4,6 +4,7 @@ import run_session "../run"
 import "core:fmt"
 import "core:os"
 import "core:slice"
+import "core:time"
 import rl "vendor:raylib"
 import advisor "../advisor"
 import app "../engine/app"
@@ -84,7 +85,9 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 	for _ in 0..<30 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
 	if !(player.tactical.ia_remaining < after_view) { fmt.eprintln("mechanics lab: the IA's seconds did not run again after the view"); return false }
 	artifacts.screenshot("odin_pp_ia_card_after.png")
-	return mechanics_lab_ia_follow(window, renderer, room, controller, cards, buffer)
+	if !mechanics_lab_ia_follow(window, renderer, room, controller, cards, buffer) { return false }
+	if !mechanics_lab_ia_defend(window, renderer, room, data, controller, cards, buffer) { return false }
+	return mechanics_lab_ia_warning(window, renderer, room, data, controller, cards, buffer)
 }
 
 // The foes free, the player follows the IA's advice for twenty seconds of the world, or until its seconds are over.
@@ -92,7 +95,7 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 mechanics_lab_ia_follow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	for &foe in room.enemies { foe.recovery_pulses = 0 }
-	steps, bumps, played, followed := 0, 0, 0, 0
+	steps, bumps, played, waits, followed := 0, 0, 0, 0, 0
 	health := room.player.health
 	for frame := 0; frame < 1200 && room.phase == .Combat && game.ia_active(room); frame += 1 {
 		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
@@ -109,19 +112,22 @@ mechanics_lab_ia_follow :: proc(window: ^app.Window, renderer: ^render.Renderer,
 			if bumps < 8 { artifacts.screenshot(fmt.ctprintf("odin_pp_ia_bump_%02d.png", bumps)) }
 			bumps += 1
 		case .Card:
-			// The card framed in the hand and its target marked; then raised, as the player takes it.
+			// The card framed in the hand; then held, its frame on the target's cell.
 			if played < 4 {
 				artifacts.screenshot(fmt.ctprintf("odin_pp_ia_card_hint_%02d.png", 2*played))
-				mechanics_lab_still(window, renderer, room, advice.move.card_id, fmt.ctprintf("odin_pp_ia_card_hint_%02d.png", 2*played+1))
+				mechanics_lab_ia_held_still(window, renderer, room, advice.move.card_id, fmt.ctprintf("odin_pp_ia_card_hint_%02d.png", 2*played+1))
 			}
 			played += 1
+		case .Wait:
+			if waits < 4 { artifacts.screenshot(fmt.ctprintf("odin_pp_ia_wait_%02d.png", waits)) }
+			waits += 1
 		}
 		commands, count := run_session.advisor_move_commands(room, advice.move)
 		for command in commands[:count] { run_session.commit_gameplay_command(room, renderer, cards, command) }
 		followed += 1
 	}
-	fmt.eprintf("mechanics lab IA: %d moves followed (%d steps, %d bumps, %d cards), life %d to %d, %d foes left\n",
-		followed, steps, bumps, played, health, room.player.health, len(room.enemies))
+	fmt.eprintf("mechanics lab IA: %d moves followed (%d steps, %d bumps, %d cards, %d waits), life %d to %d, %d foes left\n",
+		followed, steps, bumps, played, waits, health, room.player.health, len(room.enemies))
 	if steps == 0 || bumps == 0 || played == 0 { fmt.eprintln("mechanics lab: the IA advised no step, no bump or no card in twenty seconds"); return false }
 	return true
 }
@@ -169,5 +175,125 @@ mechanics_lab_ia_timing :: proc(window: ^app.Window, renderer: ^render.Renderer,
 			values[(count*99+99)/100-1], values[count-1], roots, packet.round, packet.nodes)
 	}
 	run_session.advisor_pilot_release()
+	return true
+}
+
+// The board with `card_id` held, as when the player takes the card up: the advice's frame on its target.
+@(private = "file")
+mechanics_lab_ia_held_still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, card_id: u32, name: cstring) {
+	for _ in 0..<3 {
+		render.update_renderer_frame_timeline(renderer, 0)
+		render.update_tactical_view(renderer, room, {}, false, true)
+		app.begin_canvas(window, render.RESIN_BACKGROUND)
+		render.draw_tactical_world(renderer, room, card_id)
+		render.draw_tactical_status(renderer, room)
+		render.draw_tactical_hand(renderer, room, 0, card_id, 0, {})
+		render.draw_tactical_hud(renderer, room, false, false)
+		render.draw_mechanics_lab_banner(renderer, room)
+		app.present(window, render.LETTERBOX_COLOR)
+	}
+	artifacts.screenshot(name)
+}
+
+// A scene of the IA's arena: built afresh, its seconds endless, a brute of 40 next to the player (south), its cleave
+// about to fall on his cell and the two beside it, the other foes held far away; `dodge` whether his dodge is ready.
+@(private = "file")
+mechanics_lab_ia_scene :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command, dodge: bool) -> bool {
+	player := room.player
+	game.destroy_room(room)
+	player.health = player.stats.max_health
+	rebuilt, built := run_session.create_mechanics_lab_room(data, player, game.DEFAULT_TACTICAL_CONFIG, .IA)
+	if !built { fmt.eprintln("mechanics lab: the IA's arena was not built"); return false }
+	room^ = rebuilt
+	render.clear_event_animations(renderer)
+	controller^ = {was_focused = true}
+	player.tactical.ia_remaining = 999
+	p := player.position
+	brute := -1
+	for &foe, index in room.enemies {
+		mechanics_lab_hold(room, foe.id)
+		if foe.archetype == .Brute { brute = index }
+	}
+	if brute < 0 { fmt.eprintln("mechanics lab: the IA's arena has no brute"); return false }
+	foe := &room.enemies[brute]
+	foe.position, foe.health, foe.max_health, foe.recovery_pulses = game.add_position(p, {x = 0, y = 1}), 40, 40, 0
+	foe.intent = {kind = .Attack, origin = foe.position, destination = foe.position, damage = 3, planned_pulse = room.pulse_count+1}
+	for dx in -1..=1 {
+		foe.intent.threatened_cells[foe.intent.threatened_cell_count] = game.add_position(p, {x = dx, y = 0})
+		foe.intent.threatened_cell_count += 1
+	}
+	foe.tactical_cooldown = 1
+	if !dodge { player.tactical.dodge_recovery = game.TACTICAL_DODGE_RECOVERY+1 }
+	return true
+}
+
+// THE DEFENCE: the player waits under the cleave (against the advice), his dodge ready: the defence keys come up and
+// the IA frames the right one in the panel, the dodge's landing on the floor (odin_pp_ia_defend_00.png); followed, the
+// blow misses (odin_pp_ia_defend_01.png).
+@(private = "file")
+mechanics_lab_ia_defend :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	if !mechanics_lab_ia_scene(window, renderer, room, data, controller, cards, buffer, true) { return false }
+	health := room.player.health
+	shown := false
+	for _ in 0..<600 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if room.qte.kind != .Defense || room.qte.selected { continue }
+		advice := run_session.advisor_current_advice()
+		if !advice.valid || advice.kind != .Defend { continue }
+		if !render.advice_frames_defense(renderer, room, advice.move.defense) { fmt.eprintln("mechanics lab: the IA's defence is not framed"); return false }
+		artifacts.screenshot("odin_pp_ia_defend_00.png")
+		commands, count := run_session.advisor_move_commands(room, advice.move)
+		for command in commands[:count] { run_session.commit_gameplay_command(room, renderer, cards, command) }
+		for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+		artifacts.screenshot("odin_pp_ia_defend_01.png")
+		shown = true
+		break
+	}
+	if !shown { fmt.eprintln("mechanics lab: no defence advised under the cleave"); return false }
+	fmt.eprintf("mechanics lab IA defence: advised and followed, life %d to %d\n", health, room.player.health)
+	return true
+}
+
+// THE WARNING: under the cleave, his dodge recovering, no card in hand but the IA's own (none to escape with later),
+// the IA advises a way out; the player refocuses his hand instead, standing under the blow while the cards turn (a
+// move it tried, much worse: 2 of life lost where the advice loses none). The red «!» with the life it risks shows over him for half a second
+// (odin_pp_ia_warning_NN.png).
+@(private = "file")
+mechanics_lab_ia_warning :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	if !mechanics_lab_ia_scene(window, renderer, room, data, controller, cards, buffer, false) { return false }
+	deck := &room.player.deck
+	hand := deck.hand
+	count := deck.hand_count
+	deck.hand_count = 0
+	for card in hand[:count] {
+		if card.definition_id == .IA { deck.hand[deck.hand_count] = card; deck.hand_count += 1; continue }
+		deck.discard_pile[deck.discard_count] = card
+		deck.discard_count += 1
+	}
+	for &card in deck.hand[deck.hand_count:] { card = {} }
+	// The search of this root over (frames of no time: the world waits), then the player's own move.
+	for _ in 0..<300 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0)
+		if packet := run_session.advisor_pilot_packet(); packet.done && packet.root == advisor.discrete_fingerprint(room) { break }
+		time.sleep(2*time.Millisecond)
+	}
+	advice := run_session.advisor_current_advice()
+	if !advice.valid || advice.kind == .Refocus || advice.kind == .Wait { fmt.eprintln("mechanics lab: the IA advises", advice.kind, "under the cleave"); return false }
+	artifacts.screenshot("odin_pp_ia_warning_advice.png")
+	if !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Refocus, origin_phase = .Combat}) {
+		fmt.eprintln("mechanics lab: the refocus was not taken"); return false
+	}
+	warned := 0
+	for frame in 0..<40 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if renderer.tactical.advice.warning_left > 0 {
+			if warned < 3 && frame%4 == 0 { artifacts.screenshot(fmt.ctprintf("odin_pp_ia_warning_%02d.png", warned)); warned += 1 }
+		}
+	}
+	if warned == 0 { fmt.eprintln("mechanics lab: no warning after the player's own move under the cleave"); return false }
+	fmt.eprintf("mechanics lab IA warning: %s\n", renderer.tactical.advice.warning)
 	return true
 }

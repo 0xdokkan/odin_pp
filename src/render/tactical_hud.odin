@@ -369,16 +369,39 @@ draw_tactical_defense_hud :: proc(renderer: ^Renderer, room: ^game.Room) {
 	hud_frame({x, y, 237, 143}, GOTHIC_RED)
 	gothic_text_fit(renderer, fmt.ctprintf("%s / %.2fs", "DIAGONALE" if q.kind == .Diagonal else "DIFENDITI", q.remaining), {x+12, y+8, 213, 24}, 18, GOTHIC_PAPER)
 	hud_bar({x+12, y+36, 213, 6}, q.remaining/room.player.tactical.config.qte_seconds, GOTHIC_RED)
+	// The IA's advice (advisor_view.odin): a cyan frame on the key to press, its name in cyan.
+	framed :: proc(bounds: rl.Rectangle) { rl.DrawRectangleLinesEx({bounds.x-3, bounds.y-3, bounds.width+6, bounds.height+6}, 3, IA_COLOR) }
+	keys := [?]string{"W", "D", "S", "A"}
 	if !q.selected {
 		line := y+50
-		if .Block in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "J", "BLOCK   K: PARRY", true, GOTHIC_RED); line += 29 }
-		if .Deflect in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "L", "DEVIAZIONE", true, GOTHIC_RED); line += 29 }
-		if .Dodge in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "E", "SCHIVA, POI WASD", true, GOTHIC_RED) }
+		if .Block in q.defenses {
+			row := rl.Rectangle{x+12, line, 213, 24}
+			hud_button(renderer, row, "J", "BLOCK   K: PARRY", true, GOTHIC_RED)
+			if advice_frames_defense(renderer, room, .Block) { framed(row); gothic_text(renderer, "IA: J, BLOCK", x+12, y+122, 14, IA_COLOR) }
+			if advice_frames_defense(renderer, room, .Parry) { framed(row); gothic_text(renderer, "IA: K, PARRY", x+12, y+122, 14, IA_COLOR) }
+			line += 29
+		}
+		if .Deflect in q.defenses {
+			row := rl.Rectangle{x+12, line, 213, 24}
+			hud_button(renderer, row, "L", "DEVIAZIONE", true, GOTHIC_RED)
+			if advice_frames_defense(renderer, room, .Deflect) { framed(row); gothic_text(renderer, "IA: L, DEVIAZIONE", x+12, y+122, 14, IA_COLOR) }
+			line += 29
+		}
+		if .Dodge in q.defenses {
+			row := rl.Rectangle{x+12, line, 213, 24}
+			hud_button(renderer, row, "E", "SCHIVA, POI WASD", true, GOTHIC_RED)
+			if advice_frames_defense(renderer, room, .Dodge) {
+				framed(row)
+				if key, ok := advice_frames_key(renderer, room); ok { gothic_text(renderer, fmt.ctprintf("IA: E, POI %s", keys[int(key)]), x+12, y+122, 14, IA_COLOR) }
+			}
+		}
 	} else if q.kind == .Defense && q.mode == .Dodge {
 		gothic_text(renderer, "WASD: SCEGLI LA CELLA", x+12, y+66, 16, GOTHIC_PAPER)
+		if key, ok := advice_frames_key(renderer, room); ok { gothic_text(renderer, fmt.ctprintf("IA: %s", keys[int(key)]), x+12, y+92, 18, IA_COLOR) }
 	} else {
-		keys := [?]string{"W", "D", "S", "A"}
 		gothic_text(renderer, "PREMI", x+12, y+50, 14, GOTHIC_MUTED)
-		gothic_button(renderer, {x+12, y+78, 213, 44}, fmt.ctprintf("%s", keys[int(q.keys[q.progress])]), fmt.ctprintf("%d / %d", q.progress+1, q.length))
+		button := rl.Rectangle{x+12, y+78, 213, 44}
+		gothic_button(renderer, button, fmt.ctprintf("%s", keys[int(q.keys[q.progress])]), fmt.ctprintf("%d / %d", q.progress+1, q.length))
+		if _, ok := advice_frames_key(renderer, room); ok { framed(button) }
 	}
 }

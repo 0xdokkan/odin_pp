@@ -161,3 +161,53 @@ fast_move :: proc(room: ^game.Room) -> Move {
 	}
 	return {kind = .Wait}
 }
+
+// THE DANGER (the held advice's one exception, run/advisor_driver.odin): the blows announced on the player's cell now,
+// as one number (each foe and its intent); 0 when none.
+player_danger :: proc(room: ^game.Room) -> (key: u64) {
+	cell := room.player.position
+	for &enemy in room.enemies {
+		intent := &enemy.intent
+		if intent.kind != .Attack && intent.kind != .Charge && intent.kind != .Bombard { continue }
+		if game.enemy_is_staggered(room, &enemy) { continue }
+		hit := game.enemy_intent_cell_is_threatened(intent, cell)
+		if !hit && intent.kind == .Charge {
+			for step in intent.path[:intent.path_count] { if step == cell { hit = true; break } }
+		}
+		if !hit { continue }
+		h := u64(0xcbf29ce484222325)
+		mix(&h, u64(enemy.id))
+		mix(&h, intent.planned_pulse)
+		mix(&h, u64(intent.kind))
+		key ~= h
+	}
+	return
+}
+
+// Whether an advice held since the player stood on `at` can still be done: he has not been moved, its cell is free,
+// its foe alive, its card in hand; with the defence keys up only a defence can be done, and a defence only with them.
+advice_possible :: proc(room: ^game.Room, advice: Advice, at: grid.Position) -> bool {
+	move := advice.move
+	answers := move.kind == .Defend || move.kind == .Key
+	if (room.qte.kind != .None) != answers { return false }
+	if room.player.position != at && room.qte.kind == .None { return false }
+	switch move.kind {
+	case .Wait, .Refocus: return true
+	case .Step:
+		if advice.kind == .Bump { _, foe := game.enemy_index_at(room, advice.cell); return foe }
+		return step_is_free(room, advice.cell)
+	case .Diagonal: return step_is_free(room, advice.cell)
+	case .Dodge:
+		_, ok := game.tactical_dodge_destination(room, move.direction)
+		return ok
+	case .Shoot:
+		_, alive := game.enemy_index_by_id(room, move.target.entity.id)
+		return alive && game.player_charges(room, .Arrows) > 0
+	case .Card:
+		index, held := game.hand_card_index_by_id(&room.player.deck, move.card_id)
+		return held && room.player.deck.energy >= game.card_energy_cost(room, room.player.deck.hand[index].definition_id)
+	case .Defend: return room.qte.kind == .Defense && !room.qte.selected
+	case .Key: return room.qte.kind != .None && room.qte.selected
+	}
+	return false
+}

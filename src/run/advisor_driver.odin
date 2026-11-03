@@ -1,8 +1,10 @@
 package run
 
 import "base:runtime"
+import "core:fmt"
 import advisor "../advisor"
 import game "../game"
+import grid "../engine/grid"
 import render "../render"
 
 // THE IA'S PILOT (docs/piano-ia.md, Fasi 2 e 4). Every frame of a fight the tactical controller calls it. While the
@@ -30,9 +32,26 @@ Advisor_Pilot :: struct {
 	sliced: ^advisor.Search,
 	root, generation: u64,
 	since_root: f32,
-	// The advice shown, and whether it is the current root's own.
+	// The advice shown, and how long it has been.
 	shown: advisor.Advice,
+	shown_age: f32,
+	// THE HELD ADVICE (the user's rule, 3 November 2026): once shown, an advice stays until the player's next action
+	// (`acted`, set by the game's own command: advisor_note_action). Its only exception: a foe announces a blow on the
+	// player's cell (`danger`, a new one since the advice was held); and an advice that can no longer be done (the foe
+	// dead, the card gone, the cell taken, the player moved by a blow) gives way too.
+	acted: bool,
+	// The action's new root is taken (once: then the pilot waits for its advice).
+	acted_rooted: bool,
+	held_danger: u64,
+	held_at: grid.Position,
+	// The warning: its text and its seconds left.
+	warning: cstring,
+	warning_left: f32,
 }
+
+// THE WARNING (docs/piano-ia.md, «L'avviso»): the player's own first move, one the IA had tried, loses at least this much
+// more life by the horizon than the advice (or may die where the advice does not).
+ADVISOR_WARNING_LIFE :: f32(2)
 
 // One pilot a thread (the tests play rooms side by side), in the process's own memory.
 @(private = "file", thread_local)
@@ -66,7 +85,7 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	defer renderer.tactical.advice = shown
 	if room == nil || room.player == nil || room.phase != .Combat { advisor_pilot_release(); return }
 	if !game.ia_active(room) {
-		if advisor_pilot != nil { advisor_pilot.shown, advisor_pilot.root = {}, 0 }
+		if advisor_pilot != nil { advisor_pilot.shown, advisor_pilot.root, advisor_pilot.acted = {}, 0, false }
 		return
 	}
 	if advisor_pilot == nil { advisor_pilot = advisor_pilot_open() }
@@ -74,36 +93,83 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	if p == nil { return }
 	fingerprint := advisor.discrete_fingerprint(room)
 	p.since_root += dt
+	p.warning_left = max(0, p.warning_left-dt)
+	before := p.shown
+	// The newest advice for the room as it is now (none yet: invalid).
+	fresh: advisor.Advice
 	if p.worker != nil {
 		w := p.worker
 		advisor.worker_poll(w)
 		current := w.latest.generation == p.generation && p.generation != 0
 		over := current && w.latest.done
-		if p.root == 0 || fingerprint != p.root || (over && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
-			if fingerprint != p.root {
-				// Thinking ahead, from the newest the worker found for the root before.
-				p.shown = {}
-				if pondered, found := advisor.ponder_lookup(w.latest.ponder[:w.latest.ponder_count], fingerprint); found && w.latest.root == p.root {
-					p.shown = pondered
-				}
+		if p.root == 0 || (p.acted && !p.acted_rooted) || fingerprint != p.root || (over && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
+			// The player's own move, one the worker had tried: its best reply at once (thinking ahead).
+			if p.acted && !p.acted_rooted && fingerprint != p.root && w.latest.root == p.root {
+				fresh = advisor_ahead(p, w.latest.ponder[:w.latest.ponder_count], w.latest.advice, fingerprint)
 			}
+			p.acted_rooted = p.acted
 			p.generation = advisor.worker_offer(w, room)
 			p.root, p.since_root = fingerprint, 0
 		} else if current && w.latest.advice.valid {
-			p.shown = w.latest.advice
+			fresh = w.latest.advice
 		}
 	} else {
 		s := p.sliced
-		if !s.rooted || fingerprint != p.root || (s.done && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
-			pondered, found := advisor.search_pondered(s, fingerprint)
-			if fingerprint != p.root { p.shown = pondered if found else {} }
+		if !s.rooted || (p.acted && !p.acted_rooted) || fingerprint != p.root || (s.done && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
+			if p.acted && !p.acted_rooted && fingerprint != p.root && s.rooted { fresh = advisor_ahead(p, s.ponder[:s.ponder_count], s.advice, fingerprint) }
+			p.acted_rooted = p.acted
 			advisor.search_root(s, room)
 			p.root, p.since_root = fingerprint, 0
 		}
 		advisor.search_step(s, ADVISOR_FRAME_WORK)
-		if s.advice.valid { p.shown = s.advice }
+		if !fresh.valid && s.advice.valid && s.advice.root == fingerprint { fresh = s.advice }
 	}
-	if p.shown.valid { shown = advisor_view(p.shown) }
+	// THE HELD ADVICE.
+	danger := advisor.player_danger(room)
+	switch {
+	case p.acted || !p.shown.valid:
+		// The player acted (or nothing is shown): the next advice is the one, nothing old in the meantime.
+		if p.acted { p.shown = {} }
+		if fresh.valid { advisor_hold(p, room, fresh, danger) }
+	case danger != 0 && danger != p.held_danger && fresh.valid:
+		// A blow announced on the player's cell since the advice was held: the IA may change its mind, once.
+		advisor_hold(p, room, fresh, danger)
+	case fresh.valid && !advisor.advice_possible(room, p.shown, p.held_at):
+		advisor_hold(p, room, fresh, danger)
+	}
+	if p.shown.kind != before.kind || p.shown.cell != before.cell || p.shown.move != before.move { p.shown_age = 0 } else { p.shown_age += dt }
+	if p.shown.valid { shown = advisor_view(room, p.shown) }
+	shown.age = p.shown_age
+	shown.warning, shown.warning_left = p.warning, p.warning_left
+}
+
+@(private = "file")
+advisor_hold :: proc(p: ^Advisor_Pilot, room: ^game.Room, advice: advisor.Advice, danger: u64) {
+	p.shown, p.acted, p.acted_rooted, p.held_danger, p.held_at = advice, false, false, danger, room.player.position
+}
+
+// The player's own action, done by the game (execute_gameplay_command): the held advice lets go.
+advisor_note_action :: proc() {
+	if advisor_pilot != nil { advisor_pilot.acted, advisor_pilot.acted_rooted = true, false }
+}
+
+// The situation is the one right after the player's own first move, one the IA had tried: its best reply is the advice
+// at once; and if that move was much worse than the advice, the warning.
+@(private = "file")
+advisor_ahead :: proc(p: ^Advisor_Pilot, table: []advisor.Ponder, advised: advisor.Advice, fingerprint: u64) -> advisor.Advice {
+	for entry in table {
+		if entry.child != fingerprint { continue }
+		if advised.valid {
+			extra := entry.loss-advised.loss
+			if entry.dies && !advised.dies {
+				p.warning, p.warning_left = "! MORTE", render.ADVICE_WARNING_SECONDS
+			} else if extra >= ADVISOR_WARNING_LIFE {
+				p.warning, p.warning_left = fmt.ctprintf("! -%d", int(extra+0.5)), render.ADVICE_WARNING_SECONDS
+			}
+		}
+		return entry.advice
+	}
+	return {}
 }
 
 // The advice the pilot shows now (none while the IA is off): the lab's act follows it.
@@ -123,17 +189,23 @@ advisor_pilot_packet :: proc() -> advisor.Packet {
 }
 
 // The advice as the board shows it (the provisional marks and words).
-advisor_view :: proc(advice: advisor.Advice) -> render.Advice_View {
+advisor_view :: proc(room: ^game.Room, advice: advisor.Advice) -> render.Advice_View {
 	switch advice.kind {
 	case .None: return {}
-	case .Step, .Diagonal: return {mark = .Step, cell = advice.cell, word = "VAI"}
-	case .Dodge: return {mark = .Step, cell = advice.cell, word = "SCHIVA"}
+	case .Step, .Diagonal, .Dodge:
+		// SCHIVA when the step leaves a cell a blow is coming to, VAI otherwise.
+		word: cstring = "SCHIVA" if advice.kind == .Dodge || advisor.cell_threat(room, room.player.position) > 0 else "VAI"
+		return {mark = .Step, cell = advice.cell, word = word}
 	case .Bump: return {mark = .Bump, cell = advice.cell, word = "COLPISCI"}
-	case .Wait: return {mark = .Wait, cell = advice.cell, word = "ASPETTA"}
-	case .Defend, .Key: return {mark = .Defend, cell = advice.cell, word = "DIFENDI"}
-	case .Card: return {mark = .Card, cell = advice.cell, word = "CARTA", card_id = advice.move.card_id}
-	case .Refocus: return {mark = .Wait, cell = advice.cell, word = "RIMESCOLA"}
 	case .Shoot: return {mark = .Bump, cell = advice.cell, word = "FRECCIA"}
+	case .Wait: return {mark = .Wait, cell = advice.cell, word = "ASPETTA"}
+	case .Refocus: return {mark = .Refocus, cell = advice.cell, word = "RIMESCOLA"}
+	case .Card: return {mark = .Card, cell = advice.cell, word = "CARTA", card_id = advice.move.card_id}
+	case .Defend:
+		view := render.Advice_View{mark = .Defend, cell = advice.cell, word = "DIFENDI", defense = advice.move.defense, has_defense = true}
+		if advice.move.defense == .Dodge { view.key, view.has_key = advice.move.direction, true }
+		return view
+	case .Key: return {mark = .Defend, cell = advice.cell, word = "DIFENDI", key = advice.move.direction, has_key = true}
 	}
 	return {}
 }

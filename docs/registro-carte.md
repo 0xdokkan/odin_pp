@@ -6,6 +6,23 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — IA: i segni veri e il consiglio che resta fermo (solo laboratorio)
+
+Commit **«Piano IA, Fase 5 fatta: le indicazioni vere»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 5). La carta
+non cambia. Cambia come consiglia:
+- **il consiglio resta fermo** finché il giocatore non fa la sua prossima azione (richiesta dell'utente dopo la prova:
+  prima cambiava idea troppo spesso, a ogni nemico che si spostava). Cambia prima solo se un nemico annuncia un colpo
+  sulla casella del Viandante, o se il consiglio non si può più fare (il nemico è morto, la carta non c'è più, la casella
+  è occupata, i tasti della difesa sono comparsi);
+- **i segni veri**, tutti ciano: un'impronta con una freccia per il passo (VAI, o SCHIVA quando esce da una casella
+  minacciata), un mirino che respira per il colpo (COLPISCI) e per la freccia del Feretro (FRECCIA), la cornice sulla
+  carta in mano e, quando la tieni, sulla casella del bersaglio (CARTA), la cornice sul tasto giusto nel riquadro della
+  difesa (DIFENDI), un orologio sotto il Viandante per l'attesa (ASPETTA), la sola parola per il rimescolo
+  (RIMESCOLA);
+- **l'avviso:** se il giocatore fa una mossa che fa perdere almeno 2 di vita più del consiglio, sopra di lui compare per
+  mezzo secondo un «!» rosso con la vita che rischia (per esempio «! -3»), o «! MORTE».
+- Nella nebbia nessun segno: il consiglio non svela le caselle che non vedi.
+
 ## 2026-11-03 — IA: consiglia anche le carte (solo laboratorio)
 
 Commit **«Piano IA, Fase 3 fatta: le carte nella ricerca»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 3). La

@@ -494,6 +494,10 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		result := game.napoli_nonno_move(room, command.nonno, command.seconds)
 		execution.committed = result != .Invalid_Phase && result != .None
 	}
+	// A move of the player's own lets the IA's held advice go (advisor_driver.odin).
+	if execution.committed {
+		if use, _ := advisor_command_use(command.kind); use == .Advised { advisor_note_action() }
+	}
 	game.tactical_end_combat(room)
 	return
 }

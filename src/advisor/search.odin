@@ -56,17 +56,21 @@ Advice :: struct {
 	root: u64,
 	// Given at once from the last search's thinking ahead (pondering), before this root's first round.
 	pondered: bool,
+	// The life its line loses by the horizon (a mean over dice and halves), and whether one of them dies.
+	loss: f32,
+	dies: bool,
 }
 
 @(private)
-Table_Entry :: struct { key: u64, value: f32, used: bool }
+Table_Entry :: struct { key: u64, value: f32, loss: f32, dies, used: bool }
 
 // What a move is for the marks, and the move itself as played (a hand slot's card made whole).
 @(private)
 Reply :: struct { kind: Advice_Kind, cell: grid.Position, move: Move }
 
-// THINKING AHEAD: the situation right after a first move (its discrete fingerprint), and the best reply to it.
-Ponder :: struct { child: u64, advice: Advice }
+// THINKING AHEAD: the situation right after a first move (its discrete fingerprint), the best reply to it, and what
+// that first move loses in its best line (the warning, when the player does it against the advice).
+Ponder :: struct { child: u64, advice: Advice, loss: f32, dies: bool }
 
 Search :: struct {
 	// Its own snapshot (search_root), and the one the rounds read: its own, or one lent by the worker (search_root_from).
@@ -86,6 +90,9 @@ Search :: struct {
 	children: [MAX_CANDIDATES]u64,
 	// This round's and the round before's values of every first move; the replies' values at the round of two moves.
 	values, previous: [MAX_CANDIDATES]f32,
+	// The life lost in the line that gave each first move its value, and whether it dies.
+	losses: [MAX_CANDIDATES]f32,
+	dies: [MAX_CANDIDATES]bool,
 	// [first move][reply], in the process's own memory (reply_value, reply_reply).
 	reply_values: []f32,
 	reply_described: []Reply,
@@ -347,20 +354,29 @@ playout :: proc(room: ^game.Room, elapsed: ^f32, horizon: f32) {
 @(private)
 Path_Result :: enum u8 { Played, Refused }
 
-// One branch on a fresh rehearsal: its moves (the first may be refused: then the branch is not one), then the fast rule
-// to the horizon. Its value; the situation right after the first move; what the first two are, for the marks.
-// The try rolls `dice`, never the player's own (the IA does not know the faces).
+// A branch played: its value, the life it lost by the horizon and whether the player died; the situation right after
+// the first move; what the first two moves are, for the marks.
 @(private)
-play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State) -> (value: f32, result: Path_Result, child: u64, first, second: Reply) {
+Path :: struct {
+	value, loss: f32,
+	dies: bool,
+	result: Path_Result,
+	child: u64,
+	first, second: Reply,
+}
+
+// One branch on a fresh rehearsal: its moves (the first may be refused: then the branch is not one), then the fast rule
+// to the horizon. The try rolls `dice`, never the player's own (the IA does not know the faces).
+@(private)
+play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State) -> (out: Path) {
 	room := rehearsal_room(&s.rehearsal)
 	context.allocator = try_allocator(&s.rehearsal)
 	context.temp_allocator = context.allocator
 	room.player.dice = dice
-	elapsed: f32
 	try_risk = 0
 	tempo_begin(room)
 	// With the defence keys up the world waits for the answer: the first move is the answer.
-	elapsed = reach_root(room, horizon)
+	elapsed := reach_root(room, horizon)
 	tempo_note(room, elapsed, horizon)
 	for planned, k in path {
 		if room.phase != .Combat || player_dead(room) || !player_free(room) && room.qte.kind == .None || elapsed >= horizon { break }
@@ -368,13 +384,13 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 		// A hand slot's card: the card there now, on its best target; an empty slot is no move.
 		if move.slot > 0 {
 			resolved, ok := resolve_slot(room, move)
-			if !ok { return NO_VALUE, .Refused, 0, first, second }
+			if !ok { out.value, out.result = NO_VALUE, .Refused; return }
 			move = resolved
 		}
-		if k == 0 { first = describe(room, move) }
-		if k == 1 { second = describe(room, move) }
-		if !play_move(room, move) { return NO_VALUE, .Refused, 0, first, second }
-		if k == 0 { child = discrete_fingerprint(room) }
+		if k == 0 { out.first = describe(room, move) }
+		if k == 1 { out.second = describe(room, move) }
+		if !play_move(room, move) { out.value, out.result = NO_VALUE, .Refused; return }
+		if k == 0 { out.child = discrete_fingerprint(room) }
 		elapsed += run_after_move(room, elapsed, horizon)
 	}
 	// The table keeps what the fast rule's playout gives from here on: the risk and the tempo run so far are this
@@ -382,42 +398,48 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 	key := state_fingerprint(room) ~ u64(horizon*1000) ~ (u64(elapsed*1000) << 20)
 	slot := &s.table[key & (TABLE_SLOTS-1)]
 	own := try_tempo-try_risk
-	if slot.used && slot.key == key { s.table_hits += 1; return slot.value+own, .Played, child, first, second }
+	if slot.used && slot.key == key {
+		s.table_hits += 1
+		out.value, out.loss, out.dies = slot.value+own, slot.loss, slot.dies
+		return
+	}
 	playout(room, &elapsed, horizon)
-	value = evaluate(room, &s.facts, elapsed, try_risk)+try_tempo
-	slot^ = {key = key, value = value-own, used = true}
-	return value, .Played, child, first, second
+	out.value = evaluate(room, &s.facts, elapsed, try_risk)+try_tempo
+	out.loss = f32(s.facts.health-max(0, room.player.health))
+	out.dies = player_dead(room)
+	slot^ = {key = key, value = out.value-own, loss = out.loss, dies = out.dies, used = true}
+	return
 }
 
 // One node: a branch played. A parry's two halves are weighed equally (the user's «media pesata»: a real hand gets its
 // key in time half the times, a proposal); a first card with dice is played on every face of its die (or on fixed
 // rolls of its dice) and the ways weighed equally. How many tries it took.
 @(private)
-play_node :: proc(s: ^Search, path: []Move, horizon: f32) -> (value: f32, result: Path_Result, child: u64, first, second: Reply, tries: int) {
+play_node :: proc(s: ^Search, path: []Move, horizon: f32) -> (out: Path, tries: int) {
 	neutral := game.make_dice_state(DICE_SEED)
 	if path[0].kind == .Defend && path[0].defense == .Parry {
-		lucky, missed: f32
 		path[0].succeed = true
-		lucky, result, child, first, second = play_path(s, path, horizon, neutral)
-		if result == .Refused { return value, result, child, first, second, 1 }
+		out = play_path(s, path, horizon, neutral)
+		if out.result == .Refused { return out, 1 }
 		path[0].succeed = false
-		missed, _, _, _, _ = play_path(s, path, horizon, neutral)
+		missed := play_path(s, path, horizon, neutral)
 		path[0].succeed = true
-		return (lucky+missed)/2, result, child, first, second, 2
+		out.value, out.loss, out.dies = (out.value+missed.value)/2, (out.loss+missed.loss)/2, out.dies || missed.dies
+		return out, 2
 	}
 	ways, sides, many := dice_ways(&s.source.room, path[0], &s.faces)
-	if ways <= 1 {
-		value, result, child, first, second = play_path(s, path, horizon, neutral)
-		return value, result, child, first, second, 1
-	}
-	sum: f32
+	if ways <= 1 { return play_path(s, path, horizon, neutral), 1 }
+	value, loss: f32
 	for k in 0..<ways {
-		way, way_result, way_child, way_first, way_second := play_path(s, path, horizon, dice_way(&s.faces, k, sides, many))
-		if way_result == .Refused { return NO_VALUE, .Refused, 0, way_first, way_second, k+1 }
-		if k == 0 { child, first, second = way_child, way_first, way_second }
-		sum += way
+		way := play_path(s, path, horizon, dice_way(&s.faces, k, sides, many))
+		if way.result == .Refused { way.value = NO_VALUE; return way, k+1 }
+		if k == 0 { out = way }
+		value += way.value
+		loss += way.loss
+		out.dies = out.dies || way.dies
 	}
-	return sum/f32(ways), .Played, child, first, second, ways
+	out.value, out.loss = value/f32(ways), loss/f32(ways)
+	return out, ways
 }
 
 // The nodes of the current round, how many.
@@ -484,7 +506,8 @@ finish_round :: proc(s: ^Search) {
 	}
 	if best >= 0 {
 		s.advice = {valid = true, kind = s.described[best].kind, move = s.candidates[best], cell = s.described[best].cell,
-			value = s.values[best], depth = round.depth, horizon = round.horizon, nodes = s.nodes, root = s.advice.root}
+			value = s.values[best], depth = round.depth, horizon = round.horizon, nodes = s.nodes, root = s.advice.root,
+			loss = s.losses[best], dies = s.dies[best]}
 	}
 	// A round of two moves over: the best reply to every first move, ready for thinking ahead.
 	if round.depth == 2 {
@@ -494,7 +517,8 @@ finish_round :: proc(s: ^Search) {
 			j := best_reply(s, i) or_continue
 			reply := reply_reply(s, i, j)^
 			s.ponder[s.ponder_count] = {child = s.children[i], advice = {valid = true, kind = reply.kind, move = reply.move,
-				cell = reply.cell, value = reply_value(s, i, j)^, depth = 1, horizon = round.horizon, root = s.children[i], pondered = true}}
+				cell = reply.cell, value = reply_value(s, i, j)^, depth = 1, horizon = round.horizon, root = s.children[i], pondered = true},
+				loss = s.losses[i], dies = s.dies[i]}
 			s.ponder_count += 1
 		}
 	}
@@ -506,6 +530,13 @@ finish_round :: proc(s: ^Search) {
 	begin_round(s)
 }
 
+// A first move's value raised by a deeper line, and that line's loss kept with it.
+@(private)
+improve :: proc(s: ^Search, i: int, out: Path) {
+	if out.value <= s.values[i] { return }
+	s.values[i], s.losses[i], s.dies[i] = out.value, out.loss, out.dies
+}
+
 // One node of the current round, in the fixed order.
 @(private)
 step_node :: proc(s: ^Search) {
@@ -515,23 +546,24 @@ step_node :: proc(s: ^Search) {
 	case 1:
 		i := s.cursor
 		path[0] = s.candidates[i]
-		value, result, child, first, _, tries := play_node(s, path[:1], round.horizon)
+		out, tries := play_node(s, path[:1], round.horizon)
 		s.work += tries*(2 if round.horizon > HORIZON_SHORT else 1)
-		s.legal[i] = result == .Played
+		s.legal[i] = out.result == .Played
 		// What the first move is, for the marks, on the root as the move finds it.
-		s.described[i] = first
-		s.children[i] = child
-		s.values[i] = value if s.legal[i] else NO_VALUE
+		s.described[i] = out.first
+		s.children[i] = out.child
+		s.values[i] = out.value if s.legal[i] else NO_VALUE
+		s.losses[i], s.dies[i] = out.loss, out.dies
 	case 2:
 		i, j := s.cursor/s.reply_count, s.cursor%s.reply_count
 		if !s.legal[i] { return }
 		path[0], path[1] = s.candidates[i], s.replies[j]
-		value, result, _, _, second, tries := play_node(s, path[:2], round.horizon)
+		out, tries := play_node(s, path[:2], round.horizon)
 		s.work += tries*(2 if round.horizon > HORIZON_SHORT else 1)
-		if result == .Refused { return }
-		reply_value(s, i, j)^ = value
-		reply_reply(s, i, j)^ = second
-		s.values[i] = max(s.values[i], value)
+		if out.result == .Refused { return }
+		reply_value(s, i, j)^ = out.value
+		reply_reply(s, i, j)^ = out.second
+		improve(s, i, out)
 	case 3:
 		per_beam := BEAM*s.reply_count
 		b, rest := s.cursor/per_beam, s.cursor%per_beam
@@ -539,10 +571,10 @@ step_node :: proc(s: ^Search) {
 		if k >= s.beam_reply_count[b] { return }
 		i := s.beam[b]
 		path[0], path[1], path[2] = s.candidates[i], s.replies[s.beam_replies[b][k]], s.replies[j]
-		value, result, _, _, _, tries := play_node(s, path[:3], round.horizon)
+		out, tries := play_node(s, path[:3], round.horizon)
 		s.work += tries*(2 if round.horizon > HORIZON_SHORT else 1)
-		if result == .Refused { return }
-		s.values[i] = max(s.values[i], value)
+		if out.result == .Refused { return }
+		improve(s, i, out)
 	}
 	s.nodes += 1
 }

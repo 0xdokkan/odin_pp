@@ -219,7 +219,7 @@ comunque nel momento in cui i rami si uniscono.
 | 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Fatta | vedi Esito |
 | 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Fatta | vedi Esito |
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Fatta | vedi Esito |
-| 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Da fare | — |
+| 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Fatta | vedi Esito |
 | 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Da fare | — |
 | 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Da fare | — |
 | 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Da fare | — |
@@ -1232,6 +1232,79 @@ Check della fase: i test del pacchetto `render` toccati; l'atto `ia`; il benchma
 ogni fotogramma).
 
 **Fatto quando:** l'utente approva i segni nel laboratorio.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase (scelta dell'utente): i segni proposti, il ciano `{90, 230, 255}`, la soglia
+dell'avviso di 2 di vita, nessun segno nella nebbia. Durante la fase l'utente ha provato la carta e ha chiesto una
+regola nuova (punto 1).
+
+1. **Il consiglio che resta fermo** (richiesta dell'utente, 3 novembre 2026: «continua a cambiare decisione troppo in
+   fretta»). Prima il consiglio si ricalcolava a ogni cambiamento della stanza, anche quando era solo un nemico che si
+   spostava. Ora ([advisor_driver.odin](../src/run/advisor_driver.odin)), **una volta mostrato, il consiglio resta
+   finché il giocatore non fa la sua prossima azione** (passo, colpo, carta, schivata, attesa, difesa: il gioco lo dice
+   alla IA quando esegue il comando). Le eccezioni:
+   - quella dell'utente: **un nemico annuncia un colpo sulla casella del Viandante** (sei nella sua traiettoria mentre
+     sta per attaccare). La IA può cambiare idea una volta, poi il consiglio resta di nuovo fermo;
+   - una aggiunta, perché altrimenti resterebbe un consiglio impossibile: **il consiglio non si può più fare** (il nemico
+     da colpire è morto o si è spostato, la carta non è più in mano o non c'è l'energia, la casella è occupata, un colpo
+     ha spostato il Viandante, sono comparsi i tasti della difesa).
+
+   Dopo l'azione la ricerca riparte una volta sola; se l'azione era una prima mossa già provata, il consiglio nuovo è
+   pronto nello stesso fotogramma (Fase 4).
+2. **I segni** ([advisor_view.odin](../src/render/advisor_view.odin)), tutti ciano:
+   - **passo:** un'impronta sulla casella dove andare, larga quanto la casella, e una freccia che parte dal Viandante;
+     la parola è «SCHIVA» quando il passo esce da una casella dove sta per arrivare un colpo, altrimenti «VAI»;
+   - **colpo a mano e freccia del Feretro:** un mirino sulla casella del nemico, più largo della figura, che respira
+     piano («COLPISCI», «FRECCIA»);
+   - **carta:** la cornice ciano sulla carta nella mano; quando la prendi (selezionata o trascinata) la cornice lascia la
+     mano e va sulla casella del bersaglio («CARTA»);
+   - **difesa:** la cornice ciano sul tasto giusto del riquadro della difesa a tasti e, in fondo al riquadro, il tasto da
+     premere («IA: E, POI W»); il tasto atteso dopo, incorniciato; l'impronta sulla casella dove atterra la schivata
+     («DIFENDI»);
+   - **attesa:** un piccolo orologio sotto il Viandante («ASPETTA»); **rimescolo:** solo la parola («RIMESCOLA»);
+   - nessun segno su una casella nella nebbia, nessun segno dentro le viste.
+3. **L'avviso:** se il giocatore fa una prima mossa che la IA aveva provato e che, nella sua linea migliore, fa perdere
+   almeno **2 di vita** più del consiglio (o può far morire dove il consiglio no), sopra il Viandante compare per mezzo
+   secondo un **«!» rosso** con la vita che rischia («! -3», o «! MORTE»). Per questo la ricerca ora ricorda, per ogni
+   prima mossa, la vita persa nella sua linea migliore.
+
+   Una cosa imparata provando: molte mosse che sembrano sbagliate non lo sono, perché c'è ancora tempo per rimediare
+   (spostarsi di lato sotto il fendente, poi uscire; colpire il bruto, poi scappare con la Dash). L'avviso compare solo
+   quando la mossa costa davvero vita, non quando è solo diversa.
+
+**Test** ([advisor_view_test.odin](../src/integration/advisor_view_test.odin)), tutti verdi:
+- il segno e la parola giusti per ogni tipo di consiglio (ogni tipo ne ha uno); «SCHIVA» per un passo che esce da un
+  colpo; la cornice della difesa sul tasto giusto;
+- nessun segno dentro una vista e nella nebbia; la cornice della carta sulla casella solo mentre la tieni;
+- **il consiglio fermo:** coi nemici liberi e il Viandante fermo per 150 fotogrammi, il consiglio non è mai cambiato
+  (ogni cambio avrebbe dovuto avere un colpo nuovo annunciato o un consiglio impossibile); dopo la mossa del giocatore
+  arriva il consiglio nuovo;
+- **l'eccezione:** un colpo annunciato sulla casella del Viandante fa cambiare il consiglio senza che il giocatore
+  agisca.
+
+Tutti i test delle fasi prima restano verdi (37 in tutto); nel torneo la IA perde 0 vita e uccide 158 nemici.
+
+**Laboratorio:** l'atto `ia` completo: 74 consigli seguiti in 20 secondi (19 passi, 7 colpi, 44 carte, 4 attese), vita
+22 su 22; la difesa a tasti consigliata e seguita (il colpo non arriva); l'avviso «! -3» quando il Viandante rimescola la
+mano sotto il fendente invece di uscire. Catture `odin_pp_ia_step_NN`, `bump_NN`, `card_hint_NN`, `wait_NN`,
+`defend_NN`, `warning_NN`.
+
+**Fotogrammi, in ordine incrociato** (atto `ia` con `ODIN_PP_LAB_TIMING=1`):
+
+| Corsa | IA | Media | Mediana | 99% sotto |
+|---|---|---:|---:|---:|
+| 1 | spenta | 6,30 ms | 6,26 ms | 7,89 ms |
+| 2 | accesa | 6,47 ms | 6,40 ms | 7,81 ms |
+| 3 | accesa | 6,22 ms | 6,21 ms | 7,46 ms |
+| 4 | spenta | 5,88 ms | 5,87 ms | 7,03 ms |
+
+Con la IA accesa circa 0,25 ms in più in media (+4%), come nella Fase 4, mentre la macchina a IA spenta cambia del 7%
+fra la prima e l'ultima corsa: **nessun calo misurabile**.
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 37 test verdi; l'atto `ia`; le
+quattro corse dei fotogrammi. Non fatti: la verifica completa. **Resta l'approvazione dei segni da parte dell'utente
+nel laboratorio** (è il «fatto quando» della fase).
 
 ## Fase 6 — Lo stato della partita
 
