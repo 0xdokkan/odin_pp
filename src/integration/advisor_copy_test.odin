@@ -69,13 +69,15 @@ advisor_test_command :: proc(move: advisor.Move) -> run_session.Gameplay_Command
 	case .Wait: command.kind = .Wait
 	case .Card: command.kind = .Play_Card
 	case .Refocus: command.kind = .Refocus
+	// The random games play only the five above.
+	case .Diagonal, .Defend, .Key: command.kind = .None
 	}
 	return command
 }
 
 // One frame of the game itself, with no key pressed and no window: the controller's order
 // (run.step_tactical_controller), every world command through run.execute_gameplay_command.
-@(private = "file")
+@(private)
 advisor_test_real_frame :: proc(room: ^game.Room, dt: f32) {
 	world :: proc(room: ^game.Room, kind: run_session.Gameplay_Command_Kind) -> bool {
 		return run_session.execute_gameplay_command(room, {kind = kind, origin_phase = .Combat}).committed
@@ -107,7 +109,7 @@ advisor_test_real_frame :: proc(room: ^game.Room, dt: f32) {
 	}
 }
 
-@(private = "file")
+@(private)
 advisor_test_real_until_free :: proc(room: ^game.Room, step: f32, limit: f32 = 10) {
 	for ran := f32(0); ran < limit; ran += step {
 		if room.phase != .Combat || advisor.player_free(room) { return }

@@ -216,7 +216,7 @@ comunque nel momento in cui i rami si uniscono.
 |---|---|---|---|---|
 | 0 | Base: la carta, i suoi secondi, l'arena del laboratorio; punto di partenza | — | Fatta | vedi Esito |
 | 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Fatta | vedi Esito |
-| 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Da fare | — |
+| 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Fatta | vedi Esito |
 | 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Da fare | — |
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Da fare | — |
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Da fare | — |
@@ -835,6 +835,115 @@ Check della fase: i test del pacchetto `advisor`; l'atto `ia`. Il benchmark no: 
 la carta è solo nel laboratorio.
 
 **Fatto quando:** i puzzle passano; nel torneo la IA perde molta meno vita; l'utente prova nel laboratorio.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase (scelta dell'utente: pesi 3 a 1, uccisione +10, diagonali quando servono, la regola
+veloce proposta). Le differenze, spiegate sotto, sono quattro: il rischio dei tasti, il premio alla velocità, i
+nodi per fotogramma e il torneo con otto nemici.
+
+1. **La ricerca** ([search.odin](../src/advisor/search.odin)): a ogni radice prova le 13 mosse del tabellone in ordine
+   fisso (aspetta; passi nord, est, sud, ovest; schivate; diagonali), poi tutte le risposte, poi la terza mossa per le 3
+   prime mosse migliori e le loro 3 risposte migliori; poi di nuovo a orizzonte lungo. I giri sono 5: (1 mossa, 3 s),
+   (2, 3 s), (3, 3 s), (2, 6 s), (3, 6 s). Ogni giro finito dà un consiglio intero. Ogni nodo rifà la copia dalla
+   fotografia e rigioca le sue mosse (il *copy-make*), quindi il risultato dipende solo dai nodi, mai dal tempo: tagliato
+   a uno, a otto o tutto insieme, lo stesso consiglio. A pari valore vince la prima nell'ordine.
+2. **La difesa a tasti** nella copia ([simulate.odin](../src/advisor/simulate.odin)): dentro le prove il Viandante
+   risponde subito nel modo migliore (deviare se può, se no schivare su una casella che il colpo non prende, se no
+   parare con lo scudo). Alla radice, quando i tasti sono davvero su, la IA prova ogni difesa che il giocatore ha, con
+   la schivata in ogni direzione; la parata vale metà riuscita e metà no.
+3. **I passi in diagonale:** la copia fa «inizia la diagonale» e poi i suoi due tasti, come il gioco.
+4. **La valutazione** ([evaluate.odin](../src/advisor/evaluate.odin)): morte il peggio di tutto; −3 per ogni punto di
+   vita perso; +1 per ogni danno fatto; +10 per ogni nemico ucciso (+20 i guardiani); +5 a stanza vinta; pochi punti di
+   posizione (colpi ancora annunciati sulla casella, vie di fuga, distanza dal nemico più debole, la fila di un
+   arciere).
+   - **Differenza 1, il rischio dei tasti:** se la IA conta sulla difesa a tasti, una mano vera può sbagliare il tasto.
+     Proposta: una volta su quattro, e allora arrivano tutti i colpi annunciati sulla casella. Senza questo, la IA
+     sceglieva di stare sotto due colpi contando su una difesa perfetta. Anche la diagonale ha un piccolo rischio
+     (0,2), così il passo dritto vince quando basta.
+   - **Differenza 2, il premio alla velocità:** un colpo dato subito vale fino a un quinto in più dello stesso colpo
+     alla fine dell'orizzonte. Senza questo, quando due mosse facevano lo stesso danno entro 3 secondi vinceva
+     «aspetta» (la prima nell'ordine), e la IA uccideva meno di chi colpisce sempre il più vicino. È la «IA leggermente
+     più aggressiva» chiesta dall'utente.
+5. **La regola veloce** dopo le prime mosse, quella proposta: fuori dalle caselle minacciate (passo, se no schivata),
+   colpisci il nemico accanto più debole, vai verso il più debole su una casella sicura, se no aspetta.
+6. **La tabella delle situazioni** (8192 caselle, svuotata a ogni radice) e **il pensare in anticipo:** per ogni prima
+   mossa la ricerca ricorda la situazione subito dopo e la risposta migliore; se il giocatore fa quella mossa, il
+   consiglio nuovo c'è subito, prima del primo giro della radice nuova.
+7. **Le tabelle per sempre:**
+   - in [advisor_driver.odin](../src/run/advisor_driver.odin) uno `switch` senza ramo di riserva su
+     `Gameplay_Command_Kind`: ogni comando è consigliato, consigliato più avanti (le carte nella Fase 3; Tesla, arma di
+     riserva e Ombra nella Fase 7), del mondo, o fuori dal combattimento (le viste: la IA si ferma);
+   - in [knowledge.odin](../src/advisor/knowledge.odin) uno `switch` su `Enemy_Archetype`: quanto pesa il colpo di ogni
+     nemico e quanto vale ucciderlo.
+
+   Un comando o un nemico nuovo non compila finché non ha la sua riga.
+8. **Il pilota** ([advisor_driver.odin](../src/run/advisor_driver.odin)): ogni fotogramma in cui la carta corre, il
+   controllore chiama `drive_advisor`. Se l'impronta della situazione cambia (o dopo 1 s) prende una radice nuova; poi fa
+   un pezzo di ricerca e passa il consiglio al disegno. Con la IA spenta, nelle viste e fuori dal combattimento non
+   mostra niente e restituisce la memoria.
+   - **Differenza 3, i nodi per fotogramma:** con 8 nodi un fotogramma arrivava a 5,8 ms. Con **3** (un nodo a orizzonte
+     lungo conta 2) il fotogramma peggiore misurato è 2,2-2,6 ms. Il limite vero di 2 ms arriva col thread (Fase 4).
+9. **I segni provvisori** ([advisor_view.odin](../src/render/advisor_view.odin)): un quadrato ciano sulla casella del
+   passo, della schivata o della difesa; una croce ciano sul nemico da colpire; la parola sopra il Viandante (VAI,
+   SCHIVA, COLPISCI, ASPETTA, DIFENDI).
+
+**Puzzle** ([advisor_search_test.odin](../src/integration/advisor_search_test.odin)), tutti verdi:
+- il fendente del bruto sta per cadere su tre caselle: la IA esce;
+- la freccia dell'arciere sta per partire lungo la colonna: la IA esce dalle caselle che la freccia prende (anche
+  allontanandosi oltre la sua portata, che è una mossa giusta);
+- accanto c'è un nemico a 2 di vita: la IA lo colpisce;
+- due nemici colpiranno la casella da cui si colpisce il nemico più debole, e la schivata non è pronta: la IA non ci va.
+  Nella prima versione la IA ci passava e ne usciva prima dei colpi, e le regole le davano ragione; il puzzle ora mette
+  il nemico debole fermo subito dopo la casella;
+- l'angolo: la regola veloce entra in una tasca, la IA no. Detto con onestà: con le regole di oggi la tasca non costa
+  vita (chi ci sta colpisce il bruto e lo stordisce), quindi giocando 6 secondi veri entrambi perdono 0. Il puzzle
+  controlla la scelta, non una differenza di vita;
+- con i tasti della difesa su, la IA consiglia una difesa che il giocatore ha e la schivata su una casella sicura.
+
+Altri test verdi: lo stesso consiglio comunque si taglino i nodi; la stanza vera uguale campo per campo dopo mille nodi;
+il consiglio pensato in anticipo pronto dopo la mossa consigliata; la tabella dei comandi e dei nemici.
+
+**Il torneo** (20 combattimenti, 40 secondi l'uno, `ODIN_TEST_FULL`; 4 nella prova veloce):
+- **Differenza 4:** con i 4 nemici dell'arena nessuno perdeva mai vita, nemmeno la regola semplice (chi si muove sempre o
+  colpisce sempre stordisce o evita tutto), quindi il confronto non misurava niente. Il torneo usa l'arena IA con
+  **otto nemici** (i suoi quattro più una copia di ciascuno dall'altra parte). Chi risponde ai tasti della difesa ne
+  sbaglia uno su quattro. Le regole semplici non usano la difesa a tasti, come oggi; per completezza giocano anche una
+  seconda volta rispondendo come le copie della IA.
+
+| Giocatore | Vita persa | Nemici uccisi | Tempo |
+|---|---:|---:|---:|
+| Segue la IA | **0** | **140** | 801 s |
+| Regola semplice di oggi (`choose_max_distance_command`) | 7 | 0 | 801 s |
+| Colpisce sempre il più vicino | 1 | 132 | 801 s |
+| Regola semplice, con la difesa | 7 | 0 | 801 s |
+| Il più vicino, con la difesa | 1 | 132 | 801 s |
+
+La IA perde meno vita di tutti (il criterio: almeno un terzo in meno della regola semplice) e uccide più di tutti.
+Nessuno svuota la stanza in 40 secondi: l'ultimo nemico, spesso il bombarolo dietro lo steccato, resta lontano.
+
+**Misure** (`-o:speed`, arena IA):
+
+| Cosa | Valore |
+|---|---|
+| Nodi al secondo | circa 2400 (un nodo: da 0,25 a 0,5 ms, secondo l'orizzonte) |
+| Dopo 1 ms | 4 nodi: ancora nessun consiglio |
+| Dopo 10 ms | circa 40 nodi: consiglio a una mossa, orizzonte 3 s |
+| Dopo 100 ms | circa 300 nodi: consiglio a tre mosse, orizzonte 3 s |
+| Ricerca intera (5 giri) | 483 nodi in circa 200 ms; 67 situazioni ritrovate nella tabella |
+| Fotogramma del pilota (3 di lavoro) | al massimo 2,2-2,6 ms |
+
+In parole semplici: nel fotogramma il primo consiglio arriva in 4-5 fotogrammi e quello a tre mosse in circa un
+secondo e mezzo. Con il thread della Fase 4, su un core tutto suo, il consiglio a tre mosse arriverà in un decimo di
+secondo.
+
+**Laboratorio:** l'atto `ia` gioca la carta e poi segue i consigli per 10 secondi del mondo coi nemici liberi: 22
+consigli seguiti (17 passi, 5 colpi), vita 22 su 22, un nemico ucciso; catture `odin_pp_ia_step_NN.png` e
+`odin_pp_ia_bump_NN.png`.
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 24 test (ricerca, copia e
+simulatore della Fase 1, carta IA, arena del laboratorio) verdi; l'atto `ia`. Non fatti: benchmark (la carta è solo nel
+laboratorio), verifica completa. Resta la prova dell'utente nel laboratorio (F3 fino all'arena «IA», poi la carta IA).
 
 ## Fase 3 — Le carte nella ricerca
 

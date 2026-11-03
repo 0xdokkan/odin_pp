@@ -148,6 +148,8 @@ step_tactical_controller :: proc(
 		return true
 	}
 	if controller.paused { return true }
+	// The IA's card: a slice of its search, its advice to the board's marks (advisor_driver.odin).
+	drive_advisor(room, renderer, dt)
 	// Out of a fight the lifts' platforms go on the frame's own seconds (in one, on the world's: game.tactical_tick):
 	// the lab's arena cleared with F7, an expedition walked.
 	if room.phase != .Combat { game.lift_tick(room, dt) }

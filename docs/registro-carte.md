@@ -6,6 +6,14 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — IA: la ricerca della mossa migliore (solo laboratorio)
+
+Commit **«Piano IA, Fase 2 fatta: la ricerca»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 2). La carta non cambia
+(rarità, energia, secondi): mentre corrono i suoi secondi, ora consiglia davvero la mossa senza carte (passo, colpo a
+mano, schivata, passo in diagonale, attesa, difesa a tasti) con segni provvisori: un quadrato ciano sulla casella, una
+croce ciano sul nemico da colpire, la parola sopra il Viandante (VAI, SCHIVA, COLPISCI, ASPETTA, DIFENDI). Le carte nella
+ricerca arrivano con la Fase 3, i segni veri con la Fase 5.
+
 ## 2026-11-03 — Carta nuova: IA (solo laboratorio)
 
 Commit **«Piano IA, Fase 0 fatta: la carta e i suoi secondi»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 0).

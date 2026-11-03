@@ -2,6 +2,7 @@ package devtools
 import run_session "../run"
 
 import "core:fmt"
+import advisor "../advisor"
 import app "../engine/app"
 import artifacts "artifacts"
 import game "../game"
@@ -14,6 +15,9 @@ import render "../render"
 // the chip under VITA counts them down on the world's clock (odin_pp_ia_card_NN.png). Behind the eyes of a view (the
 // AK, taken up by the rules for two seconds) they stand still and the chip says IA FERMA (odin_pp_ia_card_view.png);
 // the view over, they run again. Its foes are held, so every run sees the same.
+// Fase 2: then the foes go free and the player follows the IA's advice for ten seconds of the world, every advised move
+// sent as the game's own commands the moment he is free; the cyan square on the cell to step on
+// (odin_pp_ia_step_NN.png), the cyan cross on the foe to strike (odin_pp_ia_bump_NN.png), the word over him.
 mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
@@ -69,5 +73,37 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 	for _ in 0..<30 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
 	if !(player.tactical.ia_remaining < after_view) { fmt.eprintln("mechanics lab: the IA's seconds did not run again after the view"); return false }
 	artifacts.screenshot("odin_pp_ia_card_after.png")
+	return mechanics_lab_ia_follow(window, renderer, room, controller, cards, buffer)
+}
+
+// The foes free, the player follows the IA's advice for ten seconds of the world.
+@(private = "file")
+mechanics_lab_ia_follow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	for &foe in room.enemies { foe.recovery_pulses = 0 }
+	steps, bumps, followed := 0, 0, 0
+	health := room.player.health
+	for frame := 0; frame < 600 && room.phase == .Combat && game.ia_active(room); frame += 1 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		advice := run_session.advisor_current_advice()
+		free := advisor.player_free(room) || room.qte.kind != .None
+		if !advice.valid || !free || render.renderer_blocks_player_input(renderer) { continue }
+		// The marks of the advice about to be followed, as the player sees them.
+		if renderer.tactical.advice.mark == .None { fmt.eprintln("mechanics lab: the IA's advice has no mark"); return false }
+		#partial switch advice.kind {
+		case .Step, .Dodge, .Diagonal:
+			if steps < 8 { artifacts.screenshot(fmt.ctprintf("odin_pp_ia_step_%02d.png", steps)) }
+			steps += 1
+		case .Bump:
+			if bumps < 8 { artifacts.screenshot(fmt.ctprintf("odin_pp_ia_bump_%02d.png", bumps)) }
+			bumps += 1
+		}
+		commands, count := run_session.advisor_move_commands(room, advice.move)
+		for command in commands[:count] { run_session.commit_gameplay_command(room, renderer, cards, command) }
+		followed += 1
+	}
+	fmt.eprintf("mechanics lab IA: %d moves followed (%d steps, %d bumps), life %d to %d, %d foes left\n",
+		followed, steps, bumps, health, room.player.health, len(room.enemies))
+	if steps == 0 || bumps == 0 { fmt.eprintln("mechanics lab: the IA advised no step or no bump in ten seconds"); return false }
 	return true
 }

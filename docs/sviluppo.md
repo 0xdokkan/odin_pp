@@ -28,7 +28,12 @@ IA sa usare la cosa nuova e quanto vale, che il contesto la conosce (cure,
 pericoli, progresso), che almeno un puzzle lo prova e che il registro delle
 carte (o il CHANGELOG) lo dice. Le tabelle della IA hanno una voce per ogni
 elenco del gioco, quindi una voce mancante non compila; i test della IA
-falliscono se la copia resta indietro. Non si aggirano. Le stesse istruzioni,
+falliscono se la copia resta indietro. Non si aggirano. Le tabelle che ci sono
+già: i campi copiati (`COPIED_FIELDS` in
+[advisor/copy.odin](../src/advisor/copy.odin)), i comandi del giocatore
+(`advisor_command_use` in [run/advisor_driver.odin](../src/run/advisor_driver.odin)),
+i nemici (`enemy_knowledge` in [advisor/knowledge.odin](../src/advisor/knowledge.odin)).
+Le stesse istruzioni,
 per gli agenti, stanno in [AGENTS.md](../AGENTS.md), che leggono Codex e gli
 altri, e in [CLAUDE.md](../CLAUDE.md), che legge Claude Code.
 

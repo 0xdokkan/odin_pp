@@ -178,6 +178,7 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	draw_living_hearts(renderer, room)
 	// Bomb/fuse labels find space around the fixed health attachments.
 	draw_voxel_fuse_labels(renderer, room)
+	draw_advice_word(renderer, room)
 	// The mechanics sandbox cleared for the rod keeps its exit shut: no USCITA.
 	if tactical_exit_is_open(room, v.snapshot.phase) {
 		p := room.exit_position

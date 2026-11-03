@@ -120,10 +120,13 @@ del bruto sulla vita del nonno e il nonno che se ne va a vita zero (`odin_pp_nap
 (mazzata, boing, fruscio, stelline, tasca, posate, monete, ciabatte, risata) e, col bastone e col nonno, suona la
 tarantella (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
 dopo tutti gli altri, prima della IA.
-Con `ODIN_PP_LAB_ONLY=ia` gira solo l'atto della carta IA ([piano](piano-ia.md), Fase 0), nell'arena «IA»: l'arena
+Con `ODIN_PP_LAB_ONLY=ia` gira solo l'atto della carta IA ([piano](piano-ia.md), Fasi 0 e 2), nell'arena «IA»: l'arena
 (`odin_pp_ia_arena.png`) e la carta in mano; giocata, la scritta «IA 30s» sopra il Viandante e il segnalino sotto VITA
 che conta i secondi col mondo (`odin_pp_living_ia_card_NN.png`); dentro una vista i secondi si fermano e il segnalino dice
-«IA FERMA» (`odin_pp_ia_card_view.png`), finita la vista ripartono. Nello smoke completo gira per ultimo.
+«IA FERMA» (`odin_pp_ia_card_view.png`), finita la vista ripartono. Poi i nemici si muovono e il Viandante segue i
+consigli della IA per 10 secondi del mondo: il quadrato ciano sulla casella del passo con «VAI» o «SCHIVA»
+(`odin_pp_ia_step_NN.png`), la croce ciano sul nemico da colpire con «COLPISCI» (`odin_pp_ia_bump_NN.png`). Nello smoke
+completo gira per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di
