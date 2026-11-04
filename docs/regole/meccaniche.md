@@ -1191,3 +1191,46 @@ di Mostra effetto fa vedere una faccia a ogni giro: tre mazzate, la tavolata col
 borsellino, il nonno che usa Q ed E e dà una mazzata. Regole in `game/napoli.odin`,
 `game/first_person_club.odin` e `game/napoli_nonno.odin`; disegno in `render/napoli.odin`,
 `render/first_person_club.odin`, `render/club_juice.odin` e `render/napoli_models.odin`.
+
+### IA
+
+`IA` (rara, energia 2, prezzo 8, 50 in spedizione, **solo laboratorio**; [piano](../piano-ia.md)) per **30 s** del mondo (+3 a
+potenziamento; +5 sul tick) mostra sempre la mossa migliore. Una ricerca su un thread a parte prova le mosse in una copia della
+stanza con le regole vere e conosce tutto il gioco, tranne i risultati dei dadi: mano, mazzo, energia, tempi, nemici sulla mappa,
+cure vere. Segna la prossima mossa in ciano con una parola (VAI, SCHIVA, COLPISCI, CARTA, DIFENDI, ASPETTA): impronta per il passo,
+mirino per il colpo a mano, cornice per la carta e la sua casella. Il consiglio resta fermo fino alla tua prossima azione, salvo un
+colpo annunciato sulla tua casella o un consiglio diventato impossibile. Se stai per perdere 2 o più di vita in più rispetto al
+consiglio compare un «!» rosso col numero. Dentro le viste e col Lanciafiamme si ferma, e i suoi secondi con lei. Non consiglia le
+carte che aprono una vista né se stessa. Regole in `game/ia.odin`, ricerca in `src/advisor/`, pilota in `run/advisor_driver.odin`.
+
+**La regola per sempre:** ogni cosa nuova del gioco aggiorna anche la IA ([AGENTS.md](../../AGENTS.md)).
+
+### Nido di ragni
+
+`Nido di ragni` (non comune, energia 2, prezzo 6, 40 in spedizione, **solo laboratorio**; [piano](../piano-ia.md)) si posa su una
+casella libera a 1-3 caselle, in vista, al massimo 2 nidi. Ferma i passi, non la vista, e dura **20 s** del mondo. Esce subito un
+ragnetto, poi uno ogni 2 s, 10 in tutto se nessuno lo tocca. I ragnetti corrono a 4 caselle al secondo verso il nemico più vicino
+contato in passi, aggirano muri e muretti, passano fra i corpi, e terreno e trappole non li toccano. Mordono per **2** (+1 a
+potenziamento, massimo 2; sul tick 4) e muoiono; dopo 5 s senza arrivare muoiono da soli. Ogni colpo di un nemico sulla casella del
+nido, freccia che passa o esplosione comprese, gli toglie **3 s**. Un nemico che ha il nido accanto e non ha te accanto colpisce il
+nido. Regole in `game/spider_nest.odin`, disegno in `render/spider_nest_view.odin`.
+
+### Regina
+
+`Regina` (rara, energia 3, prezzo 8, 60 in spedizione, **solo laboratorio**; [piano](../piano-ia.md)) si posa su una casella libera a
+1-3 caselle, in vista, una sola alla volta, per **20 s** del mondo. Occupa la sua casella: ferma i passi di tutti ma non la vista, e
+nessuno la colpisce. Guarda le 8 linee degli scacchi, lunghe al massimo 24 caselle, fermate da muri, muretti, coperture, oggetti
+solidi e corpi, anche il tuo. Appena un nemico è in linea corre alla casella accanto a lui, resta lì e colpisce per **4** (+1 a
+potenziamento, massimo 2; sul tick 6), poi aspetta 2 s. Sceglie il più vicino lungo la linea; a pari distanza nord, nord-est, est e
+così via. Regole in `game/queen.odin`, disegno in `render/queen_view.odin`.
+
+### Lanciafiamme
+
+`Lanciafiamme` (rara, energia 3, prezzo 8, 60 in spedizione, **solo laboratorio**; [piano](../piano-ia.md)) per **20 s** del mondo (+2 a
+potenziamento, 5 potenziamenti; +2 sul tick) mette in mano al Viandante un lanciafiamme, sul tabellone: la camera non si muove, il
+mouse resta libero, niente carte e niente colpi a mano; passi, schivata e difesa restano come sempre. Si gira verso il mouse a 720° al
+secondo e spara tenendo il tasto sinistro. La fiamma è lunga 3 caselle, larga da 0,4 a 1,2, corre a 15 caselle al secondo e ogni
+pezzo va dritto dove è uscito: girando lascia la scia, e colpisce dove si vede. Ogni nemico toccato prende **3** e **1 Bruciatura**,
+poi niente per 2 s. Muri e coperture la fermano, i muretti no. Un barile esplode, il ghiaccio si scioglie, e una casella dove la punta
+resta 1 s prende fuoco come l'Incendio, un fuoco nuovo al secondo al massimo; i fuochi non toccano mai il Viandante. Regole in
+`game/first_person_flame.odin`, disegno e modello 3D di cartoncino in `render/flame_view.odin`.

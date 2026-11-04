@@ -14,8 +14,8 @@ test_tactical_card_catalog_has_bounded_nonzero_time_costs :: proc(t: ^testing.T)
 		// cleared room, which has no window. The First Person Shooter's and
 		// First Person Brawler's seconds run with the world's. Benvenuti a Napoli
 		// opens the club's view on one face only: its d4 is cast as the
-		// Dinosauro's.
-		if id == .Shadow_Step || id == .Fishing_Rod || (card_is_first_person(id) && id != .Napoli) { testing.expect_value(t, cost, f32(0)); continue }
+		// Dinosauro's, and the Lanciafiamme stays on the board: a card like the others.
+		if id == .Shadow_Step || id == .Fishing_Rod || (card_is_first_person(id) && id != .Napoli && id != .Flamethrower) { testing.expect_value(t, cost, f32(0)); continue }
 		testing.expect(t, cost >= 1 && cost <= 4, definition.name)
 	}
 	testing.expect_value(t, tactical_card_time_cost(.Count), f32(0))

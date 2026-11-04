@@ -229,7 +229,7 @@ comunque nel momento in cui i rami si uniscono.
 | 12 | Regina: aspetto e suoni | 11 | Fatta | vedi Esito |
 | 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
 | 14 | Lanciafiamme: aspetto e suoni | 13 | Fatta | vedi Esito |
-| 15 | Nel gioco vero: le quattro carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12, 14 | Da fare | — |
+| 15 | Nel gioco vero: le quattro carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12, 14 | Fatta, manca la prova dell'utente | vedi Esito |
 
 ## Come funziona oggi (punto di partenza)
 
@@ -2054,6 +2054,40 @@ Passi:
 7. **Partita di prova con l'utente** e ritocco dei pesi e dei numeri delle due carte.
 
 **Fatto quando:** l'utente approva e la verifica completa è verde.
+
+### Esito (4 novembre 2026)
+
+Fatta, tranne la partita di prova dell'utente. **Le quattro carte restano nel laboratorio** (scelta dell'utente): niente offerte, negozi
+o collezione, quindi `Lab_Only` resta e il test della campagna ne conta 13.
+
+- **I film di «Mostra effetto»:**
+  - **IA:** un inseguitore accanto col colpo in arrivo, uno debole a portata; i segni ciano restano un attimo a vista e il Viandante
+    segue tre consigli di fila. Il consiglio viene dal thread vero, come nel gioco, non da una ricerca a pezzi come proponeva il piano:
+    così il film mostra la carta com'è. La mossa esatta può cambiare da un giro all'altro; il test controlla solo che il Viandante si
+    muova. Il film rilascia la IA quando parte e quando si chiude, così non resta un consiglio della stanza del film.
+  - **Nido di ragni:** il nido accanto a un inseguitore libero, che lo colpisce; i ragnetti mordono.
+  - **Regina:** posata in diagonale con un nemico, corsa e colpo.
+  - **Lanciafiamme:** la fiamma girata da un nemico all'altro, poi su un barile che esplode, poi ferma su una casella per il fuoco.
+    Azioni nuove del film `Flame` e `Follow`, didascalie nuove.
+- **I salvataggi:** i test di Nido, ragnetti, Regina e Lanciafiamme tengono tutto, secondi e attese compresi. I costi in spedizione
+  sono 50, 40, 60 e 60.
+- **La regola per sempre:** `AGENTS.md`, `CLAUDE.md` e [sviluppo.md](sviluppo.md) dicono ancora il vero. Le tabelle della IA hanno
+  una voce per ogni elenco: lo garantisce il compilatore. Questo ramo non ha contenuti arrivati da altri rami dopo `6ea365b`.
+- **Prova completa del laboratorio:** verde, **2656 catture, 200 suoni** (erano 2562 e 165 prima del piano).
+- **Prestazioni:** 8 corse del benchmark della spedizione in ordine incrociato, prima del piano (`6ea365b`) e ora. In media **1,585 ms**
+  prima e **1,571 ms** ora (−0,9%, circa 630 fotogrammi al secondo in tutti e due i casi): la differenza è rumore, perché la stessa
+  versione è cambiata fino al 15% fra una corsa e l'altra. Le scene più pesanti: la 127 (2,17 ms contro 2,06), la 177 (2,10 contro
+  2,03), la 178 (2,09 contro 2,01). Le carte nuove non sono nella spedizione, quindi questo misura solo che il gioco non è peggiorato.
+- **`scripts/check.ps1`:** **1998 test verdi** nella passata con gli assert (erano 1893 prima del piano). La seconda passata, senza assert, è stata fermata a metà per passare all'unione col redesign: non è stata completata.
+
+**Trovato dalla verifica completa e corretto:** i controlli mirati delle fasi non avevano visto 5 test. Il più serio: la vista del film
+non liberava la texture della fiamma, e i testi del consiglio IA non erano dichiarati fra le cose proprie della vista (dalla Fase 5).
+Gli altri erano test che davano per scontato che ogni vista prenda il mouse e rallenti i prezzi, e il Lanciafiamme non lo fa. È
+anche emerso che **il film del Lanciafiamme non feriva nessuno** fino a questa fase: il test dei film non era fra quelli mirati della
+Fase 13.
+
+**Resta la partita di prova dell'utente:** dopo, se serve, si ritoccano numeri e pesi. L'approvazione di aspetto e suoni di IA, Nido,
+Regina e Lanciafiamme è ancora aperta.
 
 ## Rischi
 

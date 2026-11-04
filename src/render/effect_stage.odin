@@ -33,6 +33,10 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.napoli.models.cylinder",
 	"tactical.napoli.models.cube",
 	"tactical.napoli.models.shader",
+	// LANCIAFIAMME's puff (flame_view.odin), and the IA's words, constant strings the driver sets.
+	"tactical.flame.puff",
+	"tactical.advice.word",
+	"tactical.advice.warning",
 	"tactical.arsenal.ball",
 	"tactical.arsenal.puff",
 	"tactical.arsenal.dinos[0]",
@@ -146,6 +150,7 @@ destroy_borrowed_renderer :: proc(r: ^Renderer) {
 	destroy_first_person_view(r)
 	destroy_marley_view(r)
 	destroy_arsenal_view(r)
+	destroy_flame_view(&r.tactical.flame)
 	destroy_napoli_view(r)
 	if v.flipbook_state != nil { free(v.flipbook_state); v.flipbook_state = nil }
 	if v.labels != nil { free(v.labels); v.labels = nil }

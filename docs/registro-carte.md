@@ -6,6 +6,13 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-04 — IA, Nido di ragni, Regina e Lanciafiamme: i film (solo laboratorio)
+
+Commit **«Piano IA, Fase 15 fatta: film e verifica completa»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 15). Regole e numeri non
+cambiano. Le quattro carte hanno il loro film di «Mostra effetto» e restano nel laboratorio, per scelta dell'utente.
+
+**IA aggiornata:** nessun cambiamento necessario, non ci sono contenuti di gioco nuovi.
+
 ## 2026-11-04 — Lanciafiamme: aspetto e suoni (solo laboratorio)
 
 Commit **«Piano IA, Fase 14 fatta: aspetto e suoni del Lanciafiamme»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 14). Regole e

@@ -101,6 +101,10 @@ Card_Demo_Action_Kind :: enum u8 {
 	Keys,
 	// A wait (Space).
 	Wait,
+	// LANCIAFIAMME: the mouse on the scene's foe `foe` (`at` when it is below zero), the button held `seconds`.
+	Flame,
+	// IA: its advice shown a moment, then followed, whatever it is.
+	Follow,
 }
 
 // What the player does once the card has played: `after` seconds after the
@@ -111,6 +115,7 @@ Card_Demo_Action :: struct {
 	direction: Move_Direction,
 	foe: int,
 	seconds: f32,
+	at: grid.Position,
 }
 
 Card_Demo_Scene :: struct {
@@ -302,6 +307,47 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0, take := 0) -> (scen
 	definition, _ := card_definition_by_id(id)
 	scene = card_demo_default_scene(definition)
 	#partial switch id {
+	// IA: a chaser next to him, its blow coming, a weak one in reach: the three advices followed one by one, its card signs
+	// on the board all through (the worker's, as in the game).
+	case .IA:
+		card_demo_add_foe(&scene, card_demo_offset(1, 0), free = true)
+		card_demo_add_foe(&scene, card_demo_offset(-2, -1), health = 2, free = true)
+		scene.fillers[0], scene.fillers[1] = .Strike, .Firebomb
+		scene.filler_count = 2
+		for advice in 0..<3 { card_demo_add_action(&scene, {kind = .Follow, after = 0.3+1.2*f32(advice)}) }
+		scene.seconds = 4
+		scene.expects = {.Moved}
+	// NIDO DI RAGNI: set down beside a free chaser that strikes it and takes its seconds, a second foe behind: the
+	// spiderlings run and bite.
+	case .Spider_Nest:
+		scene.target = card_demo_offset(2, -1)
+		card_demo_add_foe(&scene, card_demo_offset(3, -1), free = true)
+		card_demo_add_foe(&scene, card_demo_offset(4, -3))
+		scene.seconds = 5
+		scene.foe_hurt = 1
+		scene.expects = {.Spider_Bite, .Spider_Nest_Struck}
+	// REGINA: set down in line with a foe two cells off on a diagonal: her run and her blow, then the next one, a foe held
+	// on another of her lines.
+	case .Queen:
+		scene.target = card_demo_offset(1, -1)
+		card_demo_add_foe(&scene, card_demo_offset(3, -3))
+		card_demo_add_foe(&scene, card_demo_offset(4, -1))
+		scene.seconds = 5
+		scene.foe_hurt = 1
+		scene.expects = {.Queen_Ran, .Queen_Struck}
+	// LANCIAFIAMME: turned from one foe to the other (the trail), on a barrel, then a second on one cell for its fire.
+	case .Flamethrower:
+		card_demo_add_foe(&scene, card_demo_offset(2, -1))
+		card_demo_add_foe(&scene, card_demo_offset(-2, -1))
+		scene.objects[0] = {kind = .Barrel, position = card_demo_offset(-1, 2)}
+		scene.object_count = 1
+		card_demo_add_action(&scene, {kind = .Flame, after = 0.2, foe = 0, seconds = 0.8})
+		card_demo_add_action(&scene, {kind = .Flame, foe = 1, seconds = 0.8})
+		card_demo_add_action(&scene, {kind = .Flame, foe = -1, at = card_demo_offset(-1, 2), seconds = 0.7})
+		card_demo_add_action(&scene, {kind = .Flame, foe = -1, at = card_demo_offset(3, 2), seconds = 1.4})
+		scene.seconds = 2.5
+		scene.foe_hurt = 2
+		scene.expects = {.Explosive_Armed, .Explosion}
 	// Two 4s: the 8 that pushes.
 	case .Sundering_Blow:
 		scene.faces = {4, 4, 0}
@@ -662,7 +708,7 @@ card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0, take := 0
 		case .Open_Black_Hole: events += {.Object_Spawned, .Black_Hole_Tick}
 		case .Ride: events += {.Ride_Begun}
 		case .Napoli: events += {.Napoli_Begun}
-		// IA: its seconds begin (the advisor's hints are the film of the plan's last phase).
+		// IA: its seconds begin; the advices it shows are the worker's, as in the game.
 		case .IA: events += {.IA_Begun}
 		case .Place_Spider_Nest: events += {.Object_Spawned, .Spider_Hatched}
 		case .Place_Queen: events += {.Object_Spawned}

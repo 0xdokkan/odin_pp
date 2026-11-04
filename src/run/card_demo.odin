@@ -4,6 +4,7 @@ import "core:c"
 import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
+import advisor "../advisor"
 import game "../game"
 import grid "../engine/grid"
 import level "../level"
@@ -199,6 +200,8 @@ card_demo_restart :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) {
 // on is the window's, and is left as it is.
 card_demo_close :: proc(demo: ^Card_Demo) {
 	if demo == nil { return }
+	// The IA's film leaves no advice of its room behind.
+	advisor_pilot_release()
 	card_demo_destroy_room(demo)
 	render.destroy_dice_renderer(&demo.dice_view)
 	demo^ = {}
@@ -206,6 +209,7 @@ card_demo_close :: proc(demo: ^Card_Demo) {
 
 // A fresh take: the room built again, the board told it is a new one.
 card_demo_begin_take :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> bool {
+	advisor_pilot_release()
 	card_demo_destroy_room(demo)
 	r := renderer
 	// The take's scene: a d4 card's face changes with the take (game.card_demo_take_face).
@@ -419,6 +423,14 @@ card_demo_input :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) -
 	if !demo.acting || demo.next_action >= demo.scene.action_count { return }
 	action := demo.scene.actions[demo.next_action]
 	if action.kind == .Cut { card_demo_sword_input(demo, &input, dt); return }
+	// LANCIAFIAMME: the mouse over its mark, the button held (card_demo_act paces it).
+	if action.kind == .Flame {
+		cell := action.at
+		if action.foe >= 0 { if enemy, found := card_demo_foe(demo, action.foe); found { cell = enemy.position } }
+		input.fire = demo.firing > 0
+		input.map_input.mouse = render.tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5})
+		return
+	}
 	// BENVENUTI A NAPOLI's grandpa: Q, then E (card_demo_act paces them).
 	if action.kind == .Keys {
 		input.diagonals[0] = demo.firing > CARD_DEMO_KEYS_SECONDS*0.6
@@ -540,6 +552,9 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 			if render.renderer_blocks_player_input(r) || game.tactical_shadow_step_busy(room) { return }
 		case action.kind == .Fire || action.kind == .Punch || action.kind == .Cut || action.kind == .Loose || action.kind == .Club || action.kind == .Keys:
 			if game.tactical_first_person_active(room) && render.first_person_diving(r) { return }
+		// The flame goes as soon as the card's cast is over: it needs no free hand.
+		case action.kind == .Flame:
+			if game.tactical_is_casting(room) { return }
 		case:
 			if !card_demo_board_free(demo, r) { return }
 		}
@@ -662,6 +677,24 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		} else if demo.action_time >= CARD_DEMO_TURN_SECONDS*4 {
 			done = true
 		}
+	case .Flame:
+		// LANCIAFIAMME: the button held its seconds (card_demo_input), the mouse on its mark.
+		if !game.first_person_flame_active(room) { done = true; break }
+		if demo.firing <= 0 && demo.action_time <= dt { demo.firing = action.seconds; break }
+		demo.firing -= dt
+		done = demo.firing <= 0
+	case .Follow:
+		// IA: its signs a moment on the board, then the advice followed as the game's own commands.
+		if !game.ia_active(room) { done = true; break }
+		if demo.action_time < CARD_DEMO_ADVICE_SECONDS { break }
+		advice := advisor_current_advice()
+		if advice.valid && advisor.player_free(room) {
+			commands, count := advisor_move_commands(room, advice.move)
+			for command in commands[:count] { _ = commit_gameplay_command(room, r, &demo.cards, command) }
+			done = true
+		} else if demo.action_time >= CARD_DEMO_ADVICE_SECONDS*4 {
+			done = true
+		}
 	case .Keys:
 		// BENVENUTI A NAPOLI's grandpa: Q, then E (card_demo_input).
 		if !game.napoli_nonno_active(room) { done = true; break }
@@ -775,6 +808,10 @@ card_demo_advance :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, frame_dt
 		if (game.first_person_club_active(room) || game.napoli_nonno_active(room)) && demo.next_action >= demo.scene.action_count && !demo.acting {
 			room.first_person.remaining = min(room.first_person.remaining, 1.5)
 		}
+		// LANCIAFIAMME's (20 s and more): shown, it ends half a second on.
+		if game.first_person_flame_active(room) && demo.next_action >= demo.scene.action_count && !demo.acting {
+			room.first_person.remaining = min(room.first_person.remaining, 0.5)
+		}
 		// The ground has no event: the take samples it, and the AK's hits.
 		for value in room.ground.pool { if value > 0 { demo.pooled = true } }
 		for fire in room.ground.fires[:room.ground.fire_count] { if fire.stage >= 2 { demo.burned = true } }
@@ -795,6 +832,8 @@ card_demo_advance :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, frame_dt
 	}
 }
 
+// How long the IA's signs show before its advice is followed.
+CARD_DEMO_ADVICE_SECONDS :: f32(0.8)
 CARD_DEMO_EFFECT_WORDS :: cstring("L'EFFETTO, CON LE REGOLE DEL GIOCO")
 CARD_DEMO_NO_FILM_WORDS :: cstring("NESSUNA PROVA PER QUESTA CARTA")
 
@@ -804,7 +843,7 @@ CARD_DEMO_NO_FILM_WORDS :: cstring("NESSUNA PROVA PER QUESTA CARTA")
 Card_Demo_Words :: enum u8 {
 	Double_Click, Drag_To_Player, Drag_To_Foe, Drag_To_Cell, Drag_To_Foe_In_Line, Drag_In_Line, Drag_Rod,
 	Step, Bump, Shadow_Step, Wait, Shoot, Activate, Fire, Turn, Effect, No_Film, Run_Up, Punch,
-	Sword_Turn, Sword_Step, Cut, Loose, Club, Walk_Up, Nonno_Keys,
+	Sword_Turn, Sword_Step, Cut, Loose, Club, Walk_Up, Nonno_Keys, Flame, Follow,
 }
 
 @(rodata)
@@ -835,6 +874,8 @@ CARD_DEMO_WORDS := [Card_Demo_Words]cstring{
 	.Club = "CLIC: UNA MAZZATA",
 	.Walk_Up = "TIENI PREMUTO W: VAI DAL NEMICO",
 	.Nonno_Keys = "Q CURA, E SOLDI: UNA VOLTA SOLA",
+	.Flame = "TIENI PREMUTO IL CLIC: LA FIAMMA VA DOVE MIRI",
+	.Follow = "IL SEGNO CIANO: FAI QUELLO CHE DICE LA IA",
 }
 
 // The key each caption's cap shows (nil: the mouse alone). A step's is the
@@ -893,6 +934,8 @@ card_demo_action_words :: proc(demo: ^Card_Demo, index: int) -> (key, text: cstr
 			words = .Walk_Up if game.napoli_nonno_active(room) && !card_demo_club_reaches(demo, action.foe) else .Turn
 		}
 	case .Keys: words = .Nonno_Keys
+	case .Flame: words = .Flame
+	case .Follow: words = .Follow
 	}
 	return CARD_DEMO_WORDS_KEY[words], CARD_DEMO_WORDS[words]
 }

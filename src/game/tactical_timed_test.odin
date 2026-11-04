@@ -121,9 +121,11 @@ test_timed_actions_go_at_the_players_pace :: proc(t: ^testing.T) {
 	room.first_person.active = true
 	for weapon in First_Person_Weapon {
 		room.first_person.weapon = weapon
-		quick := weapon == .Sword || weapon == .Bow
+		// The Lanciafiamme stays on the board: all its prices go at the pace.
+		board := FIRST_PERSON_WEAPONS[weapon].on_board
+		quick := weapon == .Sword || weapon == .Bow || board
 		testing.expectf(t, tactical_player_pace(&room, step = true) == (TACTICAL_PLAYER_PACE if quick else 1), "%v's step", weapon)
-		testing.expectf(t, tactical_player_pace(&room) == 1, "%v's other prices", weapon)
+		testing.expectf(t, tactical_player_pace(&room) == (TACTICAL_PLAYER_PACE if board else 1), "%v's other prices", weapon)
 	}
 	room.first_person.active = false
 	// The bare rules.

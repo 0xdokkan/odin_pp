@@ -38,6 +38,8 @@ test_first_person_input_reads_the_right_button_and_ctrl :: proc(t: ^testing.T) {
 @(test)
 test_first_person_buttons_latch_and_route_for_every_weapon :: proc(t: ^testing.T) {
 	for weapon in game.First_Person_Weapon {
+		// The Lanciafiamme takes no mouse: test_flame_leaves_the_mouse_free.
+		if game.FIRST_PERSON_WEAPONS[weapon].on_board { continue }
 		data: level.Level
 		player: game.Player
 		room: game.Room
@@ -87,6 +89,8 @@ test_first_person_buttons_latch_and_route_for_every_weapon :: proc(t: ^testing.T
 @(test)
 test_first_person_pause_latches_both_buttons_for_every_weapon :: proc(t: ^testing.T) {
 	for weapon in game.First_Person_Weapon {
+		// The Lanciafiamme takes no mouse: test_flame_leaves_the_mouse_free.
+		if game.FIRST_PERSON_WEAPONS[weapon].on_board { continue }
 		data: level.Level
 		player: game.Player
 		room: game.Room
@@ -120,4 +124,25 @@ test_first_person_pause_latches_both_buttons_for_every_weapon :: proc(t: ^testin
 		testing.expect(t, !game.tactical_first_person_active(&room) && !controller.look_captured)
 		testing.expect_value(t, run_session.first_person_buttons(&controller, renderer, &room, both), run_session.First_Person_Buttons{})
 	}
+}
+
+// The Lanciafiamme stays on the board: the mouse stays free, the button fires.
+@(test)
+test_flame_leaves_the_mouse_free :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room: game.Room
+	if !create_first_person_controller_test_room(t, &data, &player, &room) { return }
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
+	controller := run_session.Tactical_Controller{was_focused = true}
+	cards: run_session.Card_Interaction_State
+	held: run_session.Buffered_Gameplay_Command
+	first_person_weapon_controller_begin(t, &room, renderer, .Flamethrower)
+	for _ in 0..<5 { first_person_controller_frame(&controller, &room, renderer, &cards, &held, 1.0/60.0, {fire = true}) }
+	testing.expect(t, !controller.look_captured)
+	testing.expect(t, room.first_person.flame.firing)
 }

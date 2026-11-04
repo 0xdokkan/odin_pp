@@ -5,6 +5,18 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-04 — Piano della carta «IA»: la IA, il Nido di ragni, la Regina e il Lanciafiamme (Fasi 0-15)
+
+- Quattro carte nuove, **solo nel laboratorio** (scelta dell'utente): niente offerte, negozi o collezione.
+- **IA:** per 30 secondi una ricerca su un thread a parte segna sempre la mossa migliore, conosce tutto il gioco tranne i dadi e avvisa
+  se stai per perdere vita. Il pacchetto `src/advisor/` ha la copia di prova, il simulatore, la ricerca e le tabelle.
+- **Nido di ragni:** un nido che fa uscire ragnetti che aggirano i muri e mordono, e fa da esca.
+- **Regina:** un pezzo degli scacchi che corre sulle sue 8 linee e colpisce il primo nemico; nessuno la può colpire.
+- **Lanciafiamme:** una fiamma sul tabellone che lascia la scia, con un modello 3D di cartoncino in mano al Viandante.
+- **La regola per sempre:** ogni materiale di gioco nuovo, da qualunque PC o IA, aggiorna anche la carta IA (`AGENTS.md`, `CLAUDE.md`,
+  `docs/sviluppo.md`); il compilatore lo fa rispettare con tabelle senza voci di riserva.
+- Atti di laboratorio `ia`, `nido`, `regina`, `lanciafiamme`, film di Mostra effetto per tutte e quattro, suoni e icone da codice.
+
 ## 2026-11-03 — Piano di Napoli: la carta «Benvenuti a Napoli» (Fasi 0-7)
 
 - Carta nuova, rara, 3 energia: un D4 sceglie fra il **bastone** in terza persona (camera dietro la spalla, mazzate
