@@ -56,7 +56,7 @@ test_ascent_outdoor_five_biomes_are_deterministic_bounded_and_economical :: proc
 		for v in b.vertices {contained=contained && ascent_test_cell_contains(cell,v.position) && v.position.y<4}
 		for line in b.lines {contained=contained && ascent_test_cell_contains(cell,line.a) && ascent_test_cell_contains(cell,line.b)}
 		testing.expect(t,contained,"Outdoor geometry extends beyond its real blocked cell")
-		testing.expect(t,len(b.vertices)<=900 && len(b.lines)<=12)
+		testing.expect(t,len(b.vertices)<=900 && biome_test_light_lines(b.lines[:])<=12 && len(b.lines)<=64)
 	}}
 }
 
@@ -86,7 +86,7 @@ test_ascent_site_walls_all_kinds_and_rotations_follow_collision_and_budget :: pr
 				for v in b.vertices {contained=contained && ascent_test_cell_contains(cell,v.position)}
 				for line in b.lines {contained=contained && ascent_test_cell_contains(cell,line.a) && ascent_test_cell_contains(cell,line.b)}
 				testing.expect(t,contained,"Site wall enters an adjacent gameplay cell")
-				testing.expect(t,len(b.vertices)<=600 && len(b.lines)<=12)
+				testing.expect(t,len(b.vertices)<=600 && biome_test_light_lines(b.lines[:])<=12 && len(b.lines)<=64)
 			}}
 		}
 	}}
@@ -108,7 +108,7 @@ test_ascent_fixtures_all_biomes_kinds_rotations_preserve_walkable_space :: proc(
 		testing.expect(t,draw_expedition_ascent_fixture(other,w,&site))
 		testing.expect(t,slice.equal(b.vertices[:],again.vertices[:]) && slice.equal(b.lines[:],again.lines[:]))
 		ascent_test_mesh(t,&b)
-		testing.expect(t,len(b.vertices)<=1000 && len(b.lines)<=18)
+		testing.expect(t,len(b.vertices)<=1000 && biome_test_light_lines(b.lines[:])<=18 && len(b.lines)<=64)
 		contained:=true
 		for v in b.vertices {contained=contained && ascent_test_fixture_point(&site,v.position)}
 		for line in b.lines {contained=contained && ascent_test_fixture_point(&site,line.a) && ascent_test_fixture_point(&site,line.b)}

@@ -16,9 +16,9 @@ Dread_Palette :: struct {stone,cap,wood,leaf,metal,dark,accent:rl.Color}
 dread_palette :: proc(w:^world.World)->(p:Dread_Palette,handled:bool) {
 	if w==nil {return}
 	#partial switch w.biome {
-	case .Jungle:return {{57,66,48,255},{100,108,76,255},{65,49,33,255},{48,83,43,255},{142,137,102,255},{20,31,23,255},{157,194,69,254}},true
-	case .Vietnam:return {{67,74,64,255},{110,115,91,255},{77,61,42,255},{61,85,43,255},{44,58,54,255},{19,28,25,255},{216,183,86,254}},true
-	case .Gothic:return {{62,67,77,255},{112,119,125,255},{61,47,46,255},{66,87,70,255},{32,41,47,255},{17,21,29,255},{222,162,77,254}},true
+	case .Jungle:return {{65,137,104,255},{186,209,115,255},{156,95,49,255},{49,177,81,255},{240,190,65,255},{21,55,38,255},{187,224,75,254}},true
+	case .Vietnam:return {{105,143,62,255},{206,211,120,255},{180,125,57,255},{84,166,53,255},{55,121,99,255},{28,48,37,255},{249,196,75,254}},true
+	case .Gothic:return {{105,103,151,255},{192,177,207,255},{143,82,84,255},{77,143,107,255},{62,73,106,255},{28,29,48,255},{246,175,74,254}},true
 	}
 	return
 }
@@ -36,8 +36,10 @@ dread_peak :: proc(pass:Ink_Pass,base:rl.Vector3,half:rl.Vector2,height,yaw:f32,
 
 @(private)
 dread_leaf :: proc(pass:Ink_Pass,base:rl.Vector3,length,width,yaw:f32,color:rl.Color) {
-	a,b:[4]rl.Vector3
-	for q,i in ([4]rl.Vector3{{-width,0,0},{0,.07,-length},{width,0,0},{0,.04,length}}) {
+	// Broad, uneven lobes and a folded center replace the diamond blade.
+	// Root/stem remains fixed; this immutable mesh is safe for chunk baking.
+	a,b:[6]rl.Vector3
+	for q,i in ([6]rl.Vector3{{-width*.65,0,-length*.38},{0,.05,-length},{width*.85,0,-length*.41},{width,.02,length*.30},{width*.12,.04,length},{-width,.02,length*.26}}) {
 		a[i]=cyber_point(base,q,yaw);b[i]=a[i]+{0,.025,0}
 	}
 	ink_solid(pass,a[:],b[:],ink_scale(color,.70),color,{})
@@ -83,13 +85,11 @@ dread_jungle_tree :: proc(pass:Ink_Pass,base:rl.Vector3,h:u32,p:Dread_Palette) {
 
 @(private)
 dread_jungle_fern :: proc(pass:Ink_Pass,base:rl.Vector3,h:u32,p:Dread_Palette) {
-	ink_frustum(pass,base,.31,.18,.43,5,f32(h%7),p.stone,p.cap,{},.2)
-	ink_frustum(pass,base+{0,.39,0},.07,.035,.7,5,0,p.wood,p.leaf,{})
+	ink_frustum(pass,base,.07,.035,.7,5,0,p.wood,p.leaf,{})
 	for i in 0..<5 {
 		yaw:=f32(i)*math.TAU/5+f32(h%5)*.15
-		dread_leaf(pass,base+{0,.65+f32(i%2)*.14,0},.45,.105,yaw,ink_scale(p.leaf,1.1+f32(i%2)*.3))
+		dread_leaf(pass,base+{0,.26+f32(i%2)*.14,0},.44,.17,yaw,ink_scale(p.leaf,1.1+f32(i%2)*.3))
 	}
-	if h%3==0 {ink_line(pass,base+{-.18,.28,.24},base+{.16,.33,.25},p.accent)}
 }
 
 @(private)
@@ -129,14 +129,13 @@ dread_crate :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,p:Dread_Palette,stack:
 
 @(private)
 dread_grave :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,p:Dread_Palette,cross:bool=false) {
-	ink_box(pass,base,{.42,.32},.16,yaw,p.stone,p.cap,{})
 	if cross {
-		ink_box(pass,base+{0,.16,0},{.065,.08},1.37,yaw,p.wood,p.cap,{})
+		ink_box(pass,base,{.065,.08},1.53,yaw,p.wood,p.cap,{})
 		ink_box(pass,base+{0,1.07,0},{.35,.07},.12,yaw,p.wood,p.cap,{})
 		ink_box(pass,cyber_point(base,{0,.32,.083},yaw),{.018,.006},1.10,yaw,p.cap,p.cap,{})
 	} else {
-		ink_box(pass,base+{0,.16,0},{.28,.13},.82,yaw,p.stone,p.cap,{})
-		dread_peak(pass,base+{0,.98,0},{.28,.13},.29,yaw,p.cap)
+		profile:=[9]rl.Vector2{{-.27,0},{-.29,.83},{-.25,1.10},{-.16,1.23},{0,1.28},{.17,1.22},{.27,1.09},{.29,.80},{.26,0}}
+		ink_profile(pass,base,profile[:],{1,1},.26,yaw,p.stone,p.cap,EXPEDITION_PAPER_INK)
 		ink_box(pass,cyber_point(base,{0,.41,.136},yaw),{.015,.006},.40,yaw,p.dark,p.dark,{})
 		ink_box(pass,cyber_point(base,{0,.66,.136},yaw),{.12,.006},.035,yaw,p.dark,p.dark,{})
 	}
@@ -144,7 +143,8 @@ dread_grave :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,p:Dread_Palette,cross:
 
 @(private)
 dread_dead_tree :: proc(pass:Ink_Pass,base:rl.Vector3,h:u32,p:Dread_Palette) {
-	ink_frustum(pass,base,.16,.065,1.9,5,f32(h%7),p.wood,p.cap,{})
+	profile:=[8]rl.Vector2{{-.16,0},{-.11,.85},{.03,1.43},{.02,1.90},{.13,1.99},{.16,1.38},{.08,.77},{.13,0}}
+	ink_profile(pass,base,profile[:],{1,1},.18,f32(h%2)*math.PI/2,p.wood,p.cap,EXPEDITION_PAPER_INK)
 	for side in ([2]f32{-1,1}) {
 		cyber_link(pass,base+{0,.85,0},base+{side*.32,1.36,.13},{.045,.055},p.wood,p.cap)
 		cyber_link(pass,base+{side*.32,1.36,.13},base+{side*.37,1.72,.08},{.025,.035},p.wood,p.cap)
@@ -172,64 +172,37 @@ draw_expedition_dread_outdoor :: proc(pass:Ink_Pass,w:^world.World,cell:grid.Pos
 
 @(private)
 dread_sandbags :: proc(pass:Ink_Pass,base:rl.Vector3,height,yaw:f32,p:Dread_Palette) {
-	ink_box(pass,base,{.48,.43},.10,yaw,p.dark,p.stone,{})
 	for row in 0..<3 {for side in ([2]f32{-1,1}) {
-		x:=side*.24;y:=.10+f32(row)*(height-.1)/3
+		x:=side*.24;y:=f32(row)*height/3
 		bag:=p.cap if row%2==0 else ink_scale(p.cap,.83)
-		ink_box(pass,cyber_point(base,{x,y,0},yaw),{.23,.42-f32(row)*.025},(height-.1)/3-.018,yaw,bag,ink_scale(bag,1.08),{})
-		ink_box(pass,cyber_point(base,{x,y+.07,.425-f32(row)*.025},yaw),{.15,.005},.012,yaw,p.wood,p.wood,{})
+		ink_chamfer_box(pass,cyber_point(base,{x,y,0},yaw),{.235,.42-f32(row)*.025},height/3,yaw,bag,ink_scale(bag,1.08),{},.09)
 	}}
 }
 
 @(private)
 draw_expedition_dread_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,site:^world.Site,cell:grid.Position,design:world.Site_Cell)->bool {
 	p,handled:=dread_palette(w);if !handled {return false}
-	base:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5};q:=design.local
+	base:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5}
 	yaw:=f32(site.orientation%4)*math.PI/2
 	height:=expedition_site_wall_height(design)
 	gate:=abs(design.wall_height-2.2)<.01
 	if gate {height=2.12}
-	if w.biome==.Vietnam && height<1.15 && !design.fixture {
+	if w.biome==.Vietnam && site.kind!=.Workshop && height<1.15 && !design.fixture {
 		dread_sandbags(pass,base,max(height,.55),yaw,p);return true
 	}
 	if w.biome==.Jungle && site.kind==.Nest && height<1.1 {
-		ink_box(pass,base,{.47,.45},.16,0,p.stone,p.cap,{})
 		for side in ([2]f32{-1,1}) {
-			cyber_link(pass,cyber_point(base,{side*.28,.16,-.20},yaw),cyber_point(base,{side*.20,height+.15,.20},yaw),{.10,.085},p.metal,p.cap)
+			lean:=cyber_point({}, {-side*.08/height,0,.40/height},yaw)
+			ink_box(pass,cyber_point(base,{side*.28,0,-.20},yaw),{.10,.085},height,yaw,p.metal,p.cap,{}, {lean.x,lean.z})
 		}
 		return true
 	}
 	wooden:=w.biome==.Gothic && (site.kind==.Workshop || site.kind==.Nest)
 	stone:=p.wood if wooden else p.stone
-	ink_box(pass,base,{.49,.49},height,0,stone,p.cap,{})
-	ink_box(pass,base,{.495,.495},.10,0,p.dark,p.stone,{})
-	ink_box(pass,base+{0,height-.08,0},{.495,.495},.10,0,p.cap,p.cap,{})
-	for direction,i in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
-		if expedition_wall_joined(room,site,game.add_position(cell,direction),expedition_site_wall_height(design)) {continue}
-		face:=math.atan2(f32(-direction.x),f32(direction.y))
-		// The camera-facing exposed faces carry the small details. Back faces
-		// retain the same complete material and cap without redundant inserts.
-		if i>=2 {continue}
-		if w.biome==.Jungle {
-			ink_box(pass,cyber_point(base,{0,height*.44,.494},face),{.47,.003},.025,face,p.dark,p.dark,{})
-			ink_box(pass,cyber_point(base,{-.17,height*.71,.495},face),{.012,.003},height*.24,face,p.dark,p.dark,{})
-			if (abs(q.x)+abs(q.y))%3==0 {
-				cyber_link(pass,cyber_point(base,{-.28,.15,.45},face),cyber_point(base,{-.08,height-.12,.45},face),{.025,.025},p.wood,p.leaf)
-				ink_line(pass,cyber_point(base,{.16,height-.06,.498},face),cyber_point(base,{.34,height-.06,.498},face),ink_scale(p.accent,.55))
-			}
-		} else if w.biome==.Vietnam {
-			ink_box(pass,cyber_point(base,{0,height*.61,.494},face),{.32,.003},.13,face,p.dark,p.dark,{})
-			ink_box(pass,cyber_point(base,{0,height*.61-.035,.495},face),{.36,.003},.035,face,p.cap,p.cap,{})
-			if gate {ink_box(pass,cyber_point(base,{-.28,.30,.495},face),{.035,.003},.26,face,p.wood,p.wood,{})}
-		} else if wooden {
-			for x in ([3]f32{-.30,0,.30}) {ink_box(pass,cyber_point(base,{x,.13,.494},face),{.012,.003},height-.26,face,p.dark,p.dark,{})}
-			cyber_link(pass,cyber_point(base,{-.40,.22,.46},face),cyber_point(base,{.40,height-.20,.46},face),{.025,.025},p.cap,p.wood)
-		} else {
-			ink_box(pass,cyber_point(base,{0,.25,.494},face),{.20,.003},height*.48,face,p.dark,p.dark,{})
-			ink_box(pass,cyber_point(base,{0,.25,.498},face),{.016,.001},height*.48,face,p.metal,p.metal,{})
-			dread_peak(pass,cyber_point(base,{0,.25+height*.48,.493},face),{.20,.004},height*.18,face,p.dark)
-		}
+	if site.kind==.Workshop && design.wall_height<1.1 && !design.fixture {
+		draw_biome_workstation(pass,base,yaw,w.biome,height,design.local.x);return true
 	}
+	ink_wall_sheet(pass,room,site,cell,height,stone,p.cap,half=.4999,outline=false)
 	return true
 }
 
@@ -260,10 +233,8 @@ draw_expedition_dread_gate :: proc(pass:Ink_Pass,w:^world.World,a,b:rl.Vector3)-
 
 @(private)
 dread_idol :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,p:Dread_Palette) {
-	ink_box(pass,base,{.44,.42},.17,yaw,p.stone,p.cap,{})
-	ink_box(pass,base+{0,.17,0},{.28,.25},.68,yaw,p.stone,p.cap,{})
-	ink_box(pass,base+{0,.85,0},{.35,.29},.43,yaw,p.stone,p.cap,{})
-	ink_box(pass,base+{0,1.28,0},{.38,.31},.10,yaw,p.cap,p.cap,{})
+	profile:=[12]rl.Vector2{{-.32,0},{-.38,.18},{-.25,.46},{-.27,.75},{-.37,.93},{-.33,1.24},{-.19,1.38},{.20,1.38},{.34,1.24},{.37,.93},{.25,.74},{.33,0}}
+	ink_profile(pass,base,profile[:],{1,1},.58,yaw,p.stone,p.cap,EXPEDITION_PAPER_INK)
 	for side in ([2]f32{-1,1}) {
 		ink_box(pass,cyber_point(base,{side*.18,1.04,.295},yaw),{.085,.007},.065,yaw,p.dark,p.dark,{})
 	}

@@ -1,0 +1,202 @@
+Implementa nel progetto Odin PP la migrazione dello stile grafico verso
+la direzione CARTONCINO CARTOON approvata nei riferimenti locali.
+Voglio modifiche al gioco realmente eseguibile: usa le immagini come
+guida artistica e implementa il risultato nel renderer e negli asset.
+
+1. APRI I RIFERIMENTI E VERIFICA IL PROGETTO
+
+Lavora dalla radice del repository. Leggi le eventuali istruzioni locali
+aggiornate, controlla branch, worktree e modifiche presenti e preserva il
+lavoro dell'utente. Non dare per valido lo stato Git della sessione che
+ha preparato questo documento. Leggi README.md, docs/architettura.md,
+docs/sviluppo.md, docs/presentazione.md, docs/verifica.md e, quando serve,
+tools/art/README.md. I sorgenti e i test attuali prevalgono su note storiche.
+
+Apri VISIVAMENTE queste tre immagini, non limitarti ai nomi dei file:
+- docs/riferimenti/cartoncino-cartoon/01-sprite-forma-finale.png
+- docs/riferimenti/cartoncino-cartoon/02-esplorazione-composizione.png
+- docs/riferimenti/cartoncino-cartoon/03-combattimento-composizione.png
+
+Priorità vincolante: 01 definisce la forma finale approvata di personaggi,
+contorno e attacco al terreno. 02 e 03 definiscono la direzione di ambiente,
+proporzioni, composizione e leggibilità del gameplay. Nei due screenshot
+completi compaiono ancora sostegni e basi di una versione precedente:
+sono SUPERATI da 01 e non vanno riprodotti, nemmeno sui nemici.
+
+Sono mockup, non asset runtime pronti e non screenshot di una migrazione
+già fatta. La loro geometria è un esempio: non sostituire il mondo giocabile
+con una singola immagine di sfondo, non copiare una scena statica e non
+prendere le scritte dipinte nei mockup come dati autorevoli del gameplay.
+
+2. DIREZIONE VISIVA APPROVATA
+
+Il gioco deve sembrare un mondo disegnato su un foglio, con illustrazioni
+su sagome di cartoncino che emergono dal terreno in modo cartoon.
+Deve restare molto credibile come videogioco: scala coerente, percorsi
+leggibili, interni utilizzabili, coperture riconoscibili e combattimento
+comprensibile anche in movimento.
+
+PERSONAGGI E NEMICI
+- Il disegno vive dentro una sagoma piatta di cartoncino avorio ritagliata
+  sul profilo dell'oggetto. Bordo scuro disegnato e margine avorio chiaro
+  attorno a testa, antenna, braccia e corpo, come nell'immagine 01.
+- Alla base, il foglio si raccorda al pavimento con un segno breve e
+  semplice. I piedi rimangono leggibili e saldamente appoggiati; colore
+  e disegno del terreno devono risultare continui nel punto di contatto.
+- NESSUN sostegno triangolare, cavalletto, puntello o aletta di sostegno
+  dietro o accanto allo sprite. È l'ultima correzione esplicita dell'utente.
+- Niente basetta rettangolare o ovale, piedistallo, placca bianca separata,
+  spessore marcato o effetto adesivo sospeso. Non ricreare un modellino
+  fisico fotografato: il raccordo deve essere semplice, grafico e cartoon.
+- Mantieni sagoma e illustrazione distinguibili. Non trasformare gli
+  attori in figurine volumetriche o eliminare il bordo per far sparire
+  la base. Applica la stessa regola a tutti i tipi di nemico, adattando
+  sagoma e larghezza alla loro forma.
+- Preserva il concetto dei cartoncini vivi già nel progetto: supporto
+  stabile e disegno animato al suo interno, con ancoraggio ai piedi.
+  Movimento, attacchi e cambi di direzione devono restare leggibili.
+
+TERRENO, ARCHITETTURA E PROPS
+- Uniforma densità dei pixel, scala, contorni, palette e ombre fra attori
+  e ambiente. Usa pixel art dettagliata e leggibile dentro le sagome,
+  con campiture chiare e ombre disegnate semplici.
+- Per Cyber, prendi dai riferimenti l'avorio caldo, blu/ciano, corallo,
+  accenti gialli e inchiostro scuro. Negli altri biomi conserva identità
+  e palette proprie, applicando lo stesso linguaggio di carta e disegno.
+- Texture della carta discreta, colori luminosi e separati. Evita
+  grana pesante, rumore, seppia, pennellate sfocate, ombre fotorealistiche,
+  plastica lucida e bagliori che cancellino il disegno.
+- I muri e gli oggetti lunghi possono essere cartoncini allungati: il
+  bordo segue la loro sagoma e lunghezza, invece di imporre a tutto
+  una tessera rettangolare o una fila di piccoli supporti separati.
+- Il volume può essere suggerito dall'illustrazione stampata e dalle
+  geometrie necessarie al livello, con bordi leggeri e coerenti.
+- Mantieni il rapporto di scala col personaggio: ingressi attraversabili,
+  passaggi comprensibili, mobili proporzionati, coperture leggibili e
+  percorsi liberi negli interni. Non modificare collisioni o dimensioni
+  delle mappe per imitare alla lettera la composizione del mockup.
+
+HUD E COMBATTIMENTO
+- Interfaccia compatta, leggibile, coerente con carta avorio e inchiostro
+  scuro. Il mondo giocabile deve restare dominante; non ingrandire titoli
+  o decorazioni a scapito dell'azione.
+- Carte, icone, testi e risorse devono restare chiari. Usa i valori e
+  i testi derivati dai dati reali del gioco, non quelli rasterizzati
+  nelle immagini. Mantieni le funzionalità della mano e delle anteprime.
+- Bersagli, griglia, intenzioni e stato degli attori si distinguono dal
+  disegno del pavimento. Le evidenziazioni sono overlay di gameplay,
+  non pedane fisiche sotto i personaggi.
+- Preserva il combattimento continuo a battito e il targeting esistente.
+  Non introdurre turni o un pulsante fine turno per imitare altri giochi.
+
+3. AMBITO E VINCOLI TECNICI
+
+Usa il bioma Cyber come primo confronto concreto completo (esplorazione,
+interni e combattimento), poi applica i criteri ai percorsi condivisi di
+terreno, architettura, personaggi, nemici e UI. Verifica la coerenza negli
+altri biomi e nelle viste che riusano quei componenti. Evita una soluzione
+speciale che funzioni soltanto per il robot fermo in una singola scena.
+Per hub e minigiochi, preserva le identità e il funzionamento esistenti;
+controlla eventuali effetti delle modifiche ai renderer/asset condivisi.
+
+Preserva regole, salvataggi, eventi, RNG, collisioni, navigazione, targeting,
+linea di vista, picking, fog, occlusione e separazione fra simulazione e
+presentazione. Conserva altezze, piani, rampe, ponti e grotte presenti:
+la scena piana nei riferimenti non richiede di appiattire il gioco.
+Non cambiare ingombri o hitbox per compensare un problema di disegno.
+
+Prima di scegliere l'implementazione, segui il percorso di rendering
+effettivamente usato. Al momento della preparazione di questo prompt:
+- src/run/expedition_scene.odin e src/render/tactical_renderer.odin
+  orchestrano mondo, attori e HUD.
+- src/render/expedition_robot.odin contiene il robot procedurale della
+  spedizione; src/render/expedition_paper.odin contiene supporto/materiale.
+  Sostituire un solo spritesheet non basta a migrare quel percorso.
+- src/render/living_card.odin, flipbook_actor.odin ed
+  expedition_costumes.odin gestiscono attori, animazioni e costumi.
+- src/engine/gfx/living.odin e i dati degli atlanti gestiscono risorse
+  e clip. living_data.odin e flipbook_data.odin sono generati: intervieni
+  sulle fonti/pipeline appropriate, non modificare a mano i dati generati.
+- src/render/expedition_floor.odin, expedition_floor_data.odin,
+  expedition_terrain.odin, expedition_layers.odin ed expedition_decks.odin
+  coprono terreno, shader, cache e geometria a più livelli.
+- src/render/expedition_architecture.odin, expedition_cyber.odin,
+  expedition_geometry.odin, expedition_material.odin,
+  expedition_lighting.odin, expedition_post.odin ed expedition_shadows.odin
+  coprono architettura, materiali, luci e passaggi GPU.
+- src/render/tactical_hud.odin, tactical_hud_kit.odin, tactical_hand.odin,
+  card_description.odin, card_visual.odin, card_range_light.odin,
+  card_hit_mark.odin e intent_display.odin coprono HUD/carte/overlay.
+- src/render/expedition_camera.odin e tactical_surface.odin governano
+  camera e risoluzione. Rispetta le griglie di rendering e la leggibilità
+  dei pixel nelle diverse risoluzioni e durante il movimento.
+
+Questi percorsi sono una mappa iniziale da riconfermare sui sorgenti
+attuali, non una lista obbligatoria di file da modificare tutti.
+Preferisci regole/materiali condivisi e cambi coerenti al sistema esistente.
+Documenta proprietà e durata delle nuove risorse e preserva prestazioni,
+cache e memoria su mappe grandi, evitando allocazioni superflue per frame.
+
+Nota sulla pipeline: lo smoke GPU attuale verifica anche HDR, bloom e
+riflessi in expedition_post.odin. Se il nuovo stile richiede di cambiare
+quel contratto, aggiorna verifiche e documentazione con una motivazione
+concreta. Non limitarti a disabilitare gli assert o a ignorare gli errori.
+
+4. ESECUZIONE E VERIFICA
+
+Rileva la baseline visiva reale e lo stato dei controlli prima di intervenire.
+Spiega brevemente quali parti del renderer cambierai, poi procedi con
+l'implementazione. Non fermarti alla proposta, a nuovi mockup o a una
+demo separata. Se servono nuove immagini raster, usa gli strumenti e le
+skill disponibili, inserisci gli asset nella pipeline del progetto e
+verifica come appaiono nel gioco. Non usare una generazione AI come prova
+che il renderer è stato migrato.
+
+Comandi attualmente documentati, da verificare con toolchain e script
+presenti nella nuova sessione:
+
+odin version
+odin check src -vet -strict-style
+odin test src/render -o:none -out:/tmp/odin-pp-render-tests
+sh scripts/check.sh --quick --headless
+mkdir -p build
+odin build src -o:none -out:build/odin_pp
+./build/odin_pp --smoke-expedition
+sh scripts/check.sh
+
+Seleziona i controlli pertinenti durante lo sviluppo e completa quelli
+richiesti dal progetto per i file modificati. Evita test che si limitano
+a ripetere costanti estetiche; verifica invece eventuali nuovi contratti
+di rendering e regressioni. Gli smoke grafici richiedono una GPU/finestra
+funzionante. In caso di limite dell'ambiente, segnala esattamente cosa
+non è stato verificato; non dichiarare riuscita una verifica non eseguita.
+
+Il driver src/application/campaign_smoke.odin produce catture sotto
+build/captures/, fra cui odin_pp_expedition_bioma.png,
+odin_pp_expedition_scontro.png, odin_pp_expedition_dietro_muro.png,
+odin_pp_expedition_camminata.png e odin_pp_expedition_officina_cyber.png.
+Usa anche le viste disponibili degli altri biomi. Controlla almeno:
+- esplorazione, ingresso negli interni e rapporto attore/ambiente;
+- robot e più forme di nemico, fermi, in movimento e durante un'azione;
+- contatto col terreno, senza supporti laterali, su più quote e direzioni;
+- occlusione dietro un muro, z-order e nessun tremolio/bordo spurio;
+- combattimento con mano, griglia, coperture e bersagli ben distinguibili;
+- leggibilità a diverse dimensioni della finestra e stabilità delle risorse.
+
+Confronta screenshot reali prima/dopo, preferibilmente a parità di scena
+e seed. Apri e ispeziona le immagini prodotte: il superamento dei test
+da solo non dimostra la qualità della migrazione grafica.
+
+5. RISULTATO ATTESO
+
+Consegna le modifiche funzionanti nel repository, gli eventuali asset
+integrati e le note necessarie alla manutenzione. Mostra catture REALI
+di esplorazione e combattimento con il nuovo stile, oltre a un dettaglio
+di robot/nemico che renda verificabile la sagoma finale senza sostegno.
+Riassumi cosa è cambiato, quali controlli hai eseguito e gli eventuali
+limiti rimasti. Mantieni brevi aggiornamenti durante il lavoro.
+
+Il criterio visivo decisivo è questo: il disegno del personaggio è dentro
+una sagoma di cartoncino cartoon che si raccorda naturalmente al foglio
+del terreno, SENZA triangoli o cavalletti; terreno, ambiente e interfaccia
+appartengono allo stesso videogioco leggibile, colorato e coerente.

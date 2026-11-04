@@ -1,0 +1,3 @@
+# Its own hash is in assets/workshop-stock/manifest.json: a checkout on Windows must not turn its line ends.
+tools/art/build_workshop_stock.py text eol=lf
+src/render/expedition_workshop_stock_data.odin text eol=lf

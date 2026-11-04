@@ -12,8 +12,11 @@ EXPEDITION_TILED_LIGHTS :: #config(EXPEDITION_TILED_LIGHTS,true)
 EXPEDITION_LIGHT_TILE_SIDE :: 8
 EXPEDITION_LIGHT_TILE_SIZE :: f32(8)
 EXPEDITION_LIGHT_TILE_COUNT :: EXPEDITION_LIGHT_TILE_SIDE*EXPEDITION_LIGHT_TILE_SIDE
+// How much of a neon strip's radiance reaches the surfaces round it, and how far.
+EXPEDITION_NEON_SHARE :: f32(.55)
+EXPEDITION_NEON_REACH :: f32(2.6)
 #assert(EXPEDITION_LIGHTS==32 && size_of(c.int)==size_of(u32))
-Expedition_Light_Uniforms :: struct {eye,mirror,count,start,end,color,tiles,tile_origin,dim_box,dim_amount,sky_shade:c.int}
+Expedition_Light_Uniforms :: struct {eye,mirror,count,start,end,color,tiles,tile_origin,dim_box,dim_amount,sky_shade:c.int,sun:Expedition_Sun_Uniforms}
 Expedition_Lights :: struct {
 	start,end,color:[EXPEDITION_LIGHTS]rl.Vector4,
 	count:c.int,
@@ -25,22 +28,9 @@ Expedition_Lights :: struct {
 Expedition_Surface_Profile :: struct {roughness,reflection,exposure:f32}
 
 expedition_biome_surface :: proc(b:campaign.Biome)->Expedition_Surface_Profile {
-	switch b {
-	case .Cyber:return {.23,.52,1.10}
-	case .West:return {.66,.20,1.18}
-	case .Jungle:return {.56,.28,1.12}
-	case .City:return {.29,.49,1.10}
-	case .Egypt:return {.39,.40,1.16}
-	case .Vietnam:return {.32,.46,1.10}
-	case .Snow:return {.19,.60,1.02}
-	case .Inferno:return {.31,.48,1.00}
-	case .Gothic:return {.35,.44,1.12}
-	case .Sky:return {.26,.51,1.08}
-	case .Space:return {.20,.58,1.06}
-	case .Secret:return {.16,.65,1.10}
-	case .Count:return {.5,.3,1.1}
-	}
-	return {.5,.3,1.1}
+	// Matte printed stock in every biome. A faint response remains for
+	// luminous gameplay effects; the HDR/reflection resources keep their owner.
+	return {.86,.025,1.0}
 }
 
 // Shared by architecture and the one-quad floor. All light transport is
@@ -75,19 +65,28 @@ uniform float dimAmount;
 // How much of the sky's light the rock takes away (Fase 4's rule: under it the sky's light falls, the lamps stay): 0 in
 // the open, which every program has unless it sets it (the floor program's caves' pass does).
 uniform float skyShade;
-vec3 expedition_lit_open(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
+`+EXPEDITION_SUN_GLSL+`
+vec3 expedition_lit_open(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic,float skyCrowd) {
     if(lightMirror>.5) {p.y=-p.y;normal.y=-normal.y;}
     vec3 n=normalize(normal);
     vec3 base=expedition_linear(srgbBase);
-    vec3 key=normalize(vec3(-.45,1.,.3));
-    vec3 result=base*(.65+max(dot(n,key),0.)*1.65)*(1.-skyShade);
+    // The sun of expedition_sun.odin (EXPEDITION_SUN_TOWARD).
+    vec3 key=normalize(vec3(-.56,1.,.36));
+    float facing=max(dot(n,key),0.);
+    // Three authored colour bands: cool blue shadows, bright local colour.
+    // Multiplication preserves pigment saturation instead of grey shading.
+    vec3 shade=facing>.72?vec3(1.):(facing>.28?vec3(.79,.87,.98):vec3(.56,.68,.87));
+    if(skyShade<.01) {
+        // A cast shadow takes a face down to a cool band, never to black; the
+        // sky's occlusion darkens what solids crowd round.
+        float sun=facing>0.?expedition_sun(p,n):0.;
+        shade=mix(min(shade,vec3(.40,.49,.82)),shade,sun)*expedition_sky_from_crowd(skyCrowd);
+    }
+    vec3 result=base*shade*(1.-skyShade);
 #if EXPEDITION_TILED_LIGHTS
     uint candidates=expedition_light_mask(p.xz);
     if(candidates==0u) return result;
 #endif
-    vec3 v=normalize(lightEye-p);
-    vec3 f0=mix(vec3(.045),base,metallic);
-    float power=mix(180.,5.,roughness*roughness);
     for(int i=0;i<lightCount;i++) {
 #if EXPEDITION_TILED_LIGHTS
         if((candidates&(1u<<uint(i)))==0u) continue;
@@ -104,27 +103,25 @@ vec3 expedition_lit_open(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float 
         float edge=1.-radial;
         float falloff=edge*edge/(1.+distance2*.8);
         float diffuse=max(dot(n,l),0.);
-        vec3 response=base*(.5+diffuse*2.);
-        if(diffuse>0.) {
-            vec3 h=normalize(l+v);
-            float spec=pow(max(dot(n,h),0.),power)*(1.-roughness*.6);
-            float facing=1.-max(dot(v,h),0.);
-            float facing2=facing*facing;
-            vec3 fresnel=f0+(1.-f0)*(facing2*facing2*facing);
-            response+=fresnel*spec*.8;
-        }
-        result+=lightColor[i].rgb*falloff*response;
+        // Broad printed light patches. No glossy microfacet highlight.
+        vec3 response=base*(.10+diffuse*.16);
+        result+=min(lightColor[i].rgb,vec3(2.))*falloff*response;
+
     }
     return result;
 }
 // Inside a building everything outside its footprint is darker (dimBox is x0,z0,x1,z1).
-vec3 expedition_lit(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
-    vec3 lit=expedition_lit_open(p,normal,srgbBase,roughness,metallic);
+vec3 expedition_lit_with_crowd(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic,float crowd) {
+    vec3 lit=expedition_lit_open(p,normal,srgbBase,roughness,metallic,crowd);
     if(dimAmount>0.) {
         bool within=p.x>=dimBox.x && p.x<=dimBox.z && p.z>=dimBox.y && p.z<=dimBox.w;
         if(!within) lit*=1.-dimAmount;
     }
     return lit;
+}
+vec3 expedition_lit(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
+    float crowd=skyShade<.01?expedition_sky_crowd(p):0.;
+    return expedition_lit_with_crowd(p,normal,srgbBase,roughness,metallic,crowd);
 }
 `
 
@@ -133,7 +130,8 @@ expedition_light_uniforms :: proc(shader:rl.Shader)->Expedition_Light_Uniforms {
 		rl.GetShaderLocation(shader,"lightCount"),rl.GetShaderLocation(shader,"lightStart[0]"),
 		rl.GetShaderLocation(shader,"lightEnd[0]"),rl.GetShaderLocation(shader,"lightColor[0]"),
 		rl.GetShaderLocation(shader,"lightTiles[0]"),rl.GetShaderLocation(shader,"lightTileOrigin"),
-		rl.GetShaderLocation(shader,"dimBox"),rl.GetShaderLocation(shader,"dimAmount"),rl.GetShaderLocation(shader,"skyShade")}
+		rl.GetShaderLocation(shader,"dimBox"),rl.GetShaderLocation(shader,"dimAmount"),rl.GetShaderLocation(shader,"skyShade"),
+		expedition_sun_uniforms(shader)}
 }
 
 set_expedition_lights :: proc(renderer:^Renderer,shader:rl.Shader,u:Expedition_Light_Uniforms) {
@@ -143,6 +141,7 @@ set_expedition_lights :: proc(renderer:^Renderer,shader:rl.Shader,u:Expedition_L
 	rl.SetShaderValue(shader,u.eye,&eye,.VEC3);rl.SetShaderValue(shader,u.mirror,&mirror,.FLOAT)
 	l:=&m.lights;rl.SetShaderValue(shader,u.count,&l.count,.INT)
 	rl.SetShaderValue(shader,u.dim_box,&m.dim_box,.VEC4);rl.SetShaderValue(shader,u.dim_amount,&m.dim_amount,.FLOAT)
+	set_expedition_sun(renderer,shader,u.sun)
 	when EXPEDITION_TILED_LIGHTS {
 		rl.SetShaderValueV(shader,u.tiles,&l.tiles[0],.INT,EXPEDITION_LIGHT_TILE_COUNT)
 		rl.SetShaderValue(shader,u.tile_origin,&l.tile_origin,.VEC2)
@@ -224,7 +223,8 @@ prepare_expedition_lights :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wo
 	focus:=renderer.tactical.camera.target
 	defer {when EXPEDITION_TILED_LIGHTS {expedition_build_light_tiles(l,focus)}}
 	// Reserve slots for light sources that move or appear during combat.
-	for e in m.edges.emitters[:min(m.edges.emitter_count,24)] {expedition_add_light(l,e.a,e.b,e.radiance,5.5)}
+	// Neon strips light the ground only close by: a wide pool read as a pink wash along every wall.
+	for e in m.edges.emitters[:min(m.edges.emitter_count,24)] {expedition_add_light(l,e.a,e.b,e.radiance*EXPEDITION_NEON_SHARE,EXPEDITION_NEON_REACH)}
 	s:=renderer.tactical.snapshot;if s==nil {return}
 	if s.player.visible {
 		p,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,s.player.position)

@@ -8,7 +8,7 @@ import canvas "../engine/canvas"
 
 EXPEDITION_LINE_EMITTERS :: 32
 EXPEDITION_EDGE_EMISSION :: f32(5)
-EXPEDITION_EDGE_WIDTH :: f32(1.35)
+EXPEDITION_EDGE_WIDTH :: f32(1.65)
 
 Expedition_Line_Emitter :: struct { a,b,radiance:rl.Vector3 }
 Expedition_Edge_Frame :: struct {
@@ -59,7 +59,9 @@ void main() {
     float aa=max(fwidth(distanceToEdge),.7);
     float coverage=1.-smoothstep(-aa*.5,aa*.5,distanceToEdge);
     if(coverage<.001) discard;
-    vec3 radiance=pow(color.rgb,vec3(2.2))*emission;
+    // Dark contour ink is reflected pigment, never a light source.
+    float strength=max(color.r,max(color.g,color.b))<.28?1.:emission;
+    vec3 radiance=pow(color.rgb,vec3(2.2))*strength;
     // The vertices' alpha: 1 but where an edge fades with its building (draw_expedition_ribbon).
     finalColor=vec4(radiance,coverage*color.a);
 }`
@@ -125,7 +127,7 @@ begin_expedition_edges :: proc(renderer:^Renderer) {
 		} else {if e.shader.id!=0 {rl.UnloadShader(e.shader)};e.shader={}}
 	}
 	pixels:=rl.Vector2{renderer.canvas_width,renderer.canvas_height}*canvas.scale()
-	width:=e.width_pixels if e.width_pixels>0 else EXPEDITION_EDGE_WIDTH
+	width:=(e.width_pixels if e.width_pixels>0 else EXPEDITION_EDGE_WIDTH)*canvas.scale().x
 	e.frame=expedition_edge_frame(renderer.tactical.camera,pixels,width,m.reflection_pass)
 	rlgl.DrawRenderBatchActive();rlgl.DisableDepthMask()
 	e.shader_active=rl.IsShaderValid(e.shader)

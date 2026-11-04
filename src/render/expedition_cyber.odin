@@ -7,16 +7,18 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 
-// Industrial modules are static, allocation-free geometry. Their only light
-// sources are explicit seams and indicators; a chamfer is shaded metal, not
-// another glowing outline. Every primitive follows Ink_Pass (including Bake).
-CYBER_BODY :: rl.Color{22,23,27,255}
-CYBER_CAP :: rl.Color{31,33,38,255}
-CYBER_METAL :: rl.Color{45,47,52,255}
-CYBER_RECESS :: rl.Color{8,9,12,255}
-CYBER_RED :: rl.Color{242,22,30,254}
-CYBER_RED_FACE :: rl.Color{105,12,18,255}
-CYBER_SCREEN :: rl.Color{42,167,216,255}
+// Saturated printed pigments, shared by walls, furniture and machinery.
+// Only explicit indicators emit light. Static geometry follows Ink_Pass,
+// including the cache's Bake path; no decorative object changes occupancy.
+CYBER_BODY :: rl.Color{19,116,194,255}
+CYBER_CAP :: rl.Color{51,184,235,255}
+CYBER_METAL :: rl.Color{30,150,210,255}
+CYBER_RECESS :: rl.Color{21,42,72,255}
+CYBER_RED :: rl.Color{255,77,65,254}
+CYBER_RED_FACE :: rl.Color{242,66,61,255}
+CYBER_SCREEN :: rl.Color{27,218,238,255}
+CYBER_CREAM :: rl.Color{255,223,157,255}
+CYBER_YELLOW :: rl.Color{255,190,35,255}
 
 @(private)
 cyber_point :: proc(base,local:rl.Vector3,yaw:f32)->rl.Vector3 {
@@ -84,24 +86,32 @@ cyber_strip :: proc(pass:Ink_Pass,base,a,b:rl.Vector3,yaw:f32,color:rl.Color=CYB
 
 @(private)
 cyber_server :: proc(pass:Ink_Pass,base:rl.Vector3,height,yaw:f32,variant:u32=0) {
-	cyber_case(pass,base,{.46,.44},.13,yaw)
-	cyber_case(pass,base+{0,.13,0},{.36,.35},height-.13,yaw)
-	// Recesses occupy the two camera-facing faces. An asymmetric top cap
-	// and side cable make adjacent cabinets read as equipment, not pillars.
-	ink_box(pass,cyber_point(base,{0,.3,.356},yaw),{.27,.006},height-.5,yaw,CYBER_RECESS,CYBER_RECESS,{})
-	ink_box(pass,cyber_point(base,{.366,.35,0},yaw),{.006,.24},height-.62,yaw,CYBER_RECESS,CYBER_RECESS,{})
-	for i in 0..<3 {
-		y:=.42+f32(i)*.2
-		ink_box(pass,cyber_point(base,{.06,y,.366},yaw),{.16,.008},.07,yaw,CYBER_RED_FACE,CYBER_RED_FACE,{})
-		cyber_strip(pass,base,{-.1,y+.035,.377},{.22,y+.035,.377},yaw)
-	}
-	cyber_strip(pass,base,{.377,.48,-.15},{.377,height-.3,-.15},yaw,ink_scale(CYBER_RED,.6))
-	cyber_strip(pass,base,{-.19,height-.25,.365},{-.09,height-.25,.365},yaw,CYBER_SCREEN)
-	ink_box(pass,base+{0,height-.02,0},{.21,.22},.08,yaw,CYBER_RECESS,CYBER_METAL,{})
+	// A sloped shoulder and flared feet belong to the cabinet itself. This
+	// outline stays recognizable before any printed face is added.
+	profile:=[9]rl.Vector2{{-.31,0},{-.37,.09},{-.37,.77},{-.29,.96},{.10,1},
+		{.29,.95},{.36,.79},{.36,.10},{.30,0}}
+	ink_profile(pass,base,profile[:],{1,height},.58,yaw,CYBER_CREAM,CYBER_METAL,EXPEDITION_PAPER_INK)
+	recess:=[8]rl.Vector2{{-.26,0},{-.28,.08},{-.28,.89},{-.23,1},{.21,1},{.27,.91},{.27,.08},{.23,0}}
+	panel:=cyber_point(base,{0,.23,.307},yaw)
+	ink_profile(pass,panel,recess[:],{1,height*.64},.018,yaw,CYBER_RECESS,CYBER_RECESS,EXPEDITION_PAPER_INK)
 	if variant%2==0 {
-		cyber_link(pass,cyber_point(base,{-.39,.16,-.21},yaw),cyber_point(base,{-.39,height*.68,-.21},yaw),{.025,.025})
-		cyber_link(pass,cyber_point(base,{-.39,.16,-.21},yaw),cyber_point(base,{-.24,.16,-.30},yaw),{.025,.025})
+		// A rack of three broad cartridges, with handles to one side.
+		for i in 0..<3 {
+			y:=.31+f32(i)*height*.17
+			ink_box(pass,cyber_point(base,{-.025,y,.324},yaw),{.21,.008},height*.115,yaw,CYBER_BODY,CYBER_CAP,{})
+			cyber_strip(pass,base,{.11,y+.035,.338},{.11,y+height*.08,.338},yaw,CYBER_YELLOW)
+		}
+	} else {
+		// The monitoring variant has one instrument, then a quiet cable bay.
+		ink_box(pass,cyber_point(base,{0,height*.51,.324},yaw),{.21,.008},height*.21,yaw,CYBER_SCREEN,CYBER_SCREEN,{})
+		cyber_strip(pass,base,{-.14,height*.58,.337},{-.03,height*.64,.337},yaw,CYBER_RECESS)
+		cyber_strip(pass,base,{-.03,height*.64,.337},{.13,height*.60,.337},yaw,CYBER_RECESS)
+		cyber_strip(pass,base,{-.15,.38,.337},{.15,.38,.337},yaw,CYBER_RED)
 	}
+	cyber_strip(pass,base,{-.18,height*.91,.302},{.03,height*.91,.302},yaw,CYBER_RED_FACE)
+	// A single bent hose describes the service side; no repeating scratches.
+	cyber_link(pass,cyber_point(base,{-.38,.15,-.13},yaw),cyber_point(base,{-.38,height*.55,-.13},yaw),{.025,.025},CYBER_RECESS)
+	cyber_link(pass,cyber_point(base,{-.38,.15,-.13},yaw),cyber_point(base,{-.24,.15,-.23},yaw),{.025,.025},CYBER_RECESS)
 }
 
 @(private)
@@ -124,15 +134,30 @@ cyber_rock :: proc(pass:Ink_Pass,base:rl.Vector3,radius,height,phase:f32,variant
 draw_expedition_cyber_outdoor :: proc(pass:Ink_Pass,cell:grid.Position) {
 	base:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5};h:=expedition_cell_hash(cell,0xC7)
 	if h%7>=5 {
-		cyber_server(pass,base,1.55+f32((h>>4)%5)*.25,0,h)
+		cyber_server(pass,base,1.65+f32((h>>4)%3)*.22,0,h)
 		return
 	}
-	// The entire irregular pile fits the one blocked cell, including its
-	// smaller fragments. No fake boulder stands on a traversable neighbour.
-	phase:=f32(h%13)*.21
-	cyber_rock(pass,base+{-.045,0,-.055},.40,.72+f32((h>>7)%4)*.18,phase,h,h%5==0)
-	cyber_rock(pass,base+{.28,0,.27},.19,.45+f32(h%3)*.11,phase+.7,h>>3)
-	cyber_rock(pass,base+{-.29,0,.25},.16,.31,phase+1.4,h>>6)
+	// A real cream planter holds the rooted cluster; its dark soil is visible between
+	// the rim and the leaves. The trough and foliage stay inside the blocked cell.
+	cyber_case(pass,base,{.46,.36},.23,0,CYBER_CREAM,CYBER_RECESS)
+	for side in ([2]f32{-1,1}) {
+		ink_box(pass,base+{0,.23,side*.33},{.46,.03},.055,0,CYBER_CREAM,EXPEDITION_PAPER_EDGE,{})
+		ink_box(pass,base+{side*.43,.23,0},{.03,.30},.055,0,CYBER_CREAM,EXPEDITION_PAPER_EDGE,{})
+	}
+	cyber_shrub(pass,base+{0,.23,0},1.03,.42,-math.PI/4)
+}
+
+@(private)
+cyber_shrub :: proc(pass:Ink_Pass,base:rl.Vector3,height,width,yaw:f32) {
+	for i in 0..<3 {
+		side:=f32(i-1)
+		p:=cyber_point(base,{side*width*.28,0,-.055},yaw)
+		ink_leaf(pass,p,width*.53,height*(.88 if i!=1 else 1),yaw,side*.50,{29,143,79,255})
+	}
+	for side in ([2]f32{-1,1}) {
+		p:=cyber_point(base,{side*width*.28,0,.035},yaw)
+		ink_leaf(pass,p,width*.52,height*.68,yaw,side*.68,{126,199,61,255} if side<0 else rl.Color{68,174,78,255})
+	}
 }
 
 // A folded three-link industrial arm. Its whole horizontal footprint stays
@@ -144,9 +169,9 @@ cyber_robot_arm :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,mirror:f32=1) {
 	points:[4]rl.Vector3
 	for p,i in local {points[i]=cyber_point(base,{p.x*mirror,p.y,p.z},yaw)}
 	for i in 0..<3 {
-		cyber_link(pass,points[i],points[i+1],{.085 if i<2 else .045,.075},CYBER_METAL,CYBER_CAP)
+		cyber_link(pass,points[i],points[i+1],{.105 if i<2 else .045,.075},CYBER_YELLOW,CYBER_CREAM)
 		p:=local[i];p.x*=mirror
-		cyber_axle(pass,cyber_point(base,p+{0,0,-.12},yaw),cyber_point(base,p+{0,0,.12},yaw),.13 if i<2 else .10)
+		cyber_axle(pass,cyber_point(base,p+{0,0,-.12},yaw),cyber_point(base,p+{0,0,.12},yaw),.15 if i<2 else .10)
 		cyber_strip(pass,base,p+{-.055,0,.125},p+{.055,0,.125},yaw,ink_scale(CYBER_RED,.75))
 	}
 	for side in ([2]f32{-1,1}) {
@@ -173,6 +198,34 @@ cyber_conveyor :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,arm:bool=false,mirr
 	else {cyber_case(pass,base+{0,.50,0},{.16,.20},.22,yaw,CYBER_BODY,CYBER_CAP)}
 }
 
+// Two authored service benches reuse the actual low-cover cells. A recessed
+// toe opening and shaped tabletop make the furniture read at gameplay scale.
+@(private)
+cyber_workbench :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,variant:u32) {
+	body:=[10]rl.Vector2{{-.43,0},{-.43,.52},{-.36,.60},{.36,.60},{.43,.52},
+		{.43,0},{.27,0},{.27,.13},{-.27,.13},{-.27,0}}
+	ink_profile(pass,base,body[:],{1,1},.70,yaw,CYBER_CREAM,CYBER_BODY,EXPEDITION_PAPER_INK)
+	cyber_case(pass,base+{0,.58,0},{.47,.41},.08,yaw,CYBER_RED_FACE,CYBER_RED_FACE)
+	ink_box(pass,cyber_point(base,{0,.30,.357},yaw),{.26,.006},.13,yaw,CYBER_BODY,CYBER_CAP,{})
+	cyber_strip(pass,base,{-.11,.37,.369},{.11,.37,.369},yaw,CYBER_RECESS)
+	if variant%2==0 {
+		board:=[8]rl.Vector2{{-.30,0},{-.34,.05},{-.34,.39},{-.27,.46},
+			{.27,.46},{.34,.39},{.34,.05},{.30,0}}
+		ink_profile(pass,cyber_point(base,{0,.66,-.23},yaw),board[:],{1,1},.06,yaw,CYBER_BODY,CYBER_RECESS,EXPEDITION_PAPER_INK)
+		for side in ([2]f32{-1,1}) {
+			cyber_strip(pass,base,{side*.16,.74,-.194},{side*.16,.98,-.194},yaw,CYBER_RECESS)
+		}
+		cyber_case(pass,cyber_point(base,{.15,.66,.15},yaw),{.12,.13},.12,yaw,CYBER_YELLOW,CYBER_CREAM)
+	} else {
+		// A wound service spool, with two flat flanges and a broad dark core.
+		p:=cyber_point(base,{-.12,.66,0},yaw)
+		ink_frustum(pass,p,.19,.19,.045,8,0,CYBER_YELLOW,CYBER_CREAM,{})
+		ink_frustum(pass,p+{0,.045,0},.14,.14,.25,8,0,CYBER_RECESS,CYBER_RECESS,{})
+		ink_frustum(pass,p+{0,.295,0},.19,.19,.045,8,0,CYBER_YELLOW,CYBER_CREAM,{})
+		cyber_case(pass,cyber_point(base,{.24,.66,.16},yaw),{.10,.12},.16,yaw,CYBER_BODY,CYBER_CAP)
+	}
+}
+
 @(private)
 cyber_joined_wall :: proc(room:^game.Room,site:^world.Site,cell:grid.Position)->bool {
 	tile,ok:=level.tile_at(room.level_data,cell)
@@ -180,6 +233,7 @@ cyber_joined_wall :: proc(room:^game.Room,site:^world.Site,cell:grid.Position)->
 	d:=world.site_cell(site,cell)
 	return d.inside && !(d.fixture && site.active)
 }
+
 
 @(private)
 draw_expedition_cyber_wall :: proc(pass:Ink_Pass,room:^game.Room,site:^world.Site,cell:grid.Position,design:world.Site_Cell) {
@@ -189,6 +243,9 @@ draw_expedition_cyber_wall :: proc(pass:Ink_Pass,room:^game.Room,site:^world.Sit
 		cyber_conveyor(pass,base,yaw,q.x!=6,-1 if q.x==7 else 1)
 		return
 	}
+	if site.kind==.Workshop && design.wall_height<1.1 && !design.fixture {
+		cyber_workbench(pass,base,yaw,u32(abs(q.x)+abs(q.y)));return
+	}
 	if site.kind==.Nest && abs(q.x)==5 && abs(q.y)>=3 && abs(q.y)<=6 {
 		// Three equipment bays and a breaker: an actual manufacturing aisle.
 		if abs(q.y)%3==0 {cyber_server(pass,base,1.48,yaw,u32(abs(q.y)));return}
@@ -196,26 +253,36 @@ draw_expedition_cyber_wall :: proc(pass:Ink_Pass,room:^game.Room,site:^world.Sit
 	height:=expedition_site_wall_height(design)
 	gate:=abs(design.wall_height-2.2)<.01
 	if gate {height=2.12}
-	cyber_case(pass,base,{.49,.49},height,0)
-	ink_box(pass,base,{.495,.495},.10,0,CYBER_RECESS,CYBER_CAP,{})
+	if gate {
+		ink_chamfer_box(pass,base,{.5,.5},height,0,CYBER_BODY,EXPEDITION_PAPER_EDGE,EXPEDITION_PAPER_INK,cut=.12)
+	} else {
+		ink_wall_sheet(pass,room,site,cell,height,CYBER_BODY,EXPEDITION_PAPER_EDGE,outline=false,post_fill=CYBER_BODY)
+	}
 	for direction in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
 		if cyber_joined_wall(room,site,game.add_position(cell,direction)) {continue}
+		if direction.x<0 || direction.y<0 {continue}
 		face_yaw:=math.atan2(f32(-direction.x),f32(direction.y))
-		detail:=(abs(q.x)+abs(q.y))%3==0 || gate
-		if detail {
-			ink_box(pass,cyber_point(base,{0,.19,.493},face_yaw),{.32,.005},height-.37,face_yaw,CYBER_RECESS,CYBER_RECESS,{})
-			for i in 0..<3 {
-				y:=height*.40+f32(i)*.13
-				ink_box(pass,cyber_point(base,{0,y,.499},face_yaw),{.19,.003},.045,face_yaw,CYBER_METAL,CYBER_METAL,{})
-			}
-			cyber_strip(pass,base,{-.23,height-.30,.504},{.23,height-.30,.504},face_yaw)
-			if gate {cyber_strip(pass,base,{-.34,.27,.504},{-.34,height-.24,.504},face_yaw,ink_scale(CYBER_RED,.7))}
-		} else {
-			// Recessed cable channels have short red sections, separated by dark
-			// couplings; the whole wall never becomes a luminous wire cage.
-			ink_box(pass,cyber_point(base,{0,.25,.493},face_yaw),{.46,.006},.11,face_yaw,CYBER_RECESS,CYBER_RECESS,{})
-			cyber_strip(pass,base,{-.31,.30,.504},{.31,.30,.504},face_yaw,ink_scale(CYBER_RED,.6))
+		station:=(abs(q.x)+abs(q.y)+2*direction.x)%5
+		if gate {
+			// Entrance markings are reserved for the actual door supports.
+			ink_box(pass,cyber_point(base,{-.27,.28,.501},face_yaw),{.045,.002},height-.48,face_yaw,CYBER_RED_FACE,CYBER_RED_FACE,{})
+			cyber_strip(pass,base,{-.13,height*.74,.505},{.26,height*.74,.505},face_yaw,CYBER_RED)
+		} else if station==1 {
+			// A single glazed inspection window leaves surrounding wall calm.
+			window:=[8]rl.Vector2{{-.29,0},{-.33,.06},{-.33,.37},{-.26,.44},
+				{.26,.44},{.33,.37},{.33,.06},{.29,0}}
+			ink_profile(pass,cyber_point(base,{0,height*.46,.503},face_yaw),window[:],{1,1},.004,face_yaw,CYBER_RECESS,CYBER_RECESS,EXPEDITION_PAPER_INK)
+			// Two quiet reflected strokes have ink pigmentation, not emission.
+			shine:=[4]rl.Vector2{{-.22,.10},{-.08,.34},{.02,.34},{-.12,.10}}
+			ink_profile(pass,cyber_point(base,{0,height*.46,.505},face_yaw),shine[:],{1,1},.001,face_yaw,CYBER_METAL,CYBER_METAL,{})
+		} else if station==3 {
+			// A low breaker label and one small live indicator identify service
+			// bays, without outlining every metre of masonry in red.
+			ink_box(pass,cyber_point(base,{.15,height*.24,.501},face_yaw),{.16,.002},.25,face_yaw,CYBER_CREAM,CYBER_CREAM,{})
+			ink_box(pass,cyber_point(base,{.15,height*.24+.07,.504},face_yaw),{.10,.001},.045,face_yaw,CYBER_RECESS,CYBER_RECESS,{})
+			cyber_strip(pass,base,{.07,height*.24+.19,.506},{.23,height*.24+.19,.506},face_yaw,CYBER_RED)
 		}
+
 	}
 }
 
@@ -234,16 +301,25 @@ draw_expedition_cyber_gate :: proc(pass:Ink_Pass,a,b:rl.Vector3) {
 
 @(private)
 cyber_console :: proc(pass:Ink_Pass,base:rl.Vector3,yaw:f32,archive:bool=false,secret:bool=false) {
-	cyber_case(pass,base,{.46,.44},.14,yaw)
-	cyber_case(pass,base+{0,.14,0},{.35,.32},.71,yaw)
-	cyber_case(pass,cyber_point(base,{0,.85,-.06},yaw),{.37,.18},.60,yaw)
-	ink_box(pass,cyber_point(base,{0,1.00,.126},yaw),{.28,.008},.32,yaw,CYBER_SCREEN,CYBER_SCREEN,{})
-	cyber_strip(pass,base,{-.20,1.12,.14},{.15,1.12,.14},yaw,{106,216,247,254})
-	ink_box(pass,cyber_point(base,{0,.75,.30},yaw),{.26,.07},.055,yaw,CYBER_METAL,CYBER_CAP,{})
-	for i in 0..<3 {ink_box(pass,cyber_point(base,{f32(i-1)*.12,.808,.3},yaw),{.035,.035},.012,yaw,CYBER_RECESS,CYBER_RECESS,{})}
+	cyber_case(pass,base,{.32,.31},.78,yaw,CYBER_BODY,CYBER_CAP)
+	// The oversized asymmetric CRT shoulder reads independently of its
+	// printed display; its narrow neck leaves a visible keyboard ledge.
+	hood:=[8]rl.Vector2{{-.28,0},{-.37,.13},{-.33,.65},{-.23,.72},
+		{.23,.72},{.35,.61},{.37,.13},{.26,0}}
+	ink_profile(pass,cyber_point(base,{0,.73,-.06},yaw),hood[:],{1,1},.36,yaw,CYBER_CREAM,CYBER_METAL,EXPEDITION_PAPER_INK)
+	screen:=[8]rl.Vector2{{-.24,0},{-.28,.05},{-.27,.35},{-.21,.40},
+		{.21,.40},{.27,.35},{.28,.05},{.24,0}}
+	ink_profile(pass,cyber_point(base,{0,.94,.135},yaw),screen[:],{1,1},.014,yaw,CYBER_SCREEN,CYBER_RECESS,EXPEDITION_PAPER_INK)
+	// Two purposeful print marks: a cursor and a short readable graph.
+	cyber_strip(pass,base,{-.19,1.24,.15},{-.09,1.24,.15},yaw,CYBER_CREAM)
+	cyber_strip(pass,base,{-.18,1.04,.15},{-.06,1.15,.15},yaw,CYBER_RECESS)
+	cyber_strip(pass,base,{-.06,1.15,.15},{.02,1.08,.15},yaw,CYBER_RECESS)
+	cyber_strip(pass,base,{.02,1.08,.15},{.19,1.19,.15},yaw,CYBER_RECESS)
+	ink_box(pass,cyber_point(base,{0,.77,.28},yaw),{.28,.09},.055,yaw,CYBER_CREAM,EXPEDITION_PAPER_EDGE,{})
+	for i in 0..<3 {ink_box(pass,cyber_point(base,{f32(i-1)*.12,.828,.3},yaw),{.038,.035},.012,yaw,CYBER_RECESS,CYBER_RECESS,{})}
 	color:=rl.Color{237,195,91,254} if secret else CYBER_RED
-	cyber_strip(pass,base,{-.25,.35,.329},{-.25,.62,.329},yaw,color)
-	if archive {ink_box(pass,base+{0,1.45,0},{.22,.11},.12,yaw,CYBER_RECESS,CYBER_CAP,{})}
+	cyber_strip(pass,base,{-.20,.28,.319},{-.20,.53,.319},yaw,color)
+	if archive {cyber_strip(pass,base,{.08,.51,.319},{.22,.51,.319},yaw,CYBER_YELLOW)}
 }
 
 @(private)
@@ -260,12 +336,12 @@ draw_expedition_cyber_fixture :: proc(pass:Ink_Pass,site:^world.Site,boss_defeat
 		// Its operator display faces the fixed camera, independently of the
 		// factory's entrance orientation; the square occupied cell is unchanged.
 		control_yaw:=f32(0)
-		cyber_case(pass,base,{.46,.44},.62,control_yaw)
-		cyber_robot_arm(pass,base+{0,.62,0},control_yaw)
-		ink_box(pass,base+{0,.15,.446},{.34,.008},.40,control_yaw,CYBER_RECESS,CYBER_RECESS,{})
-		ink_box(pass,base+{0,.20,.458},{.28,.008},.28,control_yaw,CYBER_SCREEN,CYBER_SCREEN,{})
+		cyber_case(pass,base,{.46,.44},.78,control_yaw,CYBER_CREAM,EXPEDITION_PAPER_EDGE)
+		cyber_robot_arm(pass,base+{0,.78,0},control_yaw)
+		ink_box(pass,base+{0,.17,.446},{.34,.008},.49,control_yaw,CYBER_RECESS,CYBER_RECESS,{})
+		ink_box(pass,base+{0,.24,.458},{.28,.008},.34,control_yaw,CYBER_SCREEN,CYBER_SCREEN,{})
 		cyber_strip(pass,base,{-.20,.34,.47},{.12,.34,.47},control_yaw,CYBER_SCREEN)
-		for side in ([2]f32{-1,1}) {ink_box(pass,base+{side*.32,.46,.46},{.018,.008},.045,0,CYBER_METAL,CYBER_METAL,{})}
+		for side in ([2]f32{-1,1}) {ink_box(pass,base+{side*.32,.61,.46},{.018,.008},.045,0,CYBER_METAL,CYBER_METAL,{})}
 	case .Nest:
 		cyber_case(pass,base,{.47,.46},.15,yaw)
 		cyber_case(pass,base+{0,.15,0},{.39,.36},1.2,yaw)

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "purpose": "Riferimenti visivi per una futura migrazione del renderer, non asset runtime e non screenshot di implementazione completata.",
+  "priority": "01-sprite-forma-finale.png prevale sempre per sagoma e raccordo dei personaggi al terreno.",
+  "images": [
+    {
+      "file": "01-sprite-forma-finale.png",
+      "source": "output/imagegen/cyber-cartoncino/dettaglio-cartoon-senza-sostegno.png",
+      "sha256": "7c51d343e3e931f31e2f703ef9f9dab5f3a3a432abde6111ddaca42c4b584c87",
+      "bytes": 1866468,
+      "width": 1668,
+      "height": 943,
+      "role": "Riferimento prioritario: forma finale approvata di sprite, sagoma e attacco al terreno; nessun sostegno laterale."
+    },
+    {
+      "file": "02-esplorazione-composizione.png",
+      "source": "output/imagegen/cyber-cartoncino/esplorazione-innesto-popup.png",
+      "sha256": "182d7e1aa6961f3afb5316f6728b0a6250b90a5f7c2f3bfe0a2a3fbeaf79d4e7",
+      "bytes": 2899748,
+      "width": 1672,
+      "height": 941,
+      "role": "Riferimento per ambiente, palette, proporzioni e leggibilita. La base del personaggio e superata dal riferimento 01."
+    },
+    {
+      "file": "03-combattimento-composizione.png",
+      "source": "output/imagegen/cyber-cartoncino/combattimento-innesto-popup-v2.png",
+      "sha256": "6c5bbe8db77e9a33a7498065fef97558c138a0bcc2962bed12d4e68cb6fdf46a",
+      "bytes": 2753001,
+      "width": 1672,
+      "height": 941,
+      "role": "Riferimento per combattimento, carte, griglia e rapporto attori/ambiente. Le basi degli attori sono superate dal riferimento 01."
+    }
+  ]
+}

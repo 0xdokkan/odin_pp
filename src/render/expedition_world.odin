@@ -18,15 +18,15 @@ draw_expedition_tile :: proc(renderer:^Renderer,room:^game.Room,w:^world.World,c
 	if tile.kind==.Void {return}
 	c:=expedition_color(w.biome); base:=rl.Vector3{f32(cell.x)+0.5,-0.12,f32(cell.y)+0.5}
 	_,design:=expedition_site_near(renderer,w,cell)
-	// The matte night floor of the reference; courtyards are a shade apart.
-	ink:=rl.Color{9,11,18,255}
+	// CPU fallback retains the same light stock as the floor shader.
+	ink:=rl.Color{244,225,188,255}
 	if design.inside {
 		#partial switch design.surface {
-		case .Platform:ink={14,17,27,255}
-		case .Approach,.Threshold:ink={10,12,20,255}
-		case .Passage:ink={10,12,19,255}
-		case .Garden:ink={9,14,18,255}
-		case .Ruin:ink={10,12,20,255}
+		case .Platform:ink={127,187,200,255}
+		case .Approach,.Threshold:ink={230,217,186,255}
+		case .Passage:ink={215,212,184,255}
+		case .Garden:ink={199,216,169,255}
+		case .Ruin:ink={219,210,184,255}
 		}
 	}
 	rl.DrawCubeV(base,{1,0.22,1},ink)
@@ -155,6 +155,7 @@ expedition_patrol_shown :: proc(renderer:^Renderer,group,member:int,fallback:gri
 draw_expedition_props :: proc(renderer:^Renderer,room:^game.Room,w:^world.World) {
 	renderer.tactical.expedition_mounted=w.mounted || room.player.tactical.dinosaur_remaining>0
 	renderer.tactical.expedition_clock=w.clock
+	draw_expedition_fixture_sprites(renderer,room,w)
 	update_expedition_patrol_glide(renderer,w)
 
 	for &group,g in w.groups[:w.group_count] {for m,i in group.members[:group.count] {
@@ -199,6 +200,14 @@ draw_expedition_labels :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 		if !site.active || site.state==.Resolved || world.distance(room.player.position,site.position)>10 {continue}
 		if site.secret && site.state==.Unvisited {continue}
 		label_height:=f32(2.7) if w.biome==.Cyber && site.kind==.Workshop else 1.5
+		if m:=renderer.tactical.expedition_material;m!=nil && m.fixtures!=nil && expedition_fixture_is_sprite(site.kind) {
+			label_height=1.6
+			if (w.biome==.Cyber || w.biome==.West) && site.kind==.Workshop && m.fixtures.hero_print.id!=0 {
+				// Clear the actual tall paper silhouette, including its support.
+				bounds:=m.fixtures.west_bounds if w.biome==.West else m.fixtures.hero_bounds
+				label_height=(CYBER_PRESS_FEET-bounds.y)/CARTOON_PIXELS+.35
+			}
+		}
 		p:=tactical_project(renderer,{f32(site.position.x)+.5,f32(site.position.y)+.5},label_height+cell_ground(site.position))
 		// In the saddle too; a cave's mouth is walked through, with nothing to use.
 		hint:=site.kind!=.Cave && room.phase==.Loot && world.distance(room.player.position,site.position)<=3
@@ -206,6 +215,7 @@ draw_expedition_labels :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 	}
 	names:=world.metadata(w.biome).enemies
 	for enemy in room.enemies {
+		if !tactical_enemy_name_shown(renderer,room,enemy) {continue}
 		if !tactical_cell_on_screen(renderer,enemy.position) {continue}
 		p:=tactical_project(renderer,{f32(enemy.position.x)+.5,f32(enemy.position.y)+.5},2+cell_ground(enemy.position))
 		draw_tactical_label(renderer,p,fmt.ctprintf("%s",names[int(enemy.archetype)]),"",c)

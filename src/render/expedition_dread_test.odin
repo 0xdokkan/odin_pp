@@ -59,7 +59,7 @@ test_dread_outdoor_silhouettes_are_bounded_cheap_and_cache_stable :: proc(t:^tes
 				high=max(high,v.position.y)
 			}
 			testing.expect(t,bounded,"decorative vegetation and graves stay inside their blocked cell")
-			testing.expect(t,len(b.vertices)<=900 && len(b.lines)<=1)
+			testing.expect(t,len(b.vertices)<=900 && biome_test_light_lines(b.lines[:])<=1 && len(b.lines)<=64)
 			if high<1.9 {short+=1} else {tall+=1}
 		}
 		testing.expect(t,short>5 && tall>5,"each biome has both tall and low outdoor forms")
@@ -106,7 +106,7 @@ test_dread_site_walls_follow_real_collision_and_vertex_budget :: proc(t:^testing
 					bounded=bounded && v.position.y>=0 && v.position.y<2.3
 				}
 				testing.expect(t,bounded,"facade relief and sandbags cannot enter a walkable neighbour")
-				testing.expect(t,len(b.vertices)<=600 && len(b.lines)<=2)
+				testing.expect(t,len(b.vertices)<=600 && biome_test_light_lines(b.lines[:])<=2 && len(b.lines)<=64)
 				if expedition_site_wall_height(d)<1.15 {low_covers+=1}
 			}}
 		}
@@ -126,7 +126,7 @@ test_dread_all_fixtures_keep_rotated_portals_and_walkable_centres_clear :: proc(
 			clear(&b.vertices);clear(&b.lines)
 			testing.expect(t,draw_expedition_dread_fixture({mode=.Bake,builder=&b},w,&site))
 			dread_test_mesh(t,&b)
-			testing.expect(t,len(b.vertices)<=1000 && len(b.lines)<=4)
+			testing.expect(t,len(b.vertices)<=1000 && biome_test_light_lines(b.lines[:])<=4 && len(b.lines)<=64)
 			bounded:=true
 			for v in b.vertices {
 				if kind==.Trial || kind==.Tunnel {bounded=bounded && v.position.y<=.026;continue}
@@ -178,7 +178,7 @@ test_dread_gate_beams_leave_walking_clearance_at_all_orientations :: proc(t:^tes
 				bounded=bounded && abs(local.x)<3.5 && abs(local.z)<.5 && local.y>=-.25 && local.y<.9
 			}
 			testing.expect(t,bounded,"lintels and hanging lights stay above the passage")
-			testing.expect(t,len(b.vertices)<400 && len(b.lines)<=2)
+			testing.expect(t,len(b.vertices)<400 && biome_test_light_lines(b.lines[:])<=2 && len(b.lines)<=64)
 		}
 	}
 }

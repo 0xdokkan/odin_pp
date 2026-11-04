@@ -52,9 +52,9 @@ EXPEDITION_HDR_BACKDROP :: `#version 330
 in vec2 fragTexCoord;
 out vec4 finalColor;
 void main() {
-    vec3 c=mix(vec3(5.,9.,16.),vec3(8.,14.,23.),fragTexCoord.y)/255.;
+    vec3 c=mix(vec3(223.,219.,201.),vec3(245.,235.,212.),fragTexCoord.y)/255.;
     float pool=1.-smoothstep(0.,.65,length((fragTexCoord-vec2(.51,.6))*vec2(1.78,1.)));
-    c=mix(c,vec3(25.,45.,66.)/255.,pool*.3);
+    c=mix(c,vec3(245.,236.,213.)/255.,pool*.3);
     finalColor=vec4(pow(c,vec3(2.2)),1.);
 }`
 
@@ -101,11 +101,16 @@ uniform sampler2D texture0;
 uniform sampler2D bloomTexture;
 uniform float exposure;
 out vec4 finalColor;
-vec3 aces(vec3 v) {return clamp((v*(2.51*v+.03))/(v*(2.43*v+.59)+.14),0.,1.);}
 void main() {
     vec3 c=texture(texture0,fragTexCoord).rgb;
-    c+=texture(bloomTexture,fragTexCoord).rgb*.38;
-    finalColor=vec4(pow(aces(c*exposure),vec3(1./2.2)),1.);
+    c+=texture(bloomTexture,fragTexCoord).rgb*.025;
+    c*=exposure;
+    // A painter's grade: a touch more pigment, cool shadows and warm light,
+    // so the sun's shadows read as colour rather than as grey.
+    float l=dot(c,vec3(.2126,.7152,.0722));
+    c=max(mix(vec3(l),c,1.10),0.);
+    c*=mix(vec3(.92,.95,1.07),vec3(1.03,1.,.96),smoothstep(.03,.5,l));
+    finalColor=vec4(pow(clamp(c,0.,1.),vec3(1./2.2)),1.);
 }`
 
 @(private)

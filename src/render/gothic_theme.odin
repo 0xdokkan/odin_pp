@@ -103,9 +103,9 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 	paper := rl.GenImageColor(96, 128, GOTHIC_PAPER)
 	for y in 0..<128 { for x in 0..<96 {
 		n := gothic_hash(x/2, y/2)
-		shade := i32(n%13)-6
-		if min(min(x, 95-x), min(y, 127-y)) < 5 { shade -= 8 }
-		rl.ImageDrawPixel(&paper, c.int(x), c.int(y), {u8(218+shade), u8(207+shade), u8(184+shade), 255})
+		shade := i32(n%5)-2
+		if min(min(x, 95-x), min(y, 127-y)) < 5 { shade -= 3 }
+		rl.ImageDrawPixel(&paper, c.int(x), c.int(y), {u8(250+shade), u8(238+shade), u8(208+shade), 255})
 	} }
 	art.paper = rl.LoadTextureFromImage(paper)
 	scopa_bytes := #load("../../assets/gothic/scopa-denari.png")

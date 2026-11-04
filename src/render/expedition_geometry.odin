@@ -11,7 +11,7 @@ import level "../level"
 // One upload per static 8x8 region. The cache belongs to the view's material;
 // camera, combat, window resize and the cosmetic clock never invalidate it.
 EXPEDITION_GEOMETRY_CHUNK :: 8
-Expedition_Baked_Vertex :: struct { position,normal:rl.Vector3, color:rl.Color }
+Expedition_Baked_Vertex :: struct { position,normal:rl.Vector3, color:rl.Color, print_uv:rl.Vector2 }
 Expedition_Baked_Line :: struct { a,b:rl.Vector3, color:rl.Color }
 Expedition_Geometry_Builder :: struct {
 	vertices:[dynamic]Expedition_Baked_Vertex,
@@ -39,6 +39,7 @@ Expedition_Architecture_Cache :: struct {
 	key:Expedition_Architecture_Key,
 	chunks:[]Expedition_Geometry_Chunk,
 	sites:[world.MAX_SITES]Expedition_Geometry_Chunk,
+	structures:[level.MAX_STRUCTURES_PER_LEVEL]Expedition_Geometry_Chunk,
 	columns,rows:int,
 	lo,hi:grid.Position,
 	ready,failed:bool,
@@ -66,6 +67,10 @@ destroy_expedition_geometry :: proc(cache:^Expedition_Architecture_Cache) {
 		if chunk.mesh.vertexCount>0 {rl.UnloadMesh(chunk.mesh)}
 		delete(chunk.lines)
 	}
+	for &chunk in cache.structures {
+		if chunk.mesh.vertexCount>0 {rl.UnloadMesh(chunk.mesh)}
+		delete(chunk.lines)
+	}
 	delete(cache.chunks);cache^={}
 }
 
@@ -75,7 +80,12 @@ expedition_build_chunk :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 	for y in origin.y..<min(origin.y+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.height) {
 		for x in origin.x..<min(origin.x+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.width) {
 			cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell)
-			if tile.kind!=.Wall && tile.kind!=.Fence {continue}
+			if tile.kind!=.Wall && tile.kind!=.Fence {
+				if hash,selected:=expedition_ground_art_selected(room.level_data,w,cell);selected {
+					expedition_ground_art_cell(builder,w.biome,cell,hash)
+				}
+				continue
+			}
 			ground:=pass;ground.lift=cell_ground(cell)
 			if draw_expedition_structure_solid(ground,room,w,cell,tile.kind) {continue}
 			site_index,design:=expedition_site_near(renderer,w,cell)
@@ -94,8 +104,9 @@ expedition_upload_chunk :: proc(chunk:^Expedition_Geometry_Chunk,builder:^Expedi
 	mesh.vertexCount=c.int(n);mesh.triangleCount=c.int(n/3)
 	mesh.vertices=cast([^]f32)rl.MemAlloc(c.uint(n*3*size_of(f32)))
 	mesh.normals=cast([^]f32)rl.MemAlloc(c.uint(n*3*size_of(f32)))
+	mesh.texcoords=cast([^]f32)rl.MemAlloc(c.uint(n*2*size_of(f32)))
 	mesh.colors=cast([^]u8)rl.MemAlloc(c.uint(n*4))
-	if mesh.vertices==nil || mesh.normals==nil || mesh.colors==nil {
+	if mesh.vertices==nil || mesh.normals==nil || mesh.colors==nil || mesh.texcoords==nil {
 		rl.UnloadMesh(mesh^);mesh^={};return false
 	}
 	minimum,maximum:=builder.vertices[0].position,builder.vertices[0].position
@@ -104,6 +115,7 @@ expedition_upload_chunk :: proc(chunk:^Expedition_Geometry_Chunk,builder:^Expedi
 			mesh.vertices[i*3+axis]=v.position[axis];mesh.normals[i*3+axis]=v.normal[axis]
 			minimum[axis]=min(minimum[axis],v.position[axis]);maximum[axis]=max(maximum[axis],v.position[axis])
 		}
+		mesh.texcoords[i*2]=v.print_uv.x;mesh.texcoords[i*2+1]=v.print_uv.y
 		mesh.colors[i*4]=v.color.r;mesh.colors[i*4+1]=v.color.g;mesh.colors[i*4+2]=v.color.b;mesh.colors[i*4+3]=v.color.a
 	}
 	chunk.center=(minimum+maximum)*.5;chunk.radius=rl.Vector3Distance(minimum,maximum)*.5+.1
@@ -150,6 +162,16 @@ prepare_expedition_geometry :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 		if !expedition_upload_chunk(chunk,&builder,site.position) {cache.ready=false;cache.failed=true;return false}
 		cache.uploads+=1
 	}
+	for placed,i in room.level_data.structures {
+		chunk:=&cache.structures[i]
+		if chunk.ready || level.structure_is_building(placed.id) || !expedition_structure_near(room.level_data,i,p) {continue}
+		clear(&builder.vertices);clear(&builder.lines)
+		anchor:=expedition_structure_anchor(room.level_data,i)
+		draw_expedition_structure_object({mode=.Bake,builder=&builder,lift=cell_ground(anchor)},room.level_data,i,w.biome)
+		rlgl.DrawRenderBatchActive()
+		if !expedition_upload_chunk(chunk,&builder,anchor) {cache.ready=false;cache.failed=true;return false}
+		cache.uploads+=1
+	}
 	return true
 }
 
@@ -162,6 +184,10 @@ collect_expedition_cached_edges :: proc(renderer:^Renderer,room:^game.Room,w:^wo
 	for site,i in w.sites[:cache.key.site_count] {
 		if !site.active || world.distance(site.position,room.player.position)>30 {continue}
 		for line in cache.sites[i].lines {expedition_collect_edge(&m.edges,line.a,line.b,line.color)}
+	}
+	for placed,i in room.level_data.structures {
+		if level.structure_is_building(placed.id) || !expedition_structure_near(room.level_data,i,room.player.position) {continue}
+		for line in cache.structures[i].lines {expedition_collect_edge(&m.edges,line.a,line.b,line.color)}
 	}
 }
 
@@ -230,6 +256,17 @@ draw_expedition_cached_architecture :: proc(renderer:^Renderer,room:^game.Room,w
 			}
 			revealed:=expedition_chunk_revealed(m,chunk)
 			if revealed!=(layer==.Revealed) {continue}
+			if chunk.mesh.vertexCount>0 {rl.DrawMesh(chunk.mesh,{shader=shader,maps=raw_data(maps[:])},rl.Matrix(1))}
+		}
+		for placed,i in room.level_data.structures {
+			if level.structure_is_building(placed.id) || !expedition_structure_near(room.level_data,i,room.player.position) {continue}
+			chunk:=&cache.structures[i]
+			if !chunk.ready || !expedition_chunk_visible(&renderer.tactical.draw_frustum,chunk,m.reflection_pass) {continue}
+			if layer==.Edges {
+				for line in chunk.lines {draw_expedition_ribbon(&m.edges,line.a,line.b,line.color)}
+				continue
+			}
+			if expedition_chunk_revealed(m,chunk)!=(layer==.Revealed) {continue}
 			if chunk.mesh.vertexCount>0 {rl.DrawMesh(chunk.mesh,{shader=shader,maps=raw_data(maps[:])},rl.Matrix(1))}
 		}
 		if layer!=.Edges && m.reflection_pass {mirror:=f32(1);rl.SetShaderValue(shader,m.light_uniforms.mirror,&mirror,.FLOAT)}

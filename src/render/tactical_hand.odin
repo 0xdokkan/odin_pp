@@ -8,6 +8,13 @@ import game "../game"
 import view "../engine/view"
 
 TACTICAL_HAND_HEIGHT :: f32(184)
+EXPEDITION_HAND_HEIGHT :: f32(160)
+
+// Drawing, hit testing and camera framing share the same compact hand.
+@(private)
+tactical_hand_height :: proc(renderer:^Renderer)->f32 {
+	return EXPEDITION_HAND_HEIGHT if renderer.tactical.expedition else TACTICAL_HAND_HEIGHT
+}
 // How far the card under the mouse rises over an overlapping hand's others
 // (it stops short of the energy and the hint over the hand).
 TACTICAL_HAND_RAISE :: f32(8)
@@ -26,7 +33,8 @@ TACTICAL_HAND_RAISE :: f32(8)
 tactical_hand_card_bounds :: proc(renderer: ^Renderer, index, count: int) -> rl.Rectangle {
 	if count <= 0 || count > game.MAX_HAND_CAPACITY || index < 0 || index >= count { return {} }
 	gap: f32 = 8
-	y := renderer.canvas_height-160+first_person_hand_drop(renderer)
+	card_height:=f32(130) if renderer.tactical.expedition else 154
+	y := renderer.canvas_height-card_height-6+first_person_hand_drop(renderer)
 	if tactical_hand_overlaps(count) {
 		width := tactical_hand_overlap_card_width(renderer)
 		span := renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER*2
@@ -39,11 +47,11 @@ tactical_hand_card_bounds :: proc(renderer: ^Renderer, index, count: int) -> rl.
 			// evenly.
 			x += f32(index)*(span-width)/f32(count-1)
 		}
-		return {x, y, width, 154}
+		return {x, y, width, card_height}
 	}
 	width := min(f32(166), (renderer.canvas_width-32-gap*f32(count-1))/f32(count))
 	left := (renderer.canvas_width-width*f32(count)-gap*f32(count-1))*0.5
-	return {left+f32(index)*(width+gap), y, width, 154}
+	return {left+f32(index)*(width+gap), y, width, card_height}
 }
 
 // More cards than the game's hand ever holds: they overlap (PROVA MECCANICHE).
@@ -242,6 +250,8 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	rarity := gothic_rarity_accent(definition.rarity)
 	edge := GOTHIC_BLUE if selected || hovered else GOTHIC_STEEL
 	x, y, width := bounds.x, bounds.y, bounds.width
+	compact:=bounds.height<150
+	shift:=f32(24) if compact else 0
 	gothic_frame({x+2, y+3, width, bounds.height}, GOTHIC_INK, GOTHIC_INK)
 	gothic_frame(bounds, GOTHIC_INK, edge, true, art)
 	ink := GOTHIC_INK if affordable && available else rl.Color{111, 102, 92, 255}
@@ -264,18 +274,21 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 		TACTICAL_CARD_NAME_SIZE, ink)
 	// A smaller recessed crest leaves room for both effect lines in an eight-card hand.
 	covered := visible > 0 && visible < width
-	icon_bounds := rl.Rectangle{x+40, y+36, width-56, 44}
+	icon_bounds := rl.Rectangle{x+40, y+(35 if compact else 36), width-56, 22 if compact else 44}
+	if compact && game.card_is_board_device(card.definition_id) {icon_bounds.x=x+78;icon_bounds.width=max(f32(12),width-94)}
 	if covered { icon_bounds.width = clamp(visible-42, 0, width-56) }
 	center_x := icon_bounds.x+icon_bounds.width*0.5
-	rl.DrawRectangleRec({center_x-23, y+43, 46, 32}, {99, 105, 111, 19})
-	rl.DrawRectangleRec({center_x-15, y+36, 30, 7}, {99, 105, 111, 19})
-	rl.DrawLineEx({center_x-25, y+44}, {center_x-25, y+75}, 1, {114, 102, 83, 75})
-	rl.DrawLineEx({center_x+25, y+44}, {center_x+25, y+75}, 1, {114, 102, 83, 75})
+	if !compact {
+		rl.DrawRectangleRec({center_x-23, y+43, 46, 32}, {99, 105, 111, 19})
+		rl.DrawRectangleRec({center_x-15, y+36, 30, 7}, {99, 105, 111, 19})
+		rl.DrawLineEx({center_x-25, y+44}, {center_x-25, y+75}, 1, {114, 102, 83, 75})
+		rl.DrawLineEx({center_x+25, y+44}, {center_x+25, y+75}, 1, {114, 102, 83, 75})
+	}
 	if covered {
-		marks_y := y+79 if game.card_is_board_device(card.definition_id) else y+70
+		marks_y := y+79-shift if game.card_is_board_device(card.definition_id) else y+70-shift
 		for mark in 0..=int(definition.rarity) { gothic_inlay(x+15+f32(mark)*8, marks_y, 2, rarity) }
 	} else {
-		for mark in 0..=int(definition.rarity) { gothic_inlay(x+width-14, y+43+f32(mark)*8, 2, rarity) }
+		for mark in 0..=int(definition.rarity) { gothic_inlay(x+width-14, y+(39 if compact else 43)+f32(mark)*(6 if compact else 8), 2, rarity) }
 	}
 	icon := gothic_card_icon(card.definition_id)
 	shadow_bounds := icon_bounds
@@ -288,22 +301,23 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	}
 	// Time has a distinct blue badge, separated from the black energy socket.
 	// The crest stays clear even with the narrowest eight-card hand.
-	rl.DrawRectangleRec({x+8, y+42, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
+	time_y:=y+36 if compact else y+42
+	rl.DrawRectangleRec({x+8, time_y, 30, 17}, {22, 41, 54, 240})
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)), {x+11, time_y+1, 25, 15}, 12, GOTHIC_BLUE)
 	if game.card_is_board_device(card.definition_id) {
-		gothic_text_fit(renderer,"PASSIVA" if card.definition_id == .Shock_Floor else "ATTIVO",{x+8,y+63,32,12},9,accent)
+		gothic_text_fit(renderer,"PASSIVA" if card.definition_id == .Shock_Floor else "ATTIVO",{x+42 if compact else x+8,y+46 if compact else y+63,32,12},9,accent)
 	}
-	rl.DrawRectangleRec({x+10, y+83, width-20, 2}, accent)
-	rl.DrawRectangleRec({x+10, y+85, width-20, 1}, {251, 244, 223, 170})
+	rl.DrawRectangleRec({x+10, y+83-shift, width-20, 2}, accent)
+	rl.DrawRectangleRec({x+10, y+85-shift, width-20, 1}, {251, 244, 223, 170})
 	first, second := tactical_card_face_lines(card, definition, width)
-	gothic_text_fit(renderer, first, {x+10, y+90, width-20, 18}, 14, ink)
-	gothic_text_fit(renderer, second, {x+10, y+109, width-20, 17}, 12, ink)
-	rl.DrawRectangleRec({x+9, y+130, width-18, 17}, {41, 42, 45, 24})
-	gothic_rule(x+10, y+128, width-20, rarity)
-	gothic_text_fit(renderer, tactical_card_target_label(definition), {x+10, y+132, width-32, 17}, 12, accent)
+	gothic_text_fit(renderer, first, {x+10, y+90-shift, width-20, 18}, 14, ink)
+	gothic_text_fit(renderer, second, {x+10, y+109-shift, width-20, 17}, 12, ink)
+	rl.DrawRectangleRec({x+9, y+130-shift, width-18, 17}, {41, 42, 45, 24})
+	gothic_rule(x+10, y+128-shift, width-20, rarity)
+	gothic_text_fit(renderer, tactical_card_target_label(definition), {x+10, y+132-shift, width-32, 17}, 12, accent)
 	if slot >= 0 {
 		shown := visible if visible > 0 else width
-		gothic_text(renderer, key if key != "" else fmt.ctprintf("%d", slot+1), x+shown-18, y+132, 12, ink)
+		gothic_text(renderer, key if key != "" else fmt.ctprintf("%d", slot+1), x+shown-18, y+132-shift, 12, ink)
 	}
 }
 
@@ -501,14 +515,15 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	effect := Inspector_Effect.None, effect_ready := true) {
 	x, y := f32(25), TACTICAL_HUD_HEIGHT+f32(26)
 	frame := tactical_card_inspector_bounds(effect)
-	gothic_frame(frame, GOTHIC_RECESS, GOTHIC_STEEL)
-	gothic_text_fit(renderer, tactical_card_title(card, definition), {x, y, 195, 25}, 18, GOTHIC_PAPER)
+	if renderer.tactical.expedition {hud_frame(frame,GOTHIC_BLUE,true)}
+	else {gothic_frame(frame, GOTHIC_RECESS, GOTHIC_STEEL)}
+	gothic_text_fit(renderer, tactical_card_title(card, definition), {x, y, 195, 25}, 18, hud_ink(renderer))
 	gothic_rule(x, y+29, 190, gothic_rarity_accent(definition.rarity))
 	gothic_text_fit(renderer, tactical_card_cost_line(renderer, card, definition), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
-	gothic_text_fit(renderer, tactical_card_target_label(definition), {x, y+54, 193, 17}, 12, GOTHIC_MUTED)
+	gothic_text_fit(renderer, tactical_card_target_label(definition), {x, y+54, 193, 17}, 12, hud_muted(renderer))
 	first, second := gothic_card_lines(card)
-	gothic_text_fit(renderer, first, {x, y+76, 192, 20}, 16, GOTHIC_PAPER)
-	gothic_text_fit(renderer, second, {x, y+97, 192, 18}, 14, GOTHIC_PAPER)
+	gothic_text_fit(renderer, first, {x, y+76, 192, 20}, 16, hud_ink(renderer))
+	gothic_text_fit(renderer, second, {x, y+97, 192, 18}, 14, hud_ink(renderer))
 	reaction, rule := tactical_card_inspector_rules(card, definition)
 	gothic_text_fit(renderer, reaction, {x, y+117, 192, 17}, 12, GOTHIC_RED)
 	tags, count := card_keyword_tags(card, definition)
@@ -589,14 +604,15 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	if drop >= TACTICAL_HAND_HEIGHT+20 { return }
 	available := !renderer_blocks_player_input(renderer) && game.tactical_allows_cards(room)
 	recovering := game.tactical_is_recovering(room)
-	top := renderer.canvas_height-TACTICAL_HAND_HEIGHT+drop
+	top := renderer.canvas_height-tactical_hand_height(renderer)+drop
 	first_bounds := tactical_hand_card_bounds(renderer, 0, deck.hand_count)
 	last_bounds := tactical_hand_card_bounds(renderer, max(0, deck.hand_count-1), deck.hand_count)
 	left := first_bounds.x if deck.hand_count > 0 else f32(24)
 	right := last_bounds.x+last_bounds.width if deck.hand_count > 0 else renderer.canvas_width-24
 	if right-left < 640 { left = (renderer.canvas_width-640)*0.5; right = left+640 }
-	rl.DrawRectangleGradientV(0, c.int(top-14), c.int(renderer.canvas_width), c.int(TACTICAL_HAND_HEIGHT+14), {8, 13, 21, 0}, {8, 13, 21, 245})
-	gothic_text(renderer, fmt.ctprintf("ENERGIA %d/%d", deck.energy, deck.rules.max_energy), left+2, top+3, 14, GOTHIC_PAPER)
+	if renderer.tactical.expedition { hud_frame({left-5,top,right-left+10,24},GOTHIC_BLUE,true) }
+	else {rl.DrawRectangleGradientV(0, c.int(top-14), c.int(renderer.canvas_width), c.int(TACTICAL_HAND_HEIGHT+14), {8, 13, 21, 0}, {8, 13, 21, 245})}
+	gothic_text(renderer, fmt.ctprintf("ENERGIA %d/%d", deck.energy, deck.rules.max_energy), left+2, top+3, 14, hud_ink(renderer))
 	if room.player.tactical.config.expedition {
 		bar := rl.Rectangle{left+126, top+7, 118, 10}
 		hud_bar(bar, f32(deck.energy)/f32(deck.rules.max_energy), {55, 150, 255, 255})
@@ -614,7 +630,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 		}
 	}
 	// The Canna da Pesca waiting in Exhaust was never played.
-	gothic_text_fit(renderer, fmt.ctprintf("MAZZO %d / SCARTI %d / ESAURITE %d", deck.draw_count, deck.discard_count, game.deck_exhausted_count(deck)), {right-205, top+5, 205, 17}, 10, GOTHIC_MUTED)
+	gothic_text_fit(renderer, fmt.ctprintf("MAZZO %d / SCARTI %d / ESAURITE %d", deck.draw_count, deck.discard_count, game.deck_exhausted_count(deck)), {right-205, top+5, 205, 17}, 10, hud_muted(renderer))
 	hint: cstring = "ROTELLA: CARTA / CLIC: GIOCA" if room.player.tactical.config.expedition else ""
 	if selected != 0 {
 		if index, found := game.hand_card_index_by_id(deck, selected); found {

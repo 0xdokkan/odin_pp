@@ -1,0 +1,99 @@
+VERIFICA MOONSHOT CARTONCINO — 30 OTTOBRE 2026
+
+Stato di questo resoconto: primo intervento implementato. La successiva
+scena Cyber del prompt MONDO_ILLUSTRATO è ora descritta e verificata in
+VERIFICA_SCENA_CYBER.txt; il resto della roadmap rimane da realizzare.
+Nessun commit creato.
+Le modifiche precedenti sono state preservate; baseline in build/moonshot/before.
+
+IMPLEMENTATO
+- 96 disegni originali di oggetti funzionali e arredi: due pose, sagoma stabile,
+  prospettiva dipinta, piedi a terra. Sei funzioni per dodici biomi più due
+  varianti di arredo per bioma. Architetture di attraversamento restano volumi.
+- Contorno finale: prop 8 px (6 avorio + 2 inchiostro), attori Cyber 7 px (5+2),
+  supporto costumi non Cyber +60%. Celle 104 px: il disegno conserva 60 px/unità.
+- Profili espressivi e superfici disegnate per tutte le famiglie ambientali;
+  muri continui, niente cornici duplicate. Edifici con facce illustrate,
+  volume percorribile e comportamento di occultamento del tetto conservato.
+- Terreno con gruppi deterministici di foglie/pietre/frammenti, ancorati alle
+  quote reali; raccordi degli hazard ammorbiditi senza cambiare le regole.
+- Camera iniziale yaw 80°, pitch 0.76 rad, distanza 21; comandi relativi alla camera.
+- HUD più compatto, picking dei supporti reali, trasparenza delle macchine
+  soltanto quando la sagoma proiettata copre effettivamente un attore.
+
+CONTROLLI E PROVENIENZA
+- Toolchain Odin dev-2026-10:84bc3fc21, macOS/Raylib.
+- scripts/check.sh: exit 0, controlli rigorosi e build con/senza assert;
+  suite completa 1853 test con assert e 1851 senza assert, tutte riuscite.
+  Durante il passaggio fra le suite sono stati eliminati due test del modulo
+  ambientale reso obsoleto dagli sprite; non sono test saltati per fallimento.
+- Dopo l'ultimo aumento del bordo: 438 test renderer superati,
+  build/moonshot/render-final.log; controllo rigoroso superato.
+- Smoke completo 198 scene riuscito prima dell'ultimo aumento del bordo:
+  build/moonshot/after/full.log. Catture archiviate in after/.
+- Baseline: eseguibile /private/tmp/odin-moonshot-baseline; catture e log
+  separati in before/. I file non sono stati ricostruiti dopo le modifiche.
+- Confronto intermedio delle dodici officine con camera della baseline
+  (yaw 45°, pitch 0.68):
+  after-matched/palette.log e PNG. Questo confronto precede soltanto
+  l'ultimo ampliamento del bordo; la camera finale è invece 80°/0.76.
+- presentation-final.log: 27 scene riuscite dopo il bordo finale, con HDR,
+  riflessi, occlusione e resize; assert identità dei quattro atlanti immutabili.
+  Tre letture HDR riuscite, fino a 2560x1440 e picco lineare 4.742.
+- Bordo finale: 12 officine (final/palette.log), tre scene Cyber con movimento
+  (final/cartoon.log), 33 scene dei costumi non Cyber (costumes-final.log).
+  Tutte concluse senza assert falliti. Le catture pertinenti sono in final/.
+- Hub, FPS e platform 3D completati e ispezionati; log e immagini in final/.
+  Rimangono i warning già presenti sui glifi mancanti del font, senza errori
+  shader o texture. I controlli nativi non certificano ogni possibile stato UI.
+
+RISORSE
+- Attori: stampa 2496x3120 (~29.71 MiB), carta 832x104 (338 KiB), maschere CPU
+  8x104x104 byte. Props: stampa 1248x1664 + carta 1248x832 = 11.883 MiB,
+  maschere CPU ~0.990 MiB. Buffer temporanei liberati dopo upload.
+- Materiale proprietario e distruttori espliciti; nessun upload per frame,
+  animazione o resize. Supporti costumi precalcolati CPU; geometria in cache.
+- Il padding finale aggiunge circa 17.36% alla memoria degli atlanti rispetto
+  alle celle 96; non è memoria aggiunta a ogni cambio di scena o bioma.
+
+MISURA DELLA BUILD FINALE
+- build/moonshot/benchmark.log: 24 scene, centro e officina dei dodici biomi,
+  Apple M1, canvas 1920x1080, build -o:none, target FPS 0 e vsync_hint false.
+  20 frame di warmup e 120 campioni per scena; nessuna cattura o lettura GPU
+  nei campioni, nessuna compilazione o suite di test lanciata in parallelo.
+- Media per scena 10.565–18.333 ms; p95 15.852–31.379 ms; massimo singolo
+  campione 52.046 ms. Sono intervalli fra frame presentati, non timer GPU
+  isolati. Questi dati non certificano 60 FPS costanti né assenza di picchi.
+- Cache geometrica residente 6.396–198.834 vertici; massimo payload mesh
+  6.826 MiB. Esclusi overhead del driver, copie CPU e altre risorse.
+- La baseline completa era limitata a circa 60 FPS: non è un confronto
+  valido per attribuire un'accelerazione o una regressione percentuale.
+  Conservare condizioni equivalenti nei benchmark del prossimo intervento.
+- Eseguibile normale aggiornato: build/odin_pp. /private/tmp/odin-direction
+  ripristinato alla stessa build normale dopo il benchmark.
+
+ISPEZIONE E LIMITI ARTISTICI
+Aperte catture native Cyber/West/Jungle/Snow, edifici fuori/dentro, rilievi,
+combattimento, occlusione e ruoli. Il tetto scompare all'interno; gli oggetti
+illustrati sono radicati e conservano colore nel pass corretto. Il confronto
+mostra un cambiamento di forme e materiali, ma non certifica una qualità
+artistica equivalente ai giochi di riferimento.
+
+Restano cortili troppo vuoti, distribuzione ripetitiva, grandi volumi ancora
+regolari e rilievi a gradoni. I costumi non Cyber conservano rig e alcuni
+supporti larghi; non sono ancora figure complete ridisegnate. In combattimento
+alcuni nomi/HP si sovrappongono e un messaggio narrativo può coprire la testa
+del giocatore. Le animazioni dei nuovi props sono due pose leggere.
+Questi limiti sono esplicitamente prioritari nel nuovo prompt, insieme al
+terreno alla scala della scena, ai landmark e alla composizione dei luoghi.
+
+FONTI VISIVE APERTE
+- Tre riferimenti locali 01/02/03, con 01 autorevole per piedi e supporto.
+- Paper Mario, galleria Nintendo; screenshot Petal Meadows in
+  build/cartoon/reference-paper-mario.jpg.
+- Bug Fables, galleria Nintendo; screenshot in
+  build/cartoon/reference-bug-fables.jpg.
+- Paper Trail, pagina ufficiale e screenshot in
+  build/moonshot/reference-paper-trail.png.
+Le fonti e gli URL sono in docs/presentazione.md e nel nuovo prompt.
+Nessun asset dei giochi citati è stato importato nel runtime.

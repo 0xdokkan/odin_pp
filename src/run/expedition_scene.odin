@@ -86,6 +86,7 @@ expedition_create :: proc(c:^campaign.Campaign,checkpoint:^world.Snapshot,path:s
 	rs.room.player.tactical.config.expedition_biome = u8(e.world.biome)
 	rs.room_created=true;rs.run_created=true
 	if roguelike_attach(rs,frame.window)!=.Ready {roguelike_destroy(rs);delete(e.path);free(e);return {},false}
+	render.prepare_expedition_workshop_stock(&rs.iso_renderer)
 	for &site,i in e.world.sites[:e.world.site_count] {if site.secret && site.kind!=.Cave && campaign.secret_known(c,e.world.biome,i) && site.state==.Unvisited {site.state=.Discovered}}
 	e.world.last_health=rs.room.player.health
 	// The inventory owns credits; this baseline detects direct card effects
@@ -615,12 +616,16 @@ expedition_draw :: proc(data:rawptr,frame:^host.Frame) {
 	render.draw_tactical_hud(&rs.iso_renderer,room,false,false)
 	if room.phase==.Combat {render.draw_hand(&rs.iso_renderer,room,rs.card_interaction.hovered_card_id,rs.card_interaction.selected_card_id,rs.card_interaction.dragged_card_id,rs.mouse_canvas)}
 	else {
-		rl.DrawRectangleRec({0,440,960,100},{8,10,18,240})
-		ui.draw_text(frame.theme,campaign.biome_name(e.world.biome),{26,450},.Title,render.expedition_color(e.world.biome))
-		ui.draw_text(frame.theme,"WASD  esplora    M  mount    E  interagisci    Z  zaino    U  personaggio    TAB  ologramma",{27,492},.Small,{191,196,211,255})
-		ui.draw_text(frame.theme,fmt.tprintf("LIV %d   XP %d / %d   PUNTI %d   CREDITI %d",e.progress.run.level,e.progress.run.xp,campaign.xp_for_level(e.progress.run.level),e.progress.run.points,campaign.backpack_credits(&e.progress.backpack)),{27,516},.Small,{132,181,211,255})
+		render.hud_frame({12,484,442,44},render.expedition_color(e.world.biome),true)
+		ui.draw_text(frame.theme,campaign.biome_name(e.world.biome),{23,489},.Small,render.EXPEDITION_PAPER_INK,false)
+		ui.draw_text(frame.theme,fmt.tprintf("LIV %d   XP %d/%d   PUNTI %d   CREDITI %d",e.progress.run.level,e.progress.run.xp,campaign.xp_for_level(e.progress.run.level),e.progress.run.points,campaign.backpack_credits(&e.progress.backpack)),{23,509},.Small,render.EXPEDITION_PAPER_INK,false)
+		render.hud_frame({466,500,482,28},render.expedition_color(e.world.biome),true)
+		ui.draw_text(frame.theme,"WASD Muovi  M Mount  E Interagisci  Z Zaino",{477,507},.Small,render.EXPEDITION_PAPER_INK,false)
 	}
-	if e.message_timer>0 {ui.draw_text_centered(frame.theme,e.message,{480,130 if room.phase==.Combat else 408},.Body,{239,218,160,255})}
+	if e.message_timer>0 {
+		render.hud_frame({166,98 if room.phase==.Combat else 448,628,28},render.expedition_color(e.world.biome),true)
+		ui.draw_text_centered(frame.theme,e.message,{480,112 if room.phase==.Combat else 462},.Small,render.EXPEDITION_PAPER_INK,false)
+	}
 	if e.placing {
 		ui.draw_text_centered(frame.theme,fmt.tprintf("POSA  %s    ROTELLA ruota   R specchia   CLIC posa   TASTO DESTRO annulla",level.structure_definition(e.place_id).name),{480,388},.Small,{239,218,160,255})
 		if e.place_cached && e.place_result!=.Ok {ui.draw_text_centered(frame.theme,world.player_placement_text(e.place_result,e.place_error),{480,366},.Small,{255,125,115,255})}

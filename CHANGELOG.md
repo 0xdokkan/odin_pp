@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-04 — Unito il redesign di cartoncino (`codex/cartoncino-redesign-sole`) nel ramo `piano-ia`
+
+- Entrano le forme e le stampe dei biomi, gli oggetti al posto dei cubi, le finiture degli edifici, le fioriere, le ombre della
+  spedizione e i pannelli di cartoncino dell'HUD. Il Viandante-robot in spedizione ora è disegnato dall'atlante di cartoncino.
+- Restano le nostre aggiunte sul disegno: il colpo che spinge indietro la carta e il suo lampo, i segni della IA nella difesa, la
+  polvere e l'inclinazione del robot mentre cammina.
+- Il bioma West ha ora una capanna e una casetta. **IA aggiornata:** sono strutture che la IA conosce già (`structure_knowledge`) e nella
+  copia di prova contano come muri e porte; nessun elenco del gioco è cambiato, quindi nessuna tabella e nessun puzzle nuovi.
+- Su Windows il controllo delle texture dell'officina falliva per i fine riga: `.gitattributes` tiene LF sul generatore e sul file
+  generato.
+
 ## 2026-11-04 — Piano della carta «IA»: la IA, il Nido di ragni, la Regina e il Lanciafiamme (Fasi 0-15)
 
 - Quattro carte nuove, **solo nel laboratorio** (scelta dell'utente): niente offerte, negozi o collezione.

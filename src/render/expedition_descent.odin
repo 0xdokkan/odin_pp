@@ -9,16 +9,16 @@ import grid "../engine/grid"
 // The descent keeps real, solid materials under the shared lighting. Only
 // lamps, inscriptions and exposed lava seams emit light. All geometry is
 // static and follows Ink_Pass, so cached walls and reflected fixtures agree.
-DESCENT_WOOD :: rl.Color{66,38,24,255}
-DESCENT_WOOD_CAP :: rl.Color{102,64,35,255}
-DESCENT_IRON :: rl.Color{34,35,37,255}
-DESCENT_IRON_CAP :: rl.Color{57,54,49,255}
-DESCENT_SAND :: rl.Color{120,88,49,255}
-DESCENT_SAND_CAP :: rl.Color{167,129,74,255}
-DESCENT_GOLD :: rl.Color{149,108,37,255}
-DESCENT_BASALT :: rl.Color{25,24,28,255}
-DESCENT_BASALT_CAP :: rl.Color{48,43,46,255}
-DESCENT_EMBER :: rl.Color{123,32,12,255}
+DESCENT_WOOD :: rl.Color{184,101,55,255}
+DESCENT_WOOD_CAP :: rl.Color{242,172,90,255}
+DESCENT_IRON :: rl.Color{62,70,97,255}
+DESCENT_IRON_CAP :: rl.Color{115,136,161,255}
+DESCENT_SAND :: rl.Color{221,158,72,255}
+DESCENT_SAND_CAP :: rl.Color{255,223,149,255}
+DESCENT_GOLD :: rl.Color{245,179,42,255}
+DESCENT_BASALT :: rl.Color{89,56,82,255}
+DESCENT_BASALT_CAP :: rl.Color{161,91,106,255}
+DESCENT_EMBER :: rl.Color{221,72,47,255}
 DESCENT_AMBER :: rl.Color{255,151,42,254}
 DESCENT_TURQUOISE :: rl.Color{61,205,188,254}
 DESCENT_LAVA :: rl.Color{255,93,23,254}
@@ -95,42 +95,40 @@ descent_barrel :: proc(pass:Ink_Pass,base:rl.Vector3,radius,height:f32,iron:bool
 
 @(private)
 descent_mesa :: proc(pass:Ink_Pass,base:rl.Vector3,radius,height,phase:f32) {
-	// Flat-topped, terraced sandstone; the darker strata remain opaque.
-	bottom:=rl.Color{94,47,29,255};middle:=rl.Color{139,73,39,255};top:=rl.Color{167,98,53,255}
-	ink_frustum(pass,base,radius,radius*.91,height*.42,6,phase,bottom,middle,{},shade=.12)
-	ink_frustum(pass,base+{0,height*.42,0},radius*.94,radius*.90,height*.10,6,phase,middle,top,{})
-	ink_frustum(pass,base+{0,height*.52,0},radius*.80,radius*.68,height*.39,6,phase,bottom,middle,{},shade=.12)
-	ink_frustum(pass,base+{0,height*.91,0},radius*.72,radius*.66,height*.09,6,phase,top,top,{})
+	// Two authored shoulders replace four concentric prism tiers. The
+	// footprint never grows when the cosmetic orientation changes.
+	profile:=[10]rl.Vector2{{-.94,0},{-.88,.36},{-.64,.44},{-.61,.88},{-.39,1},{.30,.96},{.55,.80},{.58,.45},{.91,.33},{.96,0}}
+	ink_profile(pass,base,profile[:],{radius*.80,height},radius*.94,phase,{209,111,61,255},{172,78,58,255},EXPEDITION_PAPER_INK)
+	seam:=[4]rl.Vector2{{-radius*.42,height*.39},{-radius*.29,height*.43},{radius*.39,height*.40},{radius*.37,height*.36}}
+	biome_print_face(pass,base,seam[:],phase,radius*.94,{163,83,61,255})
+	cap:=[6]rl.Vector2{{-.61,.79},{-.61,.88},{-.39,1},{.30,.96},{.55,.80},{.31,.83}}
+	ink_profile(pass,cyber_point(base,{0,0,radius*.475},phase),cap[:],{radius*.80,height},.008,phase,{247,180,101,255},{247,180,101,255},{})
 }
 
 @(private)
 descent_cactus :: proc(pass:Ink_Pass,base:rl.Vector3,height,yaw:f32) {
-	green:=rl.Color{43,62,44,255};tip:=rl.Color{69,85,48,255}
-	ink_frustum(pass,base,.14,.11,height,6,math.PI/6,green,tip,{},shade=.1)
-	ink_frustum(pass,base+{0,height,0},.11,0,.13,6,math.PI/6,green,tip,{})
-	for side in ([2]f32{-1,1}) {
-		y:=height*(.40 if side<0 else .58)
-		a:=cyber_point(base,{0,y,0},yaw);b:=cyber_point(base,{side*.32,y,0},yaw)
-		descent_axle(pass,a,b,.085,green,tip)
-		ink_frustum(pass,b,.085,.075,.40,6,math.PI/6,green,tip,{})
-		ink_frustum(pass,b+{0,.40,0},.075,0,.10,6,math.PI/6,green,tip,{})
-	}
-	ink_frustum(pass,base+{.25,0,.26},.13,.08,.16,5,.3,DESCENT_WOOD_CAP,DESCENT_SAND,{})
+	green:=rl.Color{50,144,78,255};tip:=rl.Color{145,211,86,255}
+	// Rounded crown, uneven elbows and a deliberately broad print face.
+	profile:=[24]rl.Vector2{{-.15,0},{-.17,.31},{-.34,.31},{-.43,.38},{-.43,.63},{-.39,.68},{-.32,.65},{-.31,.44},{-.16,.42},{-.15,.91},{-.09,.98},{.02,1},{.12,.96},{.16,.89},{.16,.55},{.30,.55},{.30,.73},{.36,.78},{.43,.74},{.43,.50},{.37,.44},{.16,.44},{.15,.12},{.14,0}}
+	ink_profile(pass,base,profile[:],{1,height},.20,yaw,green,ink_scale(green,.77),EXPEDITION_PAPER_INK)
+	// One broad painted rib, no repeated needles at the gameplay scale.
+	rib:=[4]rl.Vector2{{-.055,.08},{-.05,.88},{.015,.91},{.035,.08}}
+	ink_profile(pass,cyber_point(base,{0,0,.104},yaw),rib[:],{1,height},.006,yaw,tip,tip,{})
 }
 
 @(private)
 descent_obelisk :: proc(pass:Ink_Pass,base:rl.Vector3,height,yaw:f32,accent:rl.Color) {
-	ink_box(pass,base,{.43,.43},.14,yaw,DESCENT_SAND,DESCENT_SAND_CAP,{})
-	ink_box(pass,base+{0,.14,0},{.31,.31},height-.48,yaw,DESCENT_SAND,DESCENT_SAND_CAP,{})
-	ink_frustum(pass,base+{0,height-.34,0},.4384,0,.34,4,yaw+math.PI/4,DESCENT_GOLD,DESCENT_SAND_CAP,{})
-	cyber_strip(pass,base,{0,.40,.314},{0,height-.52,.314},yaw,accent)
-	for i in 0..<2 {cyber_strip(pass,base,{-.11,.59+f32(i)*.36,.314},{.11,.59+f32(i)*.36,.314},yaw,accent)}
+	profile:=[7]rl.Vector2{{-.31,0},{-.28,.79},{-.20,.88},{0,1},{.20,.88},{.27,.79},{.31,0}}
+	ink_profile(pass,base,profile[:],{1,height},.58,yaw,DESCENT_SAND,DESCENT_SAND_CAP,EXPEDITION_PAPER_INK)
+	facet:=[4]rl.Vector2{{-.22,.13},{-.18,height*.73},{-.06,height*.80},{-.10,.19}}
+	biome_print_face(pass,base,facet[:],yaw,.58,{238,189,110,255})
+	cyber_strip(pass,base,{0,.40,.294},{0,height-.52,.294},yaw,accent)
+	for i in 0..<2 {cyber_strip(pass,base,{-.11,.59+f32(i)*.36,.294},{.11,.59+f32(i)*.36,.294},yaw,accent)}
 }
 
 @(private)
 descent_column :: proc(pass:Ink_Pass,base:rl.Vector3,height:f32,accent:rl.Color,broken:bool=false) {
-	ink_box(pass,base,{.43,.43},.13,0,DESCENT_SAND,DESCENT_SAND_CAP,{})
-	ink_frustum(pass,base+{0,.13,0},.32,.26,height-.37,8,math.PI/8,DESCENT_SAND,DESCENT_SAND_CAP,{},shade=.1)
+	ink_frustum(pass,base,.32,.26,height-.24,8,math.PI/8,DESCENT_SAND,DESCENT_SAND_CAP,{},shade=.1)
 	if !broken {
 		ink_frustum(pass,base+{0,height-.24,0},.26,.43,.16,8,math.PI/8,DESCENT_GOLD,DESCENT_SAND_CAP,{})
 		ink_box(pass,base+{0,height-.08,0},{.45,.45},.08,0,DESCENT_SAND,DESCENT_SAND_CAP,{})
@@ -138,7 +136,7 @@ descent_column :: proc(pass:Ink_Pass,base:rl.Vector3,height:f32,accent:rl.Color,
 		ink_frustum(pass,base+{0,height-.24,0},.26,.19,.19,5,.35,DESCENT_SAND_CAP,DESCENT_SAND_CAP,{})
 	}
 	mark_y:=height*.6
-	mark_radius:=.32-.06*((mark_y-.13)/(height-.37))
+	mark_radius:=.32-.06*(mark_y/(height-.24))
 	front:=mark_radius*math.cos(f32(math.PI/8))+.003
 	ink_line(pass,base+{-.09,mark_y,front},base+{.09,mark_y,front},accent)
 }
@@ -171,11 +169,8 @@ draw_expedition_descent_outdoor :: proc(pass:Ink_Pass,w:^world.World,cell:grid.P
 		if h%5==0 {descent_obelisk(pass,p,1.9+f32((h>>6)%4)*.19,0,ink_scale(DESCENT_TURQUOISE,.6))}
 		else if h%5==1 {descent_column(pass,p,1.10+f32((h>>3)%3)*.26,{},true)}
 		else {
-			for i in 0..<3 {
-				half:=.46-f32(i)*.11
-				ink_box(pass,p+{0,f32(i)*.25,0},{half,half},.25,0,DESCENT_SAND,DESCENT_SAND_CAP,{})
-			}
-			ink_frustum(pass,p+{0,.75,0},.34,0,.48,4,math.PI/4,DESCENT_SAND,DESCENT_SAND_CAP,{})
+			profile:=[7]rl.Vector2{{-.45,0},{-.34,.31},{-.24,.35},{-.16,.84},{.01,1.23},{.26,.44},{.45,0}}
+			ink_profile(pass,p,profile[:],{1,1},.66,0,DESCENT_SAND,DESCENT_SAND_CAP,EXPEDITION_PAPER_INK)
 		}
 	case .Inferno:descent_basalt(pass,p,1.1+f32((h>>5)%6)*.23,h)
 	}
@@ -188,44 +183,16 @@ draw_expedition_descent_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.Worl
 	p:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5};q:=design.local
 	plain_height:=expedition_site_wall_height(design);gate:=abs(design.wall_height-2.2)<.01
 	height:=2.12 if gate else plain_height
-	h:=expedition_cell_hash(cell,0xD7)
-	if w.biome==.West && site.kind==.Workshop && q.x>=5 && q.x<=7 && abs(q.y)==5 {
-		descent_barrel(pass,p,.44,.85,abs(q.x)%2==0)
-		return true
+	if site.kind==.Workshop && design.wall_height<1.1 && !design.fixture {
+		draw_biome_workstation(pass,p,f32(site.orientation%4)*math.PI/2,w.biome,height,q.x);return true
 	}
 	if w.biome==.Egypt && gate {descent_column(pass,p,height,descent_accent(w));return true}
 	fill,cap:=DESCENT_WOOD,DESCENT_WOOD_CAP
 	if w.biome==.Egypt {fill,cap=DESCENT_SAND,DESCENT_SAND_CAP}
 	if w.biome==.Inferno {fill,cap=DESCENT_BASALT,DESCENT_BASALT_CAP}
-	ink_box(pass,p,{.475,.475},height,0,fill,cap,{})
-	ink_box(pass,p,{.49,.49},.12,0,ink_scale(fill,.72),cap,{})
-	if w.biome!=.Inferno {
-		ink_box(pass,p+{0,height-.09,0},{.49,.49},.09,0,cap,cap,{})
-	} else {
-		for i in 0..<3 {
-			o:=rl.Vector3{-.23+f32(i)*.23,height-.13,-.12 if i!=1 else .23}
-			ink_frustum(pass,p+o,.21,.19,.18+f32((h>>u32(i*3))%3)*.10,6,math.PI/6,fill,cap,{})
-		}
-	}
-	for direction in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
-		if expedition_wall_joined(room,site,game.add_position(cell,direction),plain_height) {continue}
-		yaw:=math.atan2(f32(-direction.x),f32(direction.y))
-		#partial switch w.biome {
-		case .West:
-			for side in ([2]f32{-1,1}) {ink_box(pass,cyber_point(p,{side*.34,.12,.479},yaw),{.04,.014},height-.22,yaw,cap,cap,{})}
-			descent_face_link(pass,p,{-.29,.22,.48},{.29,height-.21,.48},yaw,{.025,.012},DESCENT_IRON,DESCENT_IRON_CAP)
-			if gate {cyber_strip(pass,p,{-.13,height-.31,.496},{.13,height-.31,.496},yaw,DESCENT_AMBER)}
-		case .Egypt:
-			for i in 1..=2 {ink_box(pass,cyber_point(p,{0,height*f32(i)/3,.478},yaw),{.43,.006},.026,yaw,ink_scale(fill,.55),ink_scale(fill,.55),{})}
-			ink_box(pass,cyber_point(p,{.13,height*.34,.479},yaw),{.012,.006},height*.30,yaw,ink_scale(fill,.55),fill,{})
-			if (abs(q.x)+abs(q.y))%4==0 {cyber_strip(pass,p,{-.20,height-.20,.49},{.20,height-.20,.49},yaw,ink_scale(DESCENT_TURQUOISE,.65))}
-		case .Inferno:
-			a:=cyber_point(p,{-.12,.13,.491},yaw);b:=cyber_point(p,{.09,height*.49,.491},yaw);c:=cyber_point(p,{-.03,height-.12,.491},yaw)
-			descent_face_link(pass,p,{-.12,.13,.481},{.09,height*.49,.481},yaw,{.025,.006},DESCENT_EMBER,DESCENT_EMBER)
-			descent_face_link(pass,p,{.09,height*.49,.481},{-.03,height-.12,.481},yaw,{.020,.006},DESCENT_EMBER,DESCENT_EMBER)
-			if gate || h%3==0 {ink_line(pass,a,b,DESCENT_LAVA);ink_line(pass,b,c,ink_scale(DESCENT_LAVA,.7))}
-		}
-	}
+	// Material carries the wood grain, stone courses and ember drawing.
+	// One continuous wall replaces overlapping trim boxes and tiny braces.
+	ink_wall_sheet(pass,room,site,cell,height,fill,cap,half=.4999,outline=false)
 	return true
 }
 

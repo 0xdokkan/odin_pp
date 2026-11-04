@@ -1,0 +1,440 @@
+ODIN PP — REDESIGN GRAFICO: PROSSIMI PASSI DOPO SOLE, OMBRE E MURI COSTRUITI
+3 novembre 2026
+
+Prompt da incollare in una nuova sessione aperta su /Users/dokkan/Dev/odin_pp.
+Descrive lo stato reale lasciato dalla sessione del 31 ottobre – 1 novembre
+e un piano dettagliato, in fasi, per i passi successivi. Ogni fase ha file,
+procedure, criteri di accettazione e verifiche. Procedi in autonomia sulle
+scelte reversibili; mostra le catture all'utente prima di decisioni di gusto
+marcate (indicate con "CHIEDI" qui sotto).
+
+L'utente scrive in italiano, in tono informale ("HELLUUUU!! :3"), e accoglie
+volentieri domande. Rispondi in italiano; i commenti nel codice sono in
+inglese, come nel resto del progetto.
+
+
+0. PRIMA DI TUTTO
+
+- Nel worktree c'è molto lavoro NON committato, prodotto da più sessioni
+  (git status mostra decine di file modificati e nuovi). Non ripristinare da
+  HEAD, non fare stash, reset o checkout di file, non cancellare sorgenti.
+  Non committare se l'utente non lo chiede; se lo chiede, crea prima un
+  branch (il branch attuale è main).
+- Leggi: questo file; PROMPT_MOONSHOT_MONDO_ILLUSTRATO.txt (direzione
+  complessiva, ancora valida); PIANO_PRESTAZIONI_E_SCENA_ILLUSTRATA.txt
+  (prestazioni e scena Cyber, ancora in gran parte aperto); README.md,
+  docs/architettura.md, docs/sviluppo.md, docs/presentazione.md,
+  docs/verifica.md, tools/art/README.md.
+- Apri VISIVAMENTE 01-sprite-forma-finale.png, 02-esplorazione-
+  composizione.png e 03-combattimento-composizione.png in questa cartella.
+  Il mockup 02/03 è il bersaglio visivo; per piedi e sagome prevale 01
+  (nessuna basetta, nessun cavalletto).
+- Riferimenti esterni già consultati (screenshot ufficiali Steam, scaricati
+  con l'API pubblica store.steampowered.com/api/appdetails?appids=<id>):
+  TUNIC 553420, Bug Fables 1082710, Paper Trail 1889740, Into the Breach
+  590380, Eastward 977880. Principi tratti, da non copiare come asset:
+  * TUNIC: luce prima di tutto; ombre proiettate nette e colorate, fianchi
+    dei rilievi spessi e materici, occlusione negli angoli, accenti emissivi
+    pochi e forti, correzione colore che arricchisce le ombre.
+  * Paper Mario / Bug Fables: contorno d'inchiostro deciso, campiture
+    piatte, carta che proietta un'ombra; personaggi con ombra a disco.
+  * Into the Breach: tabellone con spessore leggibile, celle con poca
+    texture ma bordi chiari, edifici compatti e riconoscibili.
+  * Paper Trail: palette contenuta per luogo, cornici e soglie.
+  È lecito cercare altri riferimenti online: annota URL e principio.
+- Vincoli invariati (dal moonshot): non cambiare simulazione, salvataggi,
+  RNG, collisioni, percorsi, linea di vista, targeting, fog, piani, picking
+  e semantica degli hazard. La decorazione deterministica non legge l'RNG
+  della simulazione. La camera originale (yaw 80°, pitch 0,76) resta: il
+  prototipo 26°/76° è stato scartato dall'utente. Nessuna allocazione,
+  costruzione di texture o upload per frame a scena ferma. Non indebolire
+  assert o test: se un contratto cambia di proposito, aggiorna il test e
+  spiegalo.
+
+
+1. STATO REALE LASCIATO DALLA SESSIONE PRECEDENTE
+
+Tutto è implementato nel renderer della spedizione e vale per i 12 biomi.
+Verificato: odin check src -vet -strict-style pulito; odin test src/render
+465/465 riusciti; catture native aperte di officine, percorso Cyber
+(esterno, rifugio dentro/fuori, rilievo, scontro). NON ancora eseguiti:
+scripts/check.sh completo, smoke presentation/cartoon/costumes/west-scene,
+smoke completo da 198 scene, grotte, complessi, montagna, prima persona.
+
+1.1 Sole e cielo — src/render/expedition_sun.odin (nuovo)
+- Expedition_Sun vive in Expedition_Material (campo `sun`), distrutto da
+  destroy_expedition_material.
+- Mappa d'ombra 2048² solo profondità (colore R8 di riserva se l'FBO non è
+  completo), vista ortografica dalla luce EXPEDITION_SUN_TOWARD (-.56,1,.36),
+  quadrato EXPEDITION_SUN_SPAN 60 unità centrato sul target della camera,
+  agganciato ai texel. Confronto hardware: GL_TEXTURE_COMPARE_MODE impostato
+  con glTexParameteri ottenuto da rlgl.GetProcAddress (expedition_sun_compare);
+  nello shader è un sampler2DShadow con 4 letture filtrate.
+- Mappa del cielo 512² RGBA16F: altezza (worldPosition.y) dall'alto, poi due
+  giri del blur separabile del post (expedition_blur) → occlusione ambientale
+  modellata dalle impronte reali (expedition_sky nello shader).
+- Unità di texture 14 (sole) e 15 (cielo), legate a mano con
+  rlgl.ActiveTextureSlot/EnableTexture (bind/unbind_expedition_sun): il
+  programma del pavimento usa già tutti e 4 gli slot del batch di raylib
+  (floorMap, workshopStock, reflectionSharp, reflectionBlur) e DrawMesh usa le
+  unità 0..11.
+- Proiettano ombra: blocchi di architettura in cache e siti
+  (cache.chunks/cache.sites), rilievo (draw_expedition_terrain_casters in
+  expedition_terrain.odin), edifici con tetto solo se visibile
+  (draw_expedition_structure_casters in structure_expedition.odin), sagome
+  di carta degli arredi con alpha test (draw_expedition_fixture_casters e
+  parametro `caster` di draw_expedition_fixture_sprite). Gli attori (robot,
+  nemici) NON proiettano: conservano il disco di contatto.
+- Cache: Expedition_Sun_Key (centro, vettore destro della camera, rebuild e
+  upload della geometria, rebuild del rilievo, tetti visibili, bioma). Le
+  mappe si ridisegnano solo se il target si sposta oltre EXPEDITION_SUN_REUSE
+  (5 unità) o cambia la chiave. Contatore sun.renders.
+- Integrazione: EXPEDITION_SUN_GLSL è incluso in EXPEDITION_LIGHT_GLSL
+  (expedition_lighting.odin). In expedition_lit_open la direzione delle bande
+  cel coincide col sole; in ombra la faccia scende a min(banda,
+  (.40,.49,.82)), mai nero; poi moltiplica per expedition_sky. Disattivato
+  sotto la roccia (skyShade>0) e nel passaggio riflesso (lightMirror).
+  Nota: nel riflesso i blocchi in VBO impostano lightMirror=0, quindi lì il
+  sole viene ancora calcolato (innocuo, piccolo costo).
+- -define:EXPEDITION_SUN=false spegne tutto, per misure A/B nella stessa build.
+
+1.2 Post — expedition_post.odin, tactical_surface.odin
+- EXPEDITION_HDR_RESOLVE: saturazione ×1,10 e split toning (ombre
+  fredde, luci calde) prima del gamma.
+- TACTICAL_SURFACE_RESOLVE: uniform `vignette` (0,17 solo in spedizione).
+  Si applica anche agli attori di carta, disegnati dopo il resolve HDR.
+
+1.3 Pavimento — expedition_floor.odin, expedition_cyber_floor.odin,
+expedition_west_ground.odin
+- paperStock: velatura lenta di pigmento + fibra del cartoncino (svanisce
+  con la distanza tramite aa).
+- near4: le quattro celle i cui centri incorniciano il punto, lette una volta.
+  Da lì:
+  * superficie pavimentata del sito: contorno alla metà del campo bilineare,
+    con ondulazione e linea di taglio nei biomi non "costruiti" (Cyber, City
+    e Space restano a bordi dritti);
+  * chiazze di terreno 2..8 (sabbia, erba, acqua, ghiaccio, neve, lava,
+    palude): stesso campo per il terreno dominante, ondulazione, linea di
+    taglio e riva dell'acqua (`cut` sostituisce borderMask). Il centro di ogni
+    cella mostra sempre il suo terreno reale. terrainCoverage non è più usata.
+- Officina Cyber (cyber_workshop_ground_sample, cotta nella texture
+  1024²): niente più lavatura grigia larga; linee guida rosse con nodi ad
+  anello dagli ingressi, doppia cornice gialla attorno alla pressa con
+  tacche d'angolo, prese blu, corsie tratteggiate verso i banchi.
+- Officina West: polvere "swept" ridotta da 0,62 a 0,26.
+
+1.4 Muri costruiti — expedition_architecture.odin, expedition_print.odin
+- ink_wall_sheet (usato dai muri continui di tutte le famiglie: cyber,
+  descent, dread, ascent): zoccolo largo quanto la cella (WALL_FOOTING 0,12),
+  corpo più snello (WALL_BODY 0,33 di mezza larghezza; i lati uniti arrivano
+  al bordo della cella), copertina sporgente (WALL_LIP 0,055, profonda 0,10),
+  pilastri (WALL_POST_OVER 0,08, WALL_POST_RISE 0,12) a estremità, angoli,
+  celle isolate e ogni sesta cella di una corsa dritta, solo se altezza
+  ≥0,9. La regola dei pilastri (ink_wall_post) usa ink_wall_neighbour, che
+  ignora l'altezza; i colori vengono da ink_wall_post_colors (cap mescolato
+  con l'avorio della carta).
+- paperCourses: tessitura costruttiva per bioma sulle facce wall_print
+  (pannelli Cyber 0,5×0,46 con feritoie rosse in un pannello su sette; assi
+  West; conci Jungle/Egypt; mattoni City; bambù Vietnam; blocchi Snow;
+  basalto Inferno; mattoni Gothic; marmo Sky; pannelli con rivetti Space;
+  sfaccettature Secret), giunti, smusso alto chiaro e basso scuro,
+  variazione per blocco, corso di fondazione scuro. Prima di paperMotif.
+- Neon: EXPEDITION_NEON_SHARE 0,55 ed EXPEDITION_NEON_REACH 2,6
+  (expedition_lighting.odin): le macchie rosa a terra lungo i muri sono
+  molto ridotte.
+
+1.5 Test aggiornati di proposito
+- expedition_lighting_test.odin: la luce di un neon vale
+  radiance*EXPEDITION_NEON_SHARE.
+- expedition_geometry_test.odin: i vertici di un muro hanno UV di stampa
+  nel dominio [4,5] (corpo) oppure [0,1] (zoccolo, copertina, pilastro).
+
+1.6 Prestazioni misurate (Apple M1, -o:none, canvas 1920×1080, target FPS 0,
+vsync off, 60 frame di riscaldamento e 600 campioni, stage 39 officina Cyber
+e 40 officina West; build identiche a parte EXPEDITION_SUN; log in
+build/redesign-sole/bench/):
+  Corse in ordine A,B,B,A,A,B (A = sole acceso, B = EXPEDITION_SUN=false),
+  media / p95 in ms:
+    stage 39 Cyber  A: 21,13/26,63  20,45/23,46  21,21/24,70  → media 20,93
+                    B: 21,94/28,54  19,55/22,62  19,78/22,75  → media 20,42
+    stage 40 West   A: 17,39/20,58  18,82/25,57  17,93/21,22  → media 18,04
+                    B: 16,76/19,37  16,82/20,01  16,94/19,62  → media 16,84
+  Con le mappe in cache il sole costa circa +0,5 ms nel Cyber (dentro il
+  rumore) e +1,2 ms nel West, a scena ferma. Prima della cache e del
+  confronto hardware costava circa +4 ms. NON misurati: -o:speed, il costo
+  dei ridisegni durante il movimento, lo scontro a sei nemici.
+  Attenzione: anche la build senza sole (20,4 / 16,8 ms) è più lenta dei
+  valori storici con lo stesso protocollo (18,25 / 14,65 ms in
+  VERIFICA_MONDO_ILLUSTRATO_STEP2.txt). La differenza può venire dalle altre
+  novità (pavimento con near4 e rumore, muri con più facce) o dallo stato
+  della macchina: non è dimostrato, perché i sorgenti esatti precedenti non
+  sono stati archiviati. Va indagato in FASE B.
+Le misure di questa macchina oscillano di ±1–2 ms fra corse identiche:
+confronta sempre in ordine alternato e riporta tutte le corse.
+
+1.7 Problemi ancora visibili nelle catture
+- Le strutture non edificio (Cart, Fountain, Statue, Machine, Ruin, Pen) e
+  le staccionate sono scatole EXPEDITION_INK grigio-blu con il tetto chiaro
+  (draw_expedition_structure_solid): nel Cyber appaiono come cubi grigi 2×2.
+- Gli arbusti all'aperto del Cyber (cyber_shrub) non hanno fioriere; nel
+  mockup stanno in vasche color crema.
+- Gli edifici (Hut, Cottage, Temple: structure_print_cell e le stampe Cyber
+  e West dedicate) non hanno zoccolo, copertina, pilastri né paperCourses:
+  incoerenti con i muri dei cortili.
+- I muri Cyber frammentati (tratti di 3–4 celle) ricevono molti pilastri
+  crema; con la copertura già avorio il muro può leggersi come una fila di
+  blocchi chiari.
+- Robot e nemici non ricevono l'ombra del sole (sono disegnati dopo il
+  resolve con shader propri): dentro l'ombra di un muro sembrano incollati.
+- I cortili restano larghi e poveri di gruppi funzionali (composizione: vedi
+  PIANO_PRESTAZIONI_E_SCENA_ILLUSTRATA.txt, sezione 3).
+- Mai controllati con le novità: grotte, complessi, ponti/deck, reti,
+  montagna a spirale, ologramma, prima persona, ridimensionamento, tremolio
+  delle ombre in movimento, eventuale salto quando le mappe si ridisegnano.
+
+
+2. FASE A — VERIFICA COMPLETA DELLO STATO (prima di aggiungere altro)
+
+A1. Controlli
+    odin check src -vet -strict-style
+    odin test src/render -o:none -out:build/redesign-sole/bin/render-tests
+    sh scripts/check.sh
+    Correggi le regressioni causate dalle novità; se un test difende un
+    contratto ora cambiato di proposito, aggiornalo e annotalo.
+
+A2. Smoke con finestra, ognuno in una cartella sua, così build/captures del
+    progetto non viene sovrascritta (artifacts scrive in build/captures
+    relativo alla directory di avvio):
+      odin build src -o:none -out:build/redesign-sole/bin/odin_pp
+      mkdir -p build/redesign-sole/<nome> && cd build/redesign-sole/<nome>
+      [ -e assets ] || ln -s /Users/dokkan/Dev/odin_pp/assets assets
+      ODIN_PP_SMOKE_ONLY=<selettore> ../bin/odin_pp --smoke-expedition > <selettore>.log 2>&1
+    Selettori: palette, cartoon, costumes, presentation, cyber-scene,
+    west-scene; poi lo smoke completo (nessun selettore). Controlla nei log:
+    "RENDER CHECK" (HDR, bloom e riflessi devono superare le soglie),
+    "Expedition sun unavailable" (non deve comparire), exit code 0.
+
+A3. Apri le catture, non fidarti dei soli assert. Almeno: officine dei 12
+    biomi; cyber_scene 00–11 e i fotogrammi *_motion_*; west_scene 04–07
+    (edificio fuori/soglia/dentro/uscita); expedition_grotta_*;
+    expedition_complesso_* (panorama, sotto, ponte, cancello, ascensore,
+    scontro); expedition_rete_*; expedition_montagna_*;
+    expedition_rilievo_*; expedition_edificio_*; expedition_scontro e
+    scontro_livelli; ologramma; bersagli_*.
+
+A4. Cosa cercare
+    - acne o "peter panning" delle ombre; ombre che scavalcano i muri;
+    - bordo della mappa a 30 unità (deve sfumare, non tagliare);
+    - dentro un edificio: il tetto rimosso non deve più fare ombra
+      (key.roofs); all'uscita l'ombra del tetto torna;
+    - grotte e stanze sotto la roccia: niente sole, solo lampade (skyShade);
+    - deck e ponti: ricevono ombra coerente; il rilievo alto (montagna)
+      fa ombra sui piani sotto;
+    - in movimento: nessun tremolio (mappe agganciate ai texel) e nessun
+      salto visibile al ridisegno ogni 5 unità;
+    - ologramma e prima persona: verifica se usano gli stessi programmi; se
+      il sole vi produce artefatti, spegnilo lì (sunOn=0) invece di
+      inventare una seconda resa.
+    Criterio: nessuna regressione visibile; ogni difetto trovato è corretto
+    o annotato con cattura e motivo.
+
+
+3. FASE B — PRESTAZIONI
+
+B1. Misura release e debug, A/B nella stessa sorgente:
+      F="-define:EXPEDITION_BENCHMARK=true -define:EXPEDITION_BENCHMARK_FIRST=39 -define:EXPEDITION_BENCHMARK_LAST=40 -define:EXPEDITION_BENCHMARK_WARMUP=60 -define:EXPEDITION_BENCHMARK_SAMPLES=600"
+      odin build src -o:speed ${=F} -out:build/redesign-sole/bin/bench_sun
+      odin build src -o:speed ${=F} -define:EXPEDITION_SUN=false -out:build/redesign-sole/bin/bench_nosun
+    In zsh le variabili non si spezzano da sole: serve ${=F}. Esegui in
+    ordine A, B, B, A, A, B dalla cartella con il link agli asset; leggi le
+    righe "EXPEDITION BENCHMARK", "CPU SUBMISSION", "CPU WORLD". Aggiungi lo
+    scontro a sei nemici (stage 195, vedi PIANO_PRESTAZIONI...) e una
+    passeggiata (stage 25–26) per misurare i ridisegni delle mappe durante il
+    movimento: riporta p95 e max, non solo la media.
+
+B2. Se il sole costa più di ~1 ms medio o crea picchi al ridisegno, prova
+    una variabile alla volta, misurando ognuna:
+    - 2 letture filtrate invece di 4 in expedition_sun (o 1: bordo più
+      netto, ancora coerente con la carta);
+    - un solo giro di blur del cielo, o cielo 384²;
+    - mappa d'ombra 1536²;
+    - ammortizzare il ridisegno: sole in un frame, cielo nel successivo;
+    - casters limitati ai blocchi nel frustum allargato della camera.
+    Conserva l'aspetto; se una riduzione si vede, documenta il compromesso e
+    CHIEDI.
+
+B3. Il costo del pavimento è aumentato (near4, due campi bilineari, rumore).
+    Se il profilo lo indica, salta i campi quando le quattro celle hanno lo
+    stesso terreno e la stessa superficie (caso più comune): un solo test
+    sugli interi di near4 evita il lavoro.
+
+B4. Restano aperti dal piano precedente: P1 (pausa di 2,7 s al primo uso
+    della pittura dell'officina: cyber_workshop_ground_sample ora disegna più
+    segni, rimisura) e la misura finale della selezione dei candidati HP.
+
+Criterio: tabella prima/dopo con tutte le corse, -o:none e -o:speed,
+scena per scena. Obiettivo di prodotto: 60 FPS a 1080p sul M1 (p95 ≤ 16,7
+ms) nelle scene scelte; se non raggiunto, dirlo con i numeri.
+
+
+4. FASE C — STRUTTURE NON EDIFICIO: VIA I CUBI GRIGI
+
+Catalogo: src/level/structure_catalog.odin. Piante (# muro, = staccionata):
+Cart "==", Fountain 2×2 "=", Statue 2×2 "#", Machine 3×2 "#", Ruin a L,
+Pen (recinto). Altezze in structure_wall_height (structure_diorama.odin):
+Statue 0,55, Machine 1,05, Ruin 1,1, staccionate STRUCTURE_FENCE_HEIGHT 0,5
+(Fountain 0,42), il resto DIORAMA_WALL_HEIGHT 1,58.
+
+C1. Disegna ogni struttura una volta, come oggetto, non cella per cella:
+    trova la struttura con level.structure_index_at e la sua pianta
+    (data.structure_plans[i], level.plan_at); disegnala solo dalla cella
+    d'origine. Le strutture sono cotte nei blocchi 8×8: se una struttura
+    attraversa due blocchi, conviene una cache per struttura simile a
+    cache.sites (mesh propria, stessa chiave della geometria), così i test
+    sui limiti dei blocchi restano veri. Verifica i test esistenti in
+    expedition_geometry_test.odin e structures_test.odin.
+C2. Forme (palette da structure_print_palette o ascent_material/
+    dread_palette/descent per bioma; contorni via stampa UV come i muri):
+    - Cart: cassone su due ruote (anelli come cyber_axle), timone; West
+      carro di legno, Cyber carrello a sospensione, Snow slitta, ecc.;
+    - Fountain: vasca bassa ad anello o quadrata alta 0,42, acqua dentro
+      (superficie piatta con il colore dell'acqua del bioma e una riva
+      chiara), zampillo centrale;
+    - Statue: piedistallo a gradoni e una figura semplice in ink_profile
+      (o una sagoma di carta, come gli arredi, se serve dettaglio);
+    - Machine: apparato del bioma (riusa cyber_server/console nel Cyber,
+      fornace in Inferno, ecc.);
+    - Ruin: tratti di muro con ink_wall_sheet ma altezze spezzate e cima
+      irregolare, frammenti a terra;
+    - staccionate e Pen: pali e due traverse, non un blocco pieno.
+    Tutto resta dentro le celle della pianta: collisione e picking non
+    cambiano. Le celle "=" restano basse e attraversabili alla vista come ora.
+C3. Accettazione: a 960×540 ogni struttura si riconosce senza etichetta;
+    nessun cubo grigio in palette, presentation e percorso Cyber; ombre e
+    AO corretti; budget di vertici dei test rispettato.
+
+
+5. FASE D — EDIFICI COERENTI CON I MURI
+
+D1. structure_print_cell (structure_expedition.odin) disegna i muri di Hut,
+    Cottage e Temple: aggiungi zoccolo e corsi (le facce hanno già UV
+    wall_print), pilastri agli angoli esterni; tetto, porta, dither di
+    opacità e scomparsa del tetto invariati.
+D2. Le stampe dedicate Cyber e West (draw_cyber_building_print,
+    draw_west_building_print) mantengono la loro identità: aggiungi solo
+    zoccolo e contatto col terreno coerenti.
+D3. Rispetta il test del budget (< 1.800 vertici per edificio West) e le
+    verifiche del percorso edifici (fuori, soglia, dentro, uscita) in
+    cyber-scene e west-scene.
+
+
+6. FASE E — ATTORI DI CARTA DENTRO L'OMBRA (CHIEDI prima del default)
+
+L'utente tiene ai colori stampati degli attori. Proponi un oscuramento
+lieve, non una ri-illuminazione:
+E1. Dove si disegna la carta: draw_tactical_billboard_quad
+    (tactical_renderer.odin) disegna prima il cartoncino con
+    draw_flipbook_card / paper_shader (FLIPBOOK_PAPER_FRAGMENT in
+    src/engine/gfx/flipbook.odin, caricato con il vertex shader predefinito
+    di raylib, che NON passa la posizione mondo), poi la stampa con lo
+    shader attivo in quel momento (di norma quello predefinito); i cartoncini
+    vivi passano da living_card.odin e LIVING_RING_FRAGMENT; gli arredi da
+    FIXTURE_FRAGMENT (expedition_fixture_sprites.odin). Serve un vertex
+    shader che esponga vertexPosition (i quad di rlgl sono già in coordinate
+    mondo) e una variante della stampa che campioni la mappa del sole
+    sull'unità 14, che resta legata dopo il resolve. Il pacchetto engine/gfx
+    non conosce EXPEDITION_SUN_GLSL: passa matrice e attivazione come uniform
+    opzionali, spente fuori dalla spedizione. Ricontrolla con grep prima di
+    toccare: questi percorsi sono condivisi con hub, laboratorio e minigiochi.
+E2. In ombra: colore ×mix(0,82–0,88, 1, sole), con lo stesso tono freddo
+    delle ombre del mondo; niente sul contorno d'inchiostro e sui flash di
+    colpo. Costante unica per regolarla.
+E3. Catture con un attore metà dentro e metà fuori dall'ombra di un muro,
+    scontro a sei nemici, movimento. Mostrale all'utente e CHIEDI se
+    attivarlo di default.
+
+
+7. FASE F — CYBER PIÙ VICINO AL MOCKUP
+
+F1. Fioriere: in draw_expedition_cyber_outdoor, sulle celle di arbusto
+    (h%7<5), una vasca crema bassa (cyber_case con CYBER_CREAM, cima di
+    terra scura CYBER_RECESS) sotto le foglie di cyber_shrub; le foglie
+    nascono dalla terra della vasca. Tutto dentro la cella.
+F2. Pilastri dei muri frammentati: valuta di saltare i pilastri sui tratti
+    più corti di 3 celle o di usare un pilastro blu (CYBER_BODY schiarito)
+    sui tratti intermedi, lasciando l'avorio agli angoli. Confronta catture.
+F3. Opzionale, CHIEDI: fughe sottili delle piastrelle nel pavimento del
+    cortile, come nel mockup 02, a contrasto basso e solo dove la griglia di
+    combattimento non le confonde (verifica cyber_scene 09–10).
+F4. Composizione dell'officina e del rifugio: resta valida la sezione 3 di
+    PIANO_PRESTAZIONI_E_SCENA_ILLUSTRATA.txt (gruppi funzionali, macchina
+    dominante, ingresso leggibile, terreno con masse, interno con funzione).
+
+
+8. FASE G — CONTATTO FRA TERRENO E SOLIDI IN TUTTI I BIOMI
+
+La mappa del cielo sa già dove i solidi stanno vicini: usala anche come
+maschera di accumulo nel pavimento (floorMain), oltre che come ombra.
+G1. In floorMain calcola crowd = altezza sfocata del cielo − p.y (stesso
+    campionamento di expedition_sky, esposto da una funzione condivisa) e,
+    dove crowd > 0 e il terreno è aperto, aggiungi per bioma un accumulo:
+    neve morbida e chiara contro i muri (Snow), sabbia (Egypt, West),
+    muschio e foglie (Jungle, Gothic, Vietnam), cenere (Inferno), polvere
+    metallica (Cyber, Space), petali o nuvole (Sky), cristalli (Secret).
+    Bordo a taglio di carta come le chiazze; nessun effetto su hazard reali
+    (acqua, ghiaccio, lava, elettricità restano leggibili e prevalgono).
+G2. Ridistribuisci paperDetails (foglie, crepe, sassi) vicino ai solidi
+    usando la stessa maschera, lasciando quiete le zone aperte e d'azione.
+G3. Accettazione: catture di quattro biomi diversi (Snow, Jungle, Egypt,
+    Inferno) prima/dopo; il pavimento funziona anche togliendo i dettagli
+    piccoli; nessun effetto ripetuto a griglia.
+
+
+9. FASE H — DOCUMENTAZIONE E CONSEGNA
+
+- docs/architettura.md: ownership di Expedition_Sun (in Expedition_Material),
+  unità 14/15, cache e chiave, casters.
+- docs/presentazione.md: nuova sezione "Sole, ombre e muri costruiti" (luce,
+  occlusione, grade, vignetta, chiazze a ritaglio, segnaletica officina,
+  zoccolo/copertina/pilastri, corsi per bioma) e le fasi C–G completate.
+- docs/verifica.md: come verificare ombre e occlusione, EXPEDITION_SUN=false
+  per l'A/B, cartelle isolate per gli smoke.
+- tools/art/README.md: dove regolare corsi, pilastri, ombra e grade.
+- Scrivi VERIFICA_REDESIGN_SOLE.txt in questa cartella: provenienza delle
+  catture (cartelle in build/redesign-sole/), controlli eseguiti, numeri,
+  limiti rimasti. Come "prima" usa le catture di
+  build/illustrated-world-step2/after/ (stessi seed e camera): la baseline
+  dei sorgenti precedenti al sole non è stata archiviata.
+- Distingui sempre ciò che è implementato e verificato da ciò che resta
+  proposta.
+
+
+10. TRAPPOLE GIÀ INCONTRATE
+
+- "could not open the window" / "Failed to determine Monitor": lo schermo
+  del Mac è in stop. Tieni sveglio il display durante le catture:
+  caffeinate -d -u -t 1800 & (chiudilo alla fine).
+- ln -sf assets dentro una cartella dove "assets" esiste già come link crea
+  un link DENTRO la cartella puntata (è successo: assets/assets nel
+  progetto, poi rimosso). Usa sempre [ -e assets ] || ln -s ... .
+- Matrici Odin/raylib: rl.MatrixMultiply(a,b) in Odin è a*b matematico
+  (diverso dal C). Per le shader usa projection*view; rlgl.SetMatrixProjection
+  e SetMatrixModelview accettano le due matrici separate.
+- Non aggiungere sampler al programma del pavimento con
+  SetShaderValueTexture: gli slot del batch sono pieni. Usa unità ≥12 legate
+  a mano, come il sole; tienile slegate mentre ci disegni dentro.
+- expedition_wall_joined unisce solo celle della stessa altezza; i pilastri
+  usano ink_wall_neighbour, che ignora l'altezza: non confonderli.
+- Ogni nuova faccia dei muri deve avere UV di stampa ([0,1] o [4,5]),
+  altrimenti expedition_geometry_test fallisce (e perde il contorno).
+- Le catture native sono a 2048×1152; per confronti rapidi componi
+  griglie 2×2 con ffmpeg (xstack) — ImageMagick e PIL non sono installati.
+- Le misure oscillano: mai una sola corsa, mai -o:none contro -o:speed.
+
+
+11. ORDINE CONSIGLIATO
+
+A (verifica) → B1 (misura) → C (strutture) → F1–F2 (fioriere, pilastri) →
+D (edifici) → G (contatto) → B2–B3 se servono → E (CHIEDI) → F3–F4 → H.
+Dopo ogni fase: test, catture aperte, breve resoconto all'utente in
+italiano con 2–4 immagini prima/dopo.

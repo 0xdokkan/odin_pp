@@ -1,0 +1,42 @@
+RIFERIMENTI FINALI — CARTONCINO CARTOON
+
+Questa cartella contiene copie delle tre immagini utili alla migrazione
+grafica e il prompt da incollare in una nuova sessione aperta sul progetto.
+
+COME RIPRENDERE
+Apri PROMPT_PROSSIMA_SESSIONE.txt e incollane tutto il contenuto nella nuova
+sessione. Il prompt indica già le immagini da aprire, il risultato atteso,
+i principali file del renderer e le verifiche da eseguire.
+
+QUALI IMMAGINI FANNO FEDE
+1. 01-sprite-forma-finale.png
+   È il riferimento prioritario e finale per personaggi e sprite.
+   Disegno dentro una sagoma di cartoncino, effetto cartoon, continuità
+   della base con il terreno. Nessun sostegno triangolare o cavalletto.
+
+2. 02-esplorazione-composizione.png
+   Riferimento per palette, ambiente, rapporto di scala, interni, muri,
+   passaggi, coperture e interfaccia di esplorazione.
+
+3. 03-combattimento-composizione.png
+   Riferimento per leggibilità di personaggi, nemici, terreno, bersagli,
+   griglia e mano di carte durante il combattimento.
+
+IMPORTANTE: le immagini 02 e 03 precedono l'ultima correzione della base.
+I loro sostegni laterali e le loro linguette/basette NON sono la forma
+approvata. Per questi dettagli prevale sempre l'immagine 01, da applicare
+anche ai nemici. Le immagini complete non sono state rigenerate per
+questa consegna: sono copie degli originali, senza modifiche.
+
+STATO DEL LAVORO
+Queste immagini sono mockup prodotti con ImageGen integrato, non catture
+di una migrazione già implementata. La preparazione di questo pacchetto
+non modifica codice, meccaniche o asset usati dal gioco in esecuzione.
+I testi, le geometrie e le regole mostrate nei mockup non sostituiscono
+i dati e i contratti reali del progetto.
+
+TRACCIABILITÀ
+manifest.json riporta ruolo, origine nel progetto, dimensioni, byte e
+SHA-256 di ogni copia. Le copie sono state confrontate con gli originali.
+Le iterazioni precedenti restano in output/imagegen/cyber-cartoncino/;
+non costituiscono ulteriori requisiti da reintrodurre.

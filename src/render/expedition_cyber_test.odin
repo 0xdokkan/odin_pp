@@ -32,7 +32,7 @@ test_cyber_outdoor_modules_are_deterministic_bounded_and_selectively_lit :: proc
 	defer {delete(b.vertices);delete(b.lines);delete(again.vertices);delete(again.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
 	other:=Ink_Pass{mode=.Bake,builder=&again}
-	rocks,servers:=0,0
+	plants,servers:=0,0
 	for i in 0..<96 {
 		cell:=grid.Position{x = i*7%61, y = i*13%59}
 		clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)
@@ -45,11 +45,11 @@ test_cyber_outdoor_modules_are_deterministic_bounded_and_selectively_lit :: proc
 			testing.expect(t,v.position.z>=f32(cell.y) && v.position.z<=f32(cell.y+1))
 			testing.expect(t,v.position.y>=0 && v.position.y<2.8)
 		}
-		// A few hundred cached vertices, at most five actual luminous marks.
-		testing.expect(t,len(b.vertices)<=700 && len(b.lines)<=5)
-		if len(b.lines)>1 {servers+=1} else {rocks+=1}
+		// Paper plant profiles add contour ink; only server indicators emit.
+		testing.expect(t,len(b.vertices)<=900 && len(b.lines)<=128)
+		if expedition_cell_hash(cell,0xC7)%7>=5 {servers+=1} else {plants+=1}
 	}
-	testing.expect(t,rocks>40 && servers>10)
+	testing.expect(t,plants>40 && servers>10)
 }
 
 @(test)
@@ -112,7 +112,7 @@ test_cyber_site_walls_and_factory_arms_stay_on_actual_blocked_cells :: proc(t:^t
 				testing.expect(t,v.position.x>=f32(x)-.006 && v.position.x<=f32(x+1)+.006)
 				testing.expect(t,v.position.z>=f32(y)-.006 && v.position.z<=f32(y+1)+.006)
 			}
-			testing.expect(t,len(b.vertices)<=1600 && len(b.lines)<=16)
+			testing.expect(t,len(b.vertices)<=1600 && len(b.lines)<=24)
 			if site.kind==.Workshop && d.local.x>=5 && d.local.x<=7 && abs(d.local.y)==5 {conveyors+=1;testing.expect(t,len(b.vertices)>400)}
 		}}
 	}

@@ -1,0 +1,134 @@
+SCENA CYBER — TERRENO, OFFICINA, RIFUGIO E PERCORSO NATIVO
+30 ottobre 2026
+
+AMBITO
+Implementati i quattro punti della prima scena del nuovo moonshot. Questo
+intervento riguarda Cyber; il ridisegno degli altri undici biomi resta nella
+roadmap PROMPT_MOONSHOT_MONDO_ILLUSTRATO.txt. Preservate le modifiche precedenti.
+
+RISULTATO
+1. Terreno: eliminata la campitura rettangolare dell'officina. Nove tratti di
+   usura collegano gli accessi reali, aggirano la macchina e raggiungono le
+   postazioni. Tracce brevi, curve e interrotte; raccordi solo lungo muri
+   continui. I fianchi dei rilievi ricevono strati di pigmento e un bordo caldo
+   registrato alla quota vera, anche se inclinata. Nessuna quota spostata.
+2. Officina: nuova pressa originale alta 2,71 unità, con spalle corallo,
+   manometro, pistone e vano di lavoro. Quattro pose dentro una sagoma stabile
+   di cartoncino da 8 px. I gruppi laterali distinguono materiale in ingresso,
+   convogliatore, braccio e scaffali. L'etichetta segue la cima della sagoma.
+3. Rifugio: Hut e Cottage Cyber hanno tetto con spalle piegate, fasce e feritoie,
+   ingresso marcato, sportello tecnico e finestre ampie. Console, banco e
+   scaffale sono disegnati sulle facce interne. Il tetto segue la visibilità
+   esistente: nascosto all'interno, nuovamente presente dopo l'uscita.
+4. Verifica: nuovo percorso nativo con movimento WASD, interazione E, passaggio
+   della porta e carta giocata tramite tasto della mano e click sul bersaglio.
+   Le catture includono il passaggio fra gli stati, non solo viste statiche.
+
+VINCOLI CONSERVATI
+Celle occupate, collisioni, accessi, planimetrie, altezze e regole dei pericoli
+sono quelli della mappa. Il disegno della macchina resta dentro la larghezza
+di una cella; i bordi di carta e i quad trasparenti hanno margine esterno.
+Nessun arredo occupa il corridoio percorribile del rifugio. La camera normale
+resta yaw 80°, pitch 0,76; l'ultimo atto la ruota di 0,6 rad per una seconda vista.
+
+ITERAZIONE VISIVA
+Prima passata nativa: la sedimentazione attorno a ogni vicino solido formava
+cornici quadrate sotto piante e armadi; le tracce sembravano binari continui.
+La seconda passata limita il raccordo ai muri con tre celle allineate, curva
+leggermente e interrompe le tracce. L'etichetta dell'officina è stata sollevata
+sopra la sagoma effettiva della pressa. Ispezionate entrambe le versioni nel
+framebuffer reale. Non sono immagini generate o ritoccate per la presentazione.
+
+PROVENIENZA DEL CONFRONTO
+- build/cyber-scene/before/sources contiene la copia dei sorgenti precedente
+  all'intervento; starting.patch conserva il diff iniziale della sessione.
+- La baseline è stata ricompilata da quella copia, aggiungendo soltanto il
+  medesimo harness di percorso. Il renderer precedente è rimasto isolato.
+- before/ e after/ contengono ciascuno 26 PNG del percorso: 12 atti e 14
+  fotogrammi intermedi. Stessa mappa, stessa camera e stesso input; dt 1/60.
+- after/walkthrough.log: tutti e dodici gli atti conclusi, HDR riuscito,
+  tetto Far=true / Inside=false / Far=true, carta id=3 giocata sul bersaglio
+  (57,126). La cattura di combattimento mostra il nemico a 15/20 HP.
+- Il movimento è certificato nei tratti di esplorazione. L'atto chiamato
+  scontro_movimento conserva il nome di cattura ma certifica il gioco della
+  carta; non è una prova di spostamento riuscito del giocatore in combattimento.
+- Gli ID dei sei atlanti sono invariati lungo percorso e interazione.
+
+CONTROLLI
+Toolchain Odin dev-2026-10:84bc3fc21, macOS, Raylib, Apple M1.
+- scripts/check.sh: exit 0. Suite completa con assert: 1.861 test riusciti;
+  senza assert: 1.861 test riusciti. Controlli rigorosi e build con/senza
+  assert passati; risultati in checks.log. Le due suite precedono soltanto
+  la correzione finale del culling della pressa.
+- Dopo l'ultima correzione di visibilità della pressa ai margini: 448 test
+  renderer riusciti, render-final.log. Il test mirato copre sia prospettiva sia
+  ortografica con la sola testa nel campo visibile. Parametri degli altri
+  oggetti invariati; il volume della pressa deriva dai suoi pixel opachi.
+- after/presentation.log: 27 scene, tre letture HDR riuscite, occlusione,
+  riflessi e resize fino a 2560x1440; picco lineare 4,742. Sei texture immutabili
+  anche dopo resize. 31 PNG prodotti dal log, archiviati in after/presentation/.
+- after/palette.log: dodici officine concluse. Ispezionate anche West, Jungle
+  e Snow: nessuna nuova alterazione osservata nei loro materiali. I 13 PNG del
+  log (officine e dettaglio del robot) sono in after/palette/.
+- Presentation e palette precedono soltanto l'ultima correzione di culling
+  della pressa; il percorso Cyber è stato rieseguito sulla build finale.
+- I warning nativi restano quelli dei glifi del font mancanti. Il warning
+  IMAGE nella suite CPU deriva dal test che rifiuta volutamente dati invalidi.
+
+RISORSE E COSTO
+- Officina: due texture aggiuntive 416x312 RGBA8, totale 1.038.336 byte
+  (0,990 MiB); quattro pose 104x208 e tre secondari 104x104 nello stesso pack.
+  Maschera CPU della pressa 21.632 byte. Buffer temporanei liberati dopo upload.
+- Il proprietario libera entrambe le texture anche sui fallimenti parziali.
+  Nessun upload o allocazione per frame. Atlas generici invariati.
+- Terreno: nessuna nuova texture, mesh o draw call. Un bit libero del canale R
+  della mappa cached marca l'officina; il canale G dei vertici dei fianchi
+  contiene la profondità sotto il bordo. Gli altri biomi ignorano questo dato.
+  Uniformi iniziali per 24 officine, nove segmenti e nove curvature. Il costo
+  aggiuntivo del fragment shader viene misurato, non assunto nullo.
+- Edifici: triangoli stampati nella passata esistente, senza texture dedicate
+  o allocazioni per frame. La geometria del tetto è esclusa quando si è dentro.
+- Benchmark della stessa officina (stadio 39), Apple M1, 1920x1080, -o:none,
+  target FPS 0, vsync_hint false; 20 frame di warmup, 120 campioni. Nessuna
+  compilazione, suite CPU o altra prova GPU avviata in parallelo ai campioni.
+  Sono intervalli fra frame presentati, non timer GPU isolati.
+
+  Misura                      media ms   mediana ms   p95 ms   massimo ms
+  Baseline iniziale              13,854       14,239   19,634       24,029
+  Nuova scena, prima misura      16,709       17,183   22,479       27,640
+  Baseline ripetuta              12,865       13,076   20,001       26,234
+  Nuova scena, subito dopo       16,309       17,047   22,815       27,064
+
+  Il confronto ravvicinato rileva +3,444 ms medi (+26,8%). I circa 61,3 FPS
+  medi della nuova scena non certificano 60 FPS costanti: il p95 li supera.
+  Questo aumento resta un limite da ottimizzare, non viene presentato come
+  un miglioramento prestazionale. La geometria cached rimane 57 chunk,
+  48.885 vertici, payload mesh 1.759.860 byte, linee 122.640 byte; zero rebuild
+  o upload della cache durante i campioni. Submission CPU media 5,839 ->
+  5,770 ms; il sospetto sul costo dei materiali non equivale a un profilo GPU.
+
+  Log: before/benchmark.log, before/benchmark-repeat.log,
+  after/benchmark-initial.log e after/benchmark.log. L'ultimo è la copia del
+  run after/benchmark-unoptimized-repeat.log e corrisponde ai sorgenti finali.
+  Una guardia anticipata dei tratti lontani è stata provata separatamente:
+  16,613 ms medi, p95 24,065 (after/benchmark-early-reject.log), senza risparmio
+  convincente. È stata rimossa; renderer, catture e test tornano esattamente
+  alla versione verificata prima dell'esperimento.
+- Eseguibile normale ricompilato in build/odin_pp; /private/tmp/odin-direction
+  ripristinato alla stessa build normale dopo le misure.
+
+RIFERIMENTI E LIMITI
+Riaperti i riferimenti locali e le catture del nostro gioco; consultate le
+pagine ufficiali di Paper Trail (https://www.papertrailgame.com/) e Bug Fables
+(https://www.nintendo.com/en-ca/store/products/bug-fables-the-everlasting-sapling-switch/).
+La gerarchia della macchina e le campiture tranquille sono interpretazioni
+artistiche adottate qui, non dichiarazioni dei loro autori. Asset runtime
+originali; nessuna grafica dei giochi citati importata.
+
+Il terreno non ha nuove montagne o nuovi dislivelli: questo passaggio migliora
+materiali, uso dello spazio e lettura delle quote esistenti. Su fianchi bassi
+gli strati sono discreti. Le altre aree Cyber conservano la distribuzione
+procedurale precedente e alcuni grandi volumi restano regolari. Rimangono
+da affinare le sovrapposizioni di nomi/HP nei combattimenti affollati e il
+rapporto fra HUD e spazio visibile. Il resto del mondo illustrato è una fase
+successiva, non un risultato già verificato da questo intervento.

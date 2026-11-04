@@ -14,13 +14,22 @@ EXPEDITION_REVEAL_POINTS :: 9
 // standing in front of an actor use the reveal program; paper actors are
 // drawn after HDR resolve and keep their original printed colours.
 Expedition_Material :: struct {
+	cartoon: ^Expedition_Cartoon_Assets,
+	costumes: ^Expedition_Costume_Assets,
+	fixtures: ^Expedition_Fixture_Assets,
+	fixture_shader: rl.Shader,
+	fixture_linear: c.int,
+	fixture_bounds: [FIXTURE_COUNT]rl.Rectangle,
+	fixtures_attempted: bool,
 	geometry: Expedition_Architecture_Cache,
+	// The key light's shadows and the sky's occlusion (expedition_sun.odin).
+	sun: Expedition_Sun,
 	edges: Expedition_Edges,
 	reflection_pass: bool,
 	lights: Expedition_Lights,
 	light_uniforms, reveal_light_uniforms: Expedition_Light_Uniforms,
 	shader, reveal_shader: rl.Shader,
-	tint, floor, cyber, reveal_cyber: c.int,
+	tint, floor, biome, reveal_biome: c.int,
 	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count: c.int,
 	grid_amount: f32,
 	// Inside a building the rest of the world is darker: the building's footprint (x0, z0,
@@ -45,18 +54,56 @@ Expedition_Material :: struct {
 // where it dissolves the body of a wall standing in front of an actor.
 EXPEDITION_EDGE_ALPHA :: u8(254)
 
-// A soft cool fill makes the Cyber's unlit faces read as solid charcoal.
-// It belongs to the architectural material, not to emissive ribbons, the
-// one-quad floor, or the paper pass that follows HDR tone mapping.
+// Printed surfaces share cel shadows and a hierarchy of dark contours.
+// Face UVs keep that line weight stable on screen without more geometry;
+// world-space panel marks remain registered as the camera and actors move.
 EXPEDITION_BODY_GLSL :: `
-uniform float cyberBody;
+uniform float paperBiome;
+in vec2 surfaceUV;
+float paperLine(float d,float width,float aa) {return 1.-smoothstep(width,width+aa,abs(d));}
+float paperStroke(vec2 p,vec2 a,vec2 b,float width,float aa) {
+    vec2 d=b-a;
+    return paperLine(length(p-a-d*clamp(dot(p-a,d)/dot(d,d),0.,1.)),width,aa);
+}
+` + EXPEDITION_PRINT_GLSL + `
 vec3 expedition_body(vec3 p,vec3 normal,vec3 base) {
-    vec3 lit=expedition_lit(p,normal,base,.38,.3);
-    if(cyberBody<=0.) return lit;
+    // Lift older pigments without the white wash that erased their hue.
+    if(paperBiome!=1.) {
+        float value=max(base.r,max(base.g,base.b));
+        base=mix(base,base/max(value,.12),.30*(1.-value));
+    }
     vec3 n=normalize(normal);
-    if(lightMirror>.5) n.y=-n.y;
-    float fill=.3+.7*max(dot(n,vec3(.7785,.3892,-.4927)),0.);
-    return lit+cyberBody*vec3(.006,.012,.022)*fill;
+    vec2 plane=abs(n.y)>.6?p.xz:(abs(n.x)>.6?p.zy:p.xy);
+    bool roofPrint=surfaceUV.x>=7.999;
+    bool wallPrint=surfaceUV.x>=3.999 && !roofPrint;
+    vec2 printUV=surfaceUV-vec2(roofPrint?8.:(wallPrint?4.:0.),0.);
+    if(all(lessThanEqual(printUV,vec2(1.001)))) {
+        vec2 span=1./max(fwidth(printUV),vec2(.00001));
+        vec2 distanceToCut=min(printUV,1.-printUV)*span;
+        float edge=min(distanceToCut.x,distanceToCut.y);
+        float shortSide=min(span.x,span.y);
+        // A broad painted shadow and a single highlight, not a pale wire
+        // frame around every screw, bevel and tiny control.
+        if(shortSide>16.) {
+            float fold=1.-smoothstep(.10,.12,printUV.y);
+            base*=mix(vec3(1.),vec3(.69,.78,.94),fold*.55);
+            float highlight=smoothstep(.91,.92,printUV.y)*(1.-smoothstep(.96,.97,printUV.y));
+            base=mix(base,min(base*1.17+vec3(.03,.03,.015),1.),highlight*.7);
+            if(wallPrint && abs(n.y)<.6) base=paperMotif(plane,paperCourses(plane,printUV,base));
+            if(roofPrint) base=paperRoof(plane,base);
+        }
+        // Ink is heavier than the thin ivory cut edge. Small controls keep
+        // their pigment instead of disappearing into a thick border.
+        float ink=clamp(shortSide*.11,.35,2.35);
+        float lip=ink+clamp(shortSide*.010,0.,.35);
+        // Tiny secondary faces carry flat pigment, without nested white
+        // frames and black slivers that shimmer against the main surface.
+        float contour=smoothstep(4.,11.,shortSide);
+        base=mix(base,mix(vec3(1.,.949,.82),base,smoothstep(ink,lip+.35,edge)),contour);
+        base=mix(base,vec3(.078,.114,.169),(1.-smoothstep(ink-.55,ink,edge))*contour);
+    }
+    vec3 lit=expedition_lit(p,normal,base,.9,0.);
+    return lit;
 }
 `
 
@@ -137,7 +184,7 @@ expedition_material_ready :: proc(renderer:^Renderer)->bool {
 		free(m);return false
 	}
 	m.tint=rl.GetShaderLocation(m.shader,"neonTint");m.floor=rl.GetShaderLocation(m.shader,"floorPass")
-	m.cyber=rl.GetShaderLocation(m.shader,"cyberBody");m.reveal_cyber=rl.GetShaderLocation(m.reveal_shader,"cyberBody")
+	m.biome=rl.GetShaderLocation(m.shader,"paperBiome");m.reveal_biome=rl.GetShaderLocation(m.reveal_shader,"paperBiome")
 	m.light_uniforms=expedition_light_uniforms(m.shader)
 	m.reveal_light_uniforms=expedition_light_uniforms(m.reveal_shader)
 	r:=m.reveal_shader
@@ -170,7 +217,12 @@ set_expedition_reveal :: proc(renderer:^Renderer,shader:rl.Shader,eye_at,forward
 @(private)
 destroy_expedition_material :: proc(renderer:^Renderer) {
 	m:=renderer.tactical.expedition_material;if m==nil {return}
+	destroy_expedition_cartoon(m)
+	if m.costumes!=nil {free(m.costumes);m.costumes=nil}
+	if m.fixtures!=nil {destroy_expedition_fixture_art(m.fixtures);m.fixtures=nil}
+	if m.fixture_shader.id!=0 {rl.UnloadShader(m.fixture_shader)}
 	destroy_expedition_geometry(&m.geometry)
+	destroy_expedition_sun(&m.sun)
 	destroy_expedition_edges(&m.edges)
 	rl.UnloadShader(m.shader);rl.UnloadShader(m.reveal_shader);free(m);renderer.tactical.expedition_material=nil
 }
@@ -271,19 +323,19 @@ expedition_occludes :: proc(m:^Expedition_Material,center:rl.Vector2,half_width:
 @(private)
 begin_expedition_material :: proc(renderer:^Renderer,w:^world.World,floor:bool=false,reveal:bool=false) {
 	m:=renderer.tactical.expedition_material;if m==nil {return}
-	cyber:=f32(1) if w.biome==.Cyber && !floor else 0
+	biome:=f32(int(w.biome)+1) if !floor else 0
 	if reveal {
 		r:=m.reveal_shader
 		set_expedition_reveal(renderer,r,m.reveal_eye,m.reveal_forward,m.reveal_viewport,m.reveal_points,m.reveal_count)
 		set_expedition_lights(renderer,r,m.reveal_light_uniforms)
-		rl.SetShaderValue(r,m.reveal_cyber,&cyber,.FLOAT)
+		rl.SetShaderValue(r,m.reveal_biome,&biome,.FLOAT)
 		rl.BeginShaderMode(r)
 		return
 	}
 	color:=expedition_color(w.biome);tint:=rl.Vector3{f32(color.r)/255,f32(color.g)/255,f32(color.b)/255}
 	f:=f32(1) if floor else 0
 	rl.SetShaderValue(m.shader,m.tint,&tint,.VEC3);rl.SetShaderValue(m.shader,m.floor,&f,.FLOAT)
-	rl.SetShaderValue(m.shader,m.cyber,&cyber,.FLOAT)
+	rl.SetShaderValue(m.shader,m.biome,&biome,.FLOAT)
 	set_expedition_lights(renderer,m.shader,m.light_uniforms)
 	rl.BeginShaderMode(m.shader)
 }

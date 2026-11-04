@@ -93,6 +93,7 @@ draw_terrain_chunk :: proc(f: ^Expedition_Floor, chunk: ^Expedition_Terrain_Chun
 		maps: [12]rl.MaterialMap
 		maps[rl.MaterialMapIndex.ALBEDO].color = rl.WHITE
 		maps[rl.MaterialMapIndex.METALNESS].texture = f.texture
+		maps[rl.MaterialMapIndex.NORMAL].texture = f.active_stock
 		rl.DrawMesh(chunk.mesh, {shader = f.bound.shader, maps = raw_data(maps[:])}, rl.Matrix(1))
 		return
 	}
@@ -178,15 +179,23 @@ terrain_corner_normal :: proc(block: ^Terrain_Block, x, y, corner: int) -> rl.Ve
 
 @(private = "file")
 terrain_vertex :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, p, normal: rl.Vector3, edge: u8 = 255) {
-	append(vertices, Expedition_Baked_Vertex{p, normal, {255, 255, 255, edge}})
+	append(vertices, Expedition_Baked_Vertex{p, normal, {255, 255, 255, edge}, {2,2}})
 }
 
 // A triangle of rock, lit flat: its own normal, turned to face `outward`.
 @(private = "file")
-terrain_rock :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, a, b, c, outward: rl.Vector3) {
+terrain_rock :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, a, b, c, outward, cap_a, cap_b: rl.Vector3) {
 	normal := terrain_face_normal(a, b, c)
 	if rl.Vector3DotProduct(normal, outward) < 0 { normal = -normal }
-	for p in ([3]rl.Vector3{a, b, c}) { terrain_vertex(vertices, p, normal) }
+	axis:=rl.Vector3{cap_b.x-cap_a.x,0,cap_b.z-cap_a.z}
+	for p in ([3]rl.Vector3{a, b, c}) {
+		along:=clamp(rl.Vector3DotProduct(p-cap_a,axis)/rl.Vector3LengthSqr(axis),0,1)
+		cap:=cap_a.y+(cap_b.y-cap_a.y)*along
+		// Green stores distance below the exact walkable edge, in two metres.
+		// It affects only Cyber pigment; positions, normals and topology stay exact.
+		depth:=u8(clamp((cap-p.y)*127.5,0,255))
+		append(vertices,Expedition_Baked_Vertex{p,normal,{255,255-depth,255,255},{2,2}})
+	}
 }
 
 @(private = "file")
@@ -201,7 +210,7 @@ terrain_hash :: proc(x, y, salt: int) -> f32 {
 // The wall of rock on side `side` of the cell at (x, y), from its top edge down to the neighbour's edge (`low`, one
 // height per end). Only the parts where this cell is the higher are drawn; the neighbour draws the rest. The middle
 // of the wall is pushed a little into the rock, so it breaks into facets; the top edge, where one walks, stays exact.
-@(private = "file")
+@(private)
 terrain_wall :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, y, side: int, top, low: [2]f32, base: f32) -> bool {
 	sides := TERRAIN_SIDES
 	a, b := side, (side+1)%4
@@ -217,14 +226,14 @@ terrain_wall :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, y, side: in
 	tall := ((top[0]-bottom[0])+(top[1]-bottom[1]))*0.5*game.HEIGHT_STEP_DRAWN
 	push := min(f32(0.06), tall*0.3)*(0.4+0.6*terrain_hash(x, y, side))
 	mid_m := (top_m+low_m)*0.5-outward*push
-	terrain_rock(vertices, top_a, top_m, mid_m, outward)
-	terrain_rock(vertices, top_a, mid_m, mid_a, outward)
-	terrain_rock(vertices, top_m, top_b, mid_b, outward)
-	terrain_rock(vertices, top_m, mid_b, mid_m, outward)
-	terrain_rock(vertices, mid_a, mid_m, low_m, outward)
-	terrain_rock(vertices, mid_a, low_m, low_a, outward)
-	terrain_rock(vertices, mid_m, mid_b, low_b, outward)
-	terrain_rock(vertices, mid_m, low_b, low_m, outward)
+	terrain_rock(vertices, top_a, top_m, mid_m, outward,top_a,top_b)
+	terrain_rock(vertices, top_a, mid_m, mid_a, outward,top_a,top_b)
+	terrain_rock(vertices, top_m, top_b, mid_b, outward,top_a,top_b)
+	terrain_rock(vertices, top_m, mid_b, mid_m, outward,top_a,top_b)
+	terrain_rock(vertices, mid_a, mid_m, low_m, outward,top_a,top_b)
+	terrain_rock(vertices, mid_a, low_m, low_a, outward,top_a,top_b)
+	terrain_rock(vertices, mid_m, mid_b, low_b, outward,top_a,top_b)
+	terrain_rock(vertices, mid_m, low_b, low_m, outward,top_a,top_b)
 	return true
 }
 
@@ -399,7 +408,7 @@ expedition_terrain_tall_in_view :: proc(renderer: ^Renderer, room: ^game.Room) -
 }
 
 // Builds the relief of every block when the map's geometry is new.
-@(private = "file")
+@(private)
 prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^level.Level) {
 	if !cache.ready || cache.geometry_id != data.geometry_id || cache.revision != data.geometry_revision {
 		rebuilds := cache.rebuilds
@@ -474,4 +483,44 @@ draw_expedition_floor_plane :: proc(renderer: ^Renderer, room: ^game.Room, dimen
 			quad(start, row, column-start, 1)
 		}
 	}
+}
+
+// The relief in the window round the player for the sun's passes (expedition_sun.odin), with `material`'s program: from
+// the video card where a block is already there, else vertex by vertex. Nothing before the relief is first built.
+@(private)
+draw_expedition_terrain_casters :: proc(renderer: ^Renderer, room: ^game.Room, material: rl.Material) {
+	data := room.level_data
+	f := renderer.tactical.expedition_floor
+	if data == nil || f == nil || !level.has_heights(data) { return }
+	cache := &f.terrain
+	if !cache.ready || cache.geometry_id != data.geometry_id || cache.revision != data.geometry_revision { return }
+	p := room.player.position
+	low := grid.Position{x = max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, y = max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
+	high := grid.Position{x = min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), y = min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
+	for cy in low.y..=high.y {
+		for cx in low.x..=high.x {
+			chunk := &cache.chunks[cy*cache.columns+cx]
+			if len(chunk.vertices) == 0 { continue }
+			draw_expedition_surface_caster(chunk, material)
+		}
+	}
+}
+
+// Both relief and decks cast from the same cached vertices they draw. Before a chunk's first
+// visible upload the CPU copy is sufficient; shadow rendering does not create a second mesh.
+@(private)
+draw_expedition_surface_caster :: proc(chunk: ^Expedition_Terrain_Chunk, material: rl.Material) {
+	if len(chunk.vertices) == 0 { return }
+	if chunk.mesh.vaoId != 0 {
+		rlgl.DrawRenderBatchActive()
+		rl.DrawMesh(chunk.mesh, material, rl.Matrix(1))
+		return
+	}
+	_ = rlgl.CheckRenderBatchLimit(i32(len(chunk.vertices)))
+	rlgl.Begin(rlgl.TRIANGLES)
+	for v in chunk.vertices {
+		rlgl.Normal3f(v.normal.x, v.normal.y, v.normal.z)
+		rlgl.Vertex3f(v.position.x, v.position.y, v.position.z)
+	}
+	rlgl.End()
 }

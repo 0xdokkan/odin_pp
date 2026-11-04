@@ -6,6 +6,22 @@ import game "../game"
 import view "../engine/view"
 
 @(test)
+test_expedition_compact_health_retains_exact_hp_and_fixed_width_across_damage :: proc(t:^testing.T) {
+	testing.expect_value(t,living_heart_compact_text(20,20),"20")
+	testing.expect_value(t,living_heart_compact_text(9,20)," 9")
+	testing.expect_value(t,living_heart_compact_text(-1,20)," 0")
+	testing.expect_value(t,living_heart_compact_text(100,20),"100")
+	full_width,height:=living_heart_size(living_heart_compact_text(20,20),true,true)
+	testing.expect(t,full_width==29 && height==14,"Compact tags preserve full-size figures and intent glyphs")
+	for hp in 0..=20 {
+		width,h:=living_heart_size(living_heart_compact_text(i32(hp),20),true,true)
+		testing.expect(t,width==full_width && h==height)
+	}
+	// The focused inspector's health fraction remains available unchanged.
+	testing.expect_value(t,living_heart_text(9,20)," 9/20")
+}
+
+@(test)
 test_living_heart_reads_the_health_over_the_maximum :: proc(t: ^testing.T) {
 	testing.expect_value(t, living_heart_text(12, 18), "12/18")
 	testing.expect_value(t, living_heart_text(-3, 18), " 0/18")

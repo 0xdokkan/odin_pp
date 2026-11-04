@@ -29,7 +29,7 @@ tactical_draw_frustum :: proc(camera: rl.Camera3D, width, height: f32) -> (resul
 }
 
 @(private)
-tactical_cell_on_screen :: proc(renderer: ^Renderer, cell: grid.Position) -> bool {
+tactical_cell_on_screen :: proc(renderer: ^Renderer, cell: grid.Position, center_height:f32=.65, radius:f32=1.8) -> bool {
 	f := &renderer.tactical.draw_frustum
 	if !f.valid { return true }
 	// Covers a complete wall, cap, lamp, floor bevel, shadow and drifting mote.
@@ -37,8 +37,9 @@ tactical_cell_on_screen :: proc(renderer: ^Renderer, cell: grid.Position) -> boo
 	// It stands on the cell's own ground (its layer's, the map's base taken off):
 	// at a fixed height a mountain's flank was culled while on screen (section 12
 	// of docs/piano-profondita.md).
-	radius :: f32(1.8)
-	delta := rl.Vector3{f32(cell.x)+0.5, cell_ground(cell)+0.65, f32(cell.y)+0.5}-f.eye
+	// Exceptional tall props supply their actual visual bounds; all existing
+	// callers keep the same center/radius and therefore the same culling.
+	delta := rl.Vector3{f32(cell.x)+0.5, cell_ground(cell)+center_height, f32(cell.y)+0.5}-f.eye
 	z := rl.Vector3DotProduct(delta, f.forward)
 	if z+radius <= 0 { return false }
 	x, y := abs(rl.Vector3DotProduct(delta, f.right)), abs(rl.Vector3DotProduct(delta, f.up))

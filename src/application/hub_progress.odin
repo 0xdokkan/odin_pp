@@ -125,4 +125,3 @@ hub_progress :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 		}
 	}
 }
-

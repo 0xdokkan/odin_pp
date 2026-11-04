@@ -19,6 +19,11 @@ HUD_SHADE :: rl.Color{164, 144, 183, 255}
 HUD_EMBER :: rl.Color{226, 122, 74, 255}
 HUD_FROST :: rl.Color{142, 186, 214, 255}
 
+@(private)
+hud_ink :: proc(renderer:^Renderer)->rl.Color {return EXPEDITION_PAPER_INK if renderer.tactical.expedition else GOTHIC_PAPER}
+@(private)
+hud_muted :: proc(renderer:^Renderer)->rl.Color {return rl.Color{78,103,112,255} if renderer.tactical.expedition else GOTHIC_MUTED}
+
 Tactical_Hud_Layout :: struct {
 	vitals, pulse, commands: rl.Rectangle,
 	map_button, refocus, dodge, character: rl.Rectangle,
@@ -29,6 +34,11 @@ Tactical_Hud_Layout :: struct {
 tactical_hud_layout :: proc(renderer: ^Renderer) -> (result: Tactical_Hud_Layout) {
 	columns := ui.hud_columns({0, 0, renderer.canvas_width, renderer.canvas_height})
 	result.vitals, result.pulse, result.commands = columns[0], columns[1], columns[2]
+	compact:=tactical_hud_height(renderer)<TACTICAL_HUD_HEIGHT
+	if compact {
+		result.vitals.y,result.pulse.y,result.commands.y=8,8,8
+		result.vitals.height,result.pulse.height,result.commands.height=52,52,52
+	}
 	c := result.commands
 	inner := rl.Rectangle{c.x+8, c.y+7, c.width-16, c.height-14}
 	w, h := (inner.width-6)*0.5, (inner.height-4)*0.5
@@ -36,11 +46,28 @@ tactical_hud_layout :: proc(renderer: ^Renderer) -> (result: Tactical_Hud_Layout
 	result.refocus = {inner.x+w+6, inner.y, w, h}
 	result.dodge = {inner.x, inner.y+h+4, w, h}
 	result.character = {inner.x+w+6, inner.y+h+4, w, h}
+	if compact {
+		result.map_button={inner.x,c.y,w,24}
+		result.refocus={inner.x+w+6,c.y,w,24}
+		result.dodge={inner.x,c.y+28,w,24}
+		result.character={inner.x+w+6,c.y+28,w,24}
+	}
+	if renderer.tactical.expedition && renderer.tactical.snapshot != nil && renderer.tactical.snapshot.phase != .Combat {
+		result.character = result.refocus
+	}
 	return
 }
 
-hud_frame :: proc(bounds: rl.Rectangle, accent: rl.Color = GOTHIC_STEEL) {
+hud_frame :: proc(bounds: rl.Rectangle, accent: rl.Color = GOTHIC_STEEL, paper:bool=false) {
 	x, y, w, h := bounds.x, bounds.y, bounds.width, bounds.height
+	if paper {
+		rl.DrawRectangleRec({x+2,y+2,w,h},{37,48,53,48})
+		rl.DrawRectangleRec(bounds,EXPEDITION_PAPER_EDGE)
+		rl.DrawRectangleLinesEx(bounds,1,EXPEDITION_PAPER_INK)
+		rl.DrawRectangleRec({x+3,y+3,2,h-6},accent)
+		rl.DrawRectangleRec({x+5,y+2,w-8,1},{255,250,230,255})
+		return
+	}
 	rl.DrawRectangleRec({x+3, y+4, w, h}, {0, 0, 0, 90})
 	rl.DrawRectangleRec(bounds, HUD_FILL)
 	rl.DrawRectangleLinesEx(bounds, 1, HUD_EDGE)
@@ -87,6 +114,20 @@ hud_hovered :: proc(renderer: ^Renderer, bounds: rl.Rectangle) -> bool {
 hud_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, key, label: cstring, enabled: bool = true,
 	accent: rl.Color = GOTHIC_BLUE, detail: cstring = nil) {
 	hovered := enabled && hud_hovered(renderer, bounds)
+	if renderer.tactical.expedition {
+		rl.DrawRectangleRec(bounds,{244,229,194,255} if !hovered else rl.Color{219,239,232,255})
+		rl.DrawRectangleLinesEx(bounds,1,EXPEDITION_PAPER_INK if enabled else hud_muted(renderer))
+		left:=bounds.x+6
+		if key!=nil {
+			width:=max(f32(20),gothic_text_width(renderer,key,12)+6)
+			rl.DrawRectangleRec({left,bounds.y+4,width,bounds.height-8},EXPEDITION_PAPER_INK)
+			gothic_text_fit(renderer,key,{left+3,bounds.y+(bounds.height-15)*.5,width-5,16},12,EXPEDITION_PAPER_EDGE)
+			left+=width+5
+		}
+		gothic_text_fit(renderer,label,{left,bounds.y+(bounds.height-17)*.5,bounds.x+bounds.width-left-4,18},12,hud_ink(renderer) if enabled else hud_muted(renderer))
+		if detail!=nil {gothic_text_fit(renderer,detail,{left,bounds.y+bounds.height-12,bounds.x+bounds.width-left-4,12},9,hud_muted(renderer))}
+		return
+	}
 	rl.DrawRectangleRec(bounds, HUD_FILL_HOVER if hovered else (HUD_FILL if enabled else rl.Color{10, 14, 20, 220}))
 	rl.DrawRectangleLinesEx(bounds, 1, accent if hovered else (HUD_EDGE if enabled else rl.Color{26, 32, 42, 255}))
 	rl.DrawRectangleRec({bounds.x+1, bounds.y+1, bounds.width-2, 1}, HUD_HIGHLIGHT)
@@ -116,10 +157,11 @@ hud_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, key, label: cstrin
 
 @(private)
 hud_chip :: proc(renderer: ^Renderer, bounds: rl.Rectangle, text: cstring, accent: rl.Color) {
-	rl.DrawRectangleRec(bounds, {14, 21, 31, 232})
-	rl.DrawRectangleLinesEx(bounds, 1, {30, 41, 56, 255})
+	paper := renderer.tactical.expedition
+	rl.DrawRectangleRec(bounds, rl.Color{244,229,194,255} if paper else rl.Color{14,21,31,232})
+	rl.DrawRectangleLinesEx(bounds, 1, EXPEDITION_PAPER_INK if paper else rl.Color{30,41,56,255})
 	rl.DrawRectangleRec({bounds.x+1, bounds.y+1, 2, bounds.height-2}, accent)
-	gothic_text_fit(renderer, text, {bounds.x+6, bounds.y+(bounds.height-15)*0.5, bounds.width-9, 16}, 12, accent)
+	gothic_text_fit(renderer, text, {bounds.x+6, bounds.y+(bounds.height-15)*0.5, bounds.width-9, 16}, 12, hud_ink(renderer) if paper else accent)
 }
 
 // Stored every frame by update_tactical_view, for hover states only.

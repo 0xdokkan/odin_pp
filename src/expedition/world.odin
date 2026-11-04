@@ -587,4 +587,3 @@ prepare_room :: proc(w:^World,room:^game.Room) {
 		append(&room.traps,game.Trap{id=room.next_trap_id,position=p,damage=4,armed=true});room.next_trap_id+=1
 	}}
 }
-

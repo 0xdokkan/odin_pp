@@ -105,11 +105,18 @@ test_expedition_chunk_excludes_active_fixture_and_restores_dormant_cover :: proc
 	w.sites[0].active=false
 	expedition_build_chunk(r,&room,w,{x = 16, y = 16},&builder)
 	testing.expect(t,len(builder.vertices)>0 && len(builder.vertices)<=600)
-	testing.expect(t,len(builder.lines)>0 && len(builder.lines)<=16)
+	// Dormant cover now carries its contour in the printed face UVs; it
+	// needs no separate luminous line geometry to remain a solid occluder.
+	// Its body takes the wall print; footing, coping lip and post take the
+	// plain paper print, each with its own contour.
+	testing.expect(t,len(builder.lines)<=16)
 	for v in builder.vertices {
 		testing.expect(t,v.position.x>=16 && v.position.x<17 && v.position.z>=16 && v.position.z<17)
 		testing.expect(t,v.position.y>=0 && v.position.y<2)
 		testing.expect(t,abs(rl.Vector3LengthSqr(v.normal)-1)<.00001)
+		wall:=v.print_uv.x>=4 && v.print_uv.x<=5
+		paper:=v.print_uv.x>=0 && v.print_uv.x<=1
+		testing.expect(t,(wall || paper) && v.print_uv.y>=0 && v.print_uv.y<=1)
 	}
 	clear(&builder.vertices);clear(&builder.lines);w.sites[0].active=true
 	expedition_build_chunk(r,&room,w,{x = 16, y = 16},&builder)
@@ -199,9 +206,17 @@ test_expedition_all_biomes_static_site_bake_is_complete_bounded_and_clock_indepe
 			valid=valid && line.color.a>0 && rl.Vector3DistanceSqr(line.a,line.b)>.000001
 			for p in ([2]rl.Vector3{line.a,line.b}) {for component in p {valid=valid && !math.is_nan(component) && !math.is_inf(component)}}
 		}
-		// Gate lintels alone are all overhead. A low base confirms the
-		// fixture dispatch contributed real geometry for each of the 9 kinds.
-		testing.expect(t,valid && identical && minimum_height<=.05,
+		// Traversal fixtures keep grounded solid geometry. Illustrated
+		// fixtures instead own a rooted sprite (tested with its atlas/quad),
+		// leaving only gate lintels in this mesh: no hidden duplicate body.
+		ownership_ok:=minimum_height<=.05
+		if expedition_fixture_is_sprite(kind) {
+			ownership_ok=true
+			for v in a.vertices {
+				if abs(v.position.x-32.5)<.8 && abs(v.position.z-32.5)<.8 {ownership_ok=false}
+			}
+		}
+		testing.expect(t,valid && identical && ownership_ok,
 			fmt.tprintf("%v %v rotation%d: valid%v stable%v minY%.3f vertices%d lines%d",biome,kind,orientation,valid,identical,minimum_height,len(a.vertices),len(a.lines)))
 	}}}
 }
