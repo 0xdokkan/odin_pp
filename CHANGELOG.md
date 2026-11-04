@@ -15,6 +15,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   copia di prova contano come muri e porte; nessun elenco del gioco è cambiato, quindi nessuna tabella e nessun puzzle nuovi.
 - Su Windows il controllo delle texture dell'officina falliva per i fine riga: `.gitattributes` tiene LF sul generatore e sul file
   generato.
+- Le catture ritagliate del redesign chiudevano di colpo la prova della spedizione su Windows, alla scena 25: `artifacts.screenshot`
+  ritaglia ora a pixel interi. Era solo nello strumento delle catture, non nel gioco.
 
 ## 2026-11-04 — Piano della carta «IA»: la IA, il Nido di ragni, la Regina e il Lanciafiamme (Fasi 0-15)
 
