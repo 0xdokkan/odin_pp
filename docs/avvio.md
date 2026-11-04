@@ -163,12 +163,12 @@ con le regole vere, senza nemici in linea (`odin_pp_regina_00.png`); un nemico i
 ferma una linea (`odin_pp_regina_wall.png`); a zero secondi il pezzo che si rovescia (`odin_pp_regina_fall.png`). L'atto controlla
 anche i suoi cinque suoni.
 
-Con `ODIN_PP_LAB_ONLY=lanciafiamme` gira solo l'atto del Lanciafiamme ([piano](piano-ia.md), Fase 13), nell'arena «Prima persona»:
+Con `ODIN_PP_LAB_ONLY=lanciafiamme` gira solo l'atto del Lanciafiamme ([piano](piano-ia.md), Fasi 13-14), nell'arena «Prima persona»:
 la carta giocata, la camera che resta sul tabellone e il mouse libero; la fiamma girata da un nemico all'altro con la sua scia
 (`odin_pp_lanciafiamme_NN.png`); un nemico toccato due volte a 2 secondi di distanza; un muro che ferma la fiamma e un muretto che
 non la ferma (`odin_pp_lanciafiamme_wall.png`); un barile, il ghiaccio e il fuoco a terra (`odin_pp_lanciafiamme_things.png`); un
-passo mentre spara (`odin_pp_lanciafiamme_walk.png`). Nel laboratorio completo viene per ultimo. Disegno e suono sono provvisori
-fino alla Fase 14.
+passo mentre spara (`odin_pp_lanciafiamme_walk.png`). L'atto controlla anche i suoi sei suoni; con `ODIN_PP_LAB_TIMING=1` misura
+invece i fotogrammi a fiamma spenta e accesa, in ordine incrociato. Nel laboratorio completo viene per ultimo.
 
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
 per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza

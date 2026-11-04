@@ -2,6 +2,10 @@ package devtools
 import run_session "../run"
 
 import "core:fmt"
+import "core:os"
+import "core:slice"
+import rl "vendor:raylib"
+import audio "../engine/audio"
 import app "../engine/app"
 import artifacts "artifacts"
 import game "../game"
@@ -13,7 +17,8 @@ import render "../render"
 // card from the hand, the camera staying on the board and the mouse free; the flame turned from one foe to the other, its
 // trail filmed (odin_pp_lanciafiamme_NN.png); a foe touched twice two seconds apart, his Bruciatura rising; a wall that stops
 // it and a low wall that does not (odin_pp_lanciafiamme_wall.png); a barrel, a block of ice, a fire on the floor
-// (odin_pp_lanciafiamme_things.png); and a step taken while it fires.
+// (odin_pp_lanciafiamme_things.png); and a step taken while it fires. Fase 14: the paper model in his hands, the flame and
+// its smoke filmed closely as he turns, each of its six sounds heard. ODIN_PP_LAB_TIMING=1 measures its frames instead.
 
 // A frame with the world running, the mouse over the board's point `at`, the button as `fire` says.
 @(private = "file")
@@ -35,6 +40,7 @@ mechanics_lab_flame :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
 	run_session.advisor_pilot_release()
+	timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator)
 	game.destroy_room(room)
 	player.health = player.stats.max_health
 	rebuilt, built := run_session.create_mechanics_lab_room(data, player, game.DEFAULT_TACTICAL_CONFIG, .First_Person)
@@ -63,6 +69,29 @@ mechanics_lab_flame :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	if !game.first_person_flame_active(room) || !game.first_person_on_board(room) { fmt.eprintln("mechanics lab: no Lanciafiamme in hand"); return false }
 	if render.first_person_amount(renderer) > 0 || controller.look_captured { fmt.eprintln("mechanics lab: the Lanciafiamme left the board's camera"); return false }
 
+	// ODIN_PP_LAB_TIMING=1: frames in crossed order, the flame off, on, on, off, turning all the time: it must not slow the game.
+	if timing == "1" {
+		rl.SetTargetFPS(0)
+		rl.ClearWindowState({.VSYNC_HINT})
+		for firing, run in ([4]bool{false, true, true, false}) {
+			samples: [600]f64
+			last := rl.GetTime()
+			for index in 0..<30+len(samples) {
+				room.first_person.remaining = 20
+				flame_lab_frame(window, renderer, room, controller, cards, buffer, first.position if index%60 < 30 else second.position, firing)
+				now := rl.GetTime()
+				if index >= 30 { samples[index-30] = (now-last)*1000 }
+				last = now
+			}
+			slice.sort(samples[:])
+			total: f64
+			for ms in samples { total += ms }
+			fmt.printf("FLAME TIMING run=%d firing=%v mean_ms=%.3f median_ms=%.3f p95_ms=%.3f p99_ms=%.3f max_ms=%.3f\n", run, firing,
+				total/f64(len(samples)), samples[len(samples)/2], samples[len(samples)*95/100], samples[len(samples)*99/100], samples[len(samples)-1])
+		}
+		return true
+	}
+
 	// On the first foe, then turned to the second: the trail, filmed.
 	id_first, id_second := first.id, second.id
 	first_cell, second_cell := first.position, second.position
@@ -71,7 +100,7 @@ mechanics_lab_flame :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	artifacts.screenshot("odin_pp_lanciafiamme_00.png")
 	for frame in 0..<24 {
 		flame_lab_frame(window, renderer, room, controller, cards, buffer, second_cell, true)
-		if frame%3 == 0 { artifacts.screenshot(fmt.ctprintf("odin_pp_lanciafiamme_%02d.png", 1+frame/3)) }
+		if frame%2 == 0 { artifacts.screenshot(fmt.ctprintf("odin_pp_lanciafiamme_%02d.png", 1+frame/2)) }
 	}
 	if second.health != 90-game.FLAME_DAMAGE { fmt.eprintln("mechanics lab: the second foe has", second.health); return false }
 
@@ -127,7 +156,15 @@ mechanics_lab_flame :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	for _ in 0..<40 { flame_lab_frame(window, renderer, room, controller, cards, buffer, grid.offset(p, -4, 0), true) }
 	if room.player.position == from { fmt.eprintln("mechanics lab: he did not walk while firing"); return false }
 	artifacts.screenshot("odin_pp_lanciafiamme_walk.png")
-	fmt.eprintf("mechanics lab Lanciafiamme: %d touches, %d fires, Bruciatura up to %d, on the board's camera\n", room.first_person.flame.hits,
-		room.first_person.flame.fires, flame_lab_burn(room, id_first))
+	// Let go: the breath.
+	for _ in 0..<30 { flame_lab_frame(window, renderer, room, controller, cards, buffer, grid.offset(p, -4, 0), false) }
+	sounds := renderer.tactical.lab_sounds
+	if sounds == nil { fmt.eprintln("mechanics lab: no sounds to count"); return false }
+	for sfx in ([6]audio.Lab_Sfx{.Card_Flamethrower, .World_Flame_On, .World_Flame_Roar, .World_Flame_Off, .World_Flame_Crackle, .World_Flame_Catch}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: the flame's sound", sfx, "never sounded"); return false }
+	}
+	fmt.eprintf("mechanics lab Lanciafiamme: %d touches, %d fires, %d barrels, Bruciatura up to %d, on the board's camera; sounds: on %d, roar %d, off %d, crackle %d, catch %d\n",
+		room.first_person.flame.hits, room.first_person.flame.fires, room.first_person.flame.barrels, flame_lab_burn(room, id_first),
+		sounds.played[.World_Flame_On], sounds.played[.World_Flame_Roar], sounds.played[.World_Flame_Off], sounds.played[.World_Flame_Crackle], sounds.played[.World_Flame_Catch])
 	return true
 }

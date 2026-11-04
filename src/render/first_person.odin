@@ -267,6 +267,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	follow_first_person_sword(renderer, room)
 	follow_first_person_bow(renderer, room)
 	follow_first_person_club(renderer, room)
+	follow_flame(renderer, room)
 	if active != f.engaged {
 		if active {
 			// The eyes look the way he faces, or along the grid way nearest the

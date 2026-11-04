@@ -624,6 +624,8 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	s := v.lab_sounds
 	// The archers' bolts whistle as they fly (enemy_arrow_view.odin).
 	lab_bolt_flights(renderer, room, s)
+	// The Lanciafiamme's click, roar, breath and crackle (flame_view.odin).
+	lab_flame_sounds(renderer, room, s, now)
 	// Characters: a sound for each clip a card starts, and for the loops of
 	// telegraph and daze.
 	for &actor in v.living_state.actors {

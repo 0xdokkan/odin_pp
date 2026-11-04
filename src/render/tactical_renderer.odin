@@ -146,6 +146,8 @@ Tactical_View :: struct {
 	marley: Marley_View,
 	// CANNONE, BUCO NERO and DINOSAURO: the prints, the climb and the walk (arsenal.odin).
 	arsenal: Arsenal_View,
+	// LANCIAFIAMME's puff and what its sounds last heard (flame_view.odin).
+	flame: Flame_View,
 	// BENVENUTI A NAPOLI: the grandpa's and the purse's prints (napoli.odin).
 	napoli: Napoli_View,
 	// INONDAZIONE: the way of its wave while the card is held over the board.
@@ -249,6 +251,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_pinball_view(renderer)
 	destroy_marley_view(renderer)
 	destroy_arsenal_view(renderer)
+	destroy_flame_view(&renderer.tactical.flame)
 	destroy_napoli_view(renderer)
 	destroy_first_person_view(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
@@ -741,6 +744,8 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_napoli_visit_table(renderer, room)
 	// Its club in the player's hand, behind his back (first_person_club.odin).
 	draw_first_person_club(renderer, room)
+	// The Lanciafiamme in his hands (flame_view.odin).
+	draw_flame_model(renderer, room)
 	for item in snapshot.loot[:snapshot.loot_count] {
 		if !item.visible || !tactical_cell_on_screen(renderer, item.position) || !tactical_render_visible(renderer, item.position) { continue }
 		draw_tactical_loot(renderer, item)
@@ -763,7 +768,6 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_advice_floor(renderer, room, active_card)
 	draw_advice_sweep(renderer, room)
 	draw_spiderlings(renderer, room)
-	draw_flame(renderer, room)
 	draw_enemy_arrow_courses(renderer, room)
 	draw_enemy_bomb_floor(renderer, room)
 	draw_marley_floor(renderer, room)
@@ -790,6 +794,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_marley_sky(renderer, room)
 	draw_flood_wave(renderer, room)
 	draw_arsenal_sky(renderer, room)
+	draw_flame(renderer, room)
 	draw_tactical_feedback(renderer, .Accent)
 	draw_card_hit_sparks(renderer, room, &preview, halo)
 	draw_enemy_arrows(renderer, room)

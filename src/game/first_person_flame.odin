@@ -65,7 +65,7 @@ First_Person_Flame :: struct {
 	tip: grid.Position,
 	tip_seconds, fire_wait: f32,
 	// Counted for the board and the tests.
-	hits, fires: i32,
+	hits, fires, barrels: i32,
 }
 
 // What the controller asks of it this frame: the left button held, the board's point under the mouse.
@@ -147,7 +147,7 @@ flame_touch_foe :: proc(room: ^Room, f: ^First_Person_Flame, enemy: Enemy) -> bo
 
 // The object on `cell`: a barrel goes off, ice melts. Whether it stops the piece.
 @(private = "file")
-flame_touch_object :: proc(room: ^Room, cell: grid.Position) -> (stopped, acted: bool) {
+flame_touch_object :: proc(room: ^Room, f: ^First_Person_Flame, cell: grid.Position) -> (stopped, acted: bool) {
 	object, found := grid_object_at(room, cell)
 	if !found { return }
 	definition, known := grid_object_definition(object.kind)
@@ -155,6 +155,7 @@ flame_touch_object :: proc(room: ^Room, cell: grid.Position) -> (stopped, acted:
 	stopped = true
 	if definition.explosive {
 		if object.detonation_pulse == 0 { acted = arm_explosive(room, object.id, PLAYER_ENTITY, room.recent_events) }
+		if acted { f.barrels += 1 }
 		return
 	}
 	if object.kind == .Ice_Block {
@@ -202,7 +203,7 @@ flame_step :: proc(room: ^Room, f: ^First_Person_Flame, input: First_Person_Flam
 		point := flame_piece_point(piece^, distance)
 		cell := grid.Position{x = int(math.floor(point.x)), y = int(math.floor(point.y)), layer = p.layer}
 		if flame_is_stopped(room, cell) { piece.alive = false; continue }
-		stopped, touched := flame_touch_object(room, cell)
+		stopped, touched := flame_touch_object(room, f, cell)
 		if touched { acted = true }
 		if stopped { piece.alive = false; continue }
 		radius := flame_width(distance)/2

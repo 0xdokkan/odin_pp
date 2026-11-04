@@ -6,6 +6,18 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-04 — Lanciafiamme: aspetto e suoni (solo laboratorio)
+
+Commit **«Piano IA, Fase 14 fatta: aspetto e suoni del Lanciafiamme»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 14). Regole e
+numeri della carta non cambiano. Il Viandante tiene in mano un modello 3D di cartoncino fatto da codice, con i serbatoi sulla
+schiena, il tubo e il bocchettone d'ottone che punta dove gira, e il suo cartoncino si specchia dal lato in cui mira. La fiamma è fatta
+di sbuffi lasciati nel mondo, dal bianco al rosso col fumo in punta, illumina il pavimento e lascia la scia quando gira. Una
+fiammella resta sulla carta dei nemici che bruciano. Icona nuova nella cella 40. Suoni da codice
+(`tools/audio/sfx_flamethrower.py`), solo nel laboratorio: `card_flamethrower` rifatto, nuovi `world_flame_on`, `world_flame_roar`,
+`world_flame_off`, `world_flame_crackle`, `world_flame_catch`. Gli altri 260 suoni sono identici byte per byte.
+
+**IA aggiornata:** nessun cambiamento necessario, non ci sono contenuti di gioco nuovi.
+
 ## 2026-11-04 — Carta nuova: Lanciafiamme (solo laboratorio)
 
 Commit **«Piano IA, Fase 13 fatta: Lanciafiamme»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 13). Carta nuova

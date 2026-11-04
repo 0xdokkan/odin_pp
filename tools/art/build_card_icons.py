@@ -93,7 +93,7 @@ docs/piano-ia.md adds to it (its Fasi 0 and 8):
              left, cyan traces with white nodes on the right, a steel stem.
     cell 38  Nido di ragni: a cobweb, its spider at the middle.
     cell 39  Regina: a chess queen of ivory and dark gold.
-    cell 40  Lanciafiamme (provisional): a nozzle and its flame.
+    cell 40  Lanciafiamme: the gun with its flame and its red tank.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -1001,34 +1001,34 @@ assert all(len(row) == 28 for row in CHESS_QUEEN) and len(CHESS_QUEEN) == 28
 
 ICONS.update({39: CHESS_QUEEN})
 
-# docs/piano-ia.md, Fase 13: the Lanciafiamme's provisional icon, a nozzle and its flame (its Fase 14).
+# docs/piano-ia.md, Fase 14: the Lanciafiamme's icon, the gun with its flame and its red tank.
 FLAMETHROWER = (
     "............................",
-    "............................",
-    "....................YY......",
-    "..................YYOOY.....",
-    "................YYOOOOYY....",
-    "..............YYOOFFOOOY....",
-    "............YYOOFFFFFOOY....",
-    "...........YOOFFFFFOOOY.....",
-    "..........KKKKFFOOOYY.......",
-    ".........KMMMKOOYYY.........",
-    "........KMMHMMKYY...........",
-    ".......KMMHMMMKK............",
-    "......KMMMMMMKmK............",
-    ".....KMMMMMMKmmmK...........",
-    "....KZZZZMMKmmmmK...........",
-    "...KZZZZZZKKmmmK............",
-    "...KZZZZZZZKKKK.............",
-    "...KZZZzZZZZK...............",
-    "....KZZZzZZZK...............",
-    "....KNnKZZZKK...............",
-    "....KNnnKKK.................",
-    ".....KNnnK..................",
-    "......KNnK..................",
-    ".......KKK..................",
-    "............................",
-    "............................",
+    "..................YYY.......",
+    "................YYOOOYY.....",
+    "..............YYOOFFFOOY....",
+    "............YYOOFFUFFFOOY...",
+    "...........YOOFFUUUFFFOY....",
+    "..........YOOFFUUFFFOOY.....",
+    ".........KKKKFFFFFOOY.......",
+    "........KHHBKOOOOYY.........",
+    ".......KMMHBBKYYY...........",
+    "......KMMMMKKK..............",
+    ".....KMMMMKmK...............",
+    "....KmMMMKmmK...............",
+    "...KZZmMKmmK..KKKK..........",
+    "..KZZZZKKmK..KRRRRK.........",
+    "..KZZZZZKK...KRFRRK.........",
+    "...KZZzZK....KRFRRK.........",
+    "...KNnKK.....KAAAAK.........",
+    "..KNnnK..KK..KRFRRK.........",
+    "..KNnK..KbbKKKRFRRK.........",
+    "...KK...KbbbbbRFRRK.........",
+    ".........KKKKKRFRRK.........",
+    ".............KAAAAK.........",
+    ".............KRFRRK.........",
+    ".............KRRRRK.........",
+    "..............KKKK..........",
     "............................",
     "............................",
 )

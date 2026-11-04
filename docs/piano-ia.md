@@ -228,7 +228,7 @@ comunque nel momento in cui i rami si uniscono.
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Fatta | vedi Esito |
 | 12 | Regina: aspetto e suoni | 11 | Fatta | vedi Esito |
 | 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
-| 14 | Lanciafiamme: aspetto e suoni | 13 | Da fare | — |
+| 14 | Lanciafiamme: aspetto e suoni | 13 | Fatta | vedi Esito |
 | 15 | Nel gioco vero: le quattro carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12, 14 | Da fare | — |
 
 ## Come funziona oggi (punto di partenza)
@@ -1923,7 +1923,7 @@ Check della fase: i test della carta, delle armi della vista e del consigliere; 
 
 Fatta, coi numeri proposti. Schivata e difesa a tasti restano come sempre; lasciato il tasto, la fiamma già uscita finisce la
 corsa e brucia ancora. Sigla `LNF`, icona provvisoria nella cella 40 (l'atlante ha ora una riga in più), suono provvisorio
-`card_flamethrower` ([tools/audio/sfx_flame.py](../tools/audio/sfx_flame.py)). Le regole stanno in
+`card_flamethrower` ([tools/audio/sfx_flamethrower.py](../tools/audio/sfx_flamethrower.py)). Le regole stanno in
 [game/first_person_flame.odin](../src/game/first_person_flame.odin). **Manca la tua prova a mano**, che è la condizione della fase.
 
 **Cambiamenti rispetto al piano, spiegati:**
@@ -1982,6 +1982,42 @@ Passi:
 Check della fase: i test del disegno, dei suoni e delle icone; l'atto `lanciafiamme`; il benchmark ABBA.
 
 **Fatto quando:** l'utente approva fiamma, scia e suoni.
+
+### Esito (4 novembre 2026)
+
+Fatta. **L'approvazione dell'utente su fiamma, scia, modello e suoni manca ancora:** ho guardato le catture ma nessuno ha ascoltato
+i suoni, e la mano è la prova vera.
+
+- **Il modello 3D di cartoncino** (richiesta dell'utente) in [render/flame_view.odin](../src/render/flame_view.odin): fatto da codice
+  con lo stesso kit dell'asso di bastoni, ogni pezzo in tre toni piatti con l'inchiostro attorno. Due serbatoi rossi sulla schiena
+  con le fasce e la valvola d'ottone, un tubo che gira sul fianco, il corpo d'acciaio con gli anelli, il calcio e le impugnature di
+  legno, il bocchettone d'ottone, due mani color mantello. Il bocchettone punta esattamente dove le regole girano il Viandante, e
+  un test lo controlla. Mentre spara trema appena. Il cartoncino del Viandante si gira dal lato in cui mira.
+- **La fiamma:** i pezzi delle regole restano già fermi nel mondo, quindi si piega e resta indietro da sola. Ogni pezzo disegna tre
+  sbuffi da un conto fisso, senza memoria presa a ogni fotogramma: il corpo di colore dal bianco al rosso, il cuore sommato, il fumo
+  scuro sopra la punta. Passa sopra le carte e non si nasconde da sola.
+- **La luce:** arancio sul pavimento, che pulsa piano, più la fiammella pilota sul bocchettone quando non spara.
+- **I nemici bruciati:** una fiammella resta sulla loro carta finché bruciano.
+- **L'icona:** cella 40, il lanciafiamme con la fiammata e il serbatoio rosso.
+- **I suoni** ([tools/audio/sfx_flamethrower.py](../tools/audio/sfx_flamethrower.py)): `card_flamethrower` rifatto e 5 nuovi
+  (`world_flame_on`, `roar`, `off`, `crackle`, `catch`). Sono 266 in tutto, gli altri 260 sono identici. Il ruggito è un pezzo che
+  torna ogni mezzo secondo e si sovrappone a se stesso.
+- **Il benchmark ABBA** (`ODIN_PP_LAB_TIMING=1`): 600 fotogrammi per giro, sempre girando. Fiamma spenta 5,88 ms, accesa 5,90 ms:
+  +0,2%, dentro il margine di misura.
+- **Laboratorio:** l'atto `lanciafiamme` fa 12 catture fitte mentre gira e controlla tutti i 6 suoni.
+
+**Cambiamenti rispetto al piano, spiegati:**
+
+- **L'aria calda** non è una vera deformazione dell'immagine: sono sbuffi tenui che ondeggiano sopra la fiamma. La deformazione
+  vera chiederebbe un passaggio in più su tutto il tabellone, per una carta sola.
+- **La fiamma passa sopra le carte, i muri e le coperture** nel disegno, non solo nelle regole: si legge meglio, e le regole la
+  fermano comunque ai muri.
+- **La fiammella sui nemici** si vede solo nel laboratorio: la Bruciatura esiste anche per l'Incendio nel gioco vero, e questa carta
+  resta nel laboratorio.
+- **La carta del nemico** resta coperta dalla fiamma finché ci passa sopra.
+- **Il modello mirando verso l'alto** finisce dietro il cartoncino del Viandante, come è giusto per un oggetto dietro di lui.
+
+Nessun contenuto di gioco nuovo: la IA non cambia.
 
 ## Fase 15 — Nel gioco vero
 
