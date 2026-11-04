@@ -260,7 +260,8 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	f := &v.first_person
 	if room == nil || room.player == nil || v.snapshot == nil { return }
 	now := renderer.sprite_assets.elapsed
-	active := game.tactical_first_person_active(room)
+	// The Lanciafiamme stays on the board: no dive, no eyes (flame_view.odin).
+	active := game.tactical_first_person_active(room) && !game.first_person_on_board(room)
 	if active { f.weapon = room.first_person.weapon }
 	follow_first_person_fists(renderer, room)
 	follow_first_person_sword(renderer, room)
@@ -998,6 +999,8 @@ FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
 	.Club = {tag = "BAN", status = FIRST_PERSON_HUD_STATUS_CLUB, hand = .Empty, accent = CLUB_MARK_COLOR},
 	// The grandpa: his own health and keys over the plate (napoli.odin).
 	.Nonno = {tag = "NONNO", status = FIRST_PERSON_HUD_STATUS_NONNO, hand = .Empty, accent = CLUB_MARK_COLOR},
+	// The flame never leaves the board: its plate is the chip under VITA (flame_view.odin).
+	.Flamethrower = {tag = "LNF", status = "LANCIAFIAMME", hand = .Empty, accent = FLAME_CHIP_COLOR},
 }
 
 // The weapon the board shows: the room's while the view is on, the last one

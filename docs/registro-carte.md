@@ -6,6 +6,22 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-04 — Carta nuova: Lanciafiamme (solo laboratorio)
+
+Commit **«Piano IA, Fase 13 fatta: Lanciafiamme»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 13). Carta nuova
+`Flamethrower`, «Lanciafiamme», sigla LNF, rara, 3 energia, prezzo 8, peso 60, 60 in spedizione, solo laboratorio (`.Lab_Only`),
+nel mazzo dell'arena «Prima persona». Per 20 s del mondo (+2 a potenziamento, 5 potenziamenti, +2 sul tick) il Viandante impugna
+il lanciafiamme restando sul tabellone: niente carte, niente colpi a mano; cammina, schiva e si difende come sempre. Si gira
+verso il mouse a 720° al secondo e spara tenendo il tasto sinistro: la fiamma è lunga 3 caselle, larga da 0,4 a 1,2, corre a 15
+caselle al secondo e ogni pezzo va dritto dove è uscito, quindi girando lascia una scia. Ogni nemico toccato prende 3 danni e 1
+Bruciatura, poi niente per 2 s. Muri e coperture la fermano, i muretti no. Un barile toccato esplode, il ghiaccio si scioglie, e
+una casella dove la punta resta 1 s prende fuoco come l'Incendio (1 di Bruciatura, un fuoco nuovo al secondo al massimo, mai sul
+Viandante). Aspetto e suono sono provvisori fino alla Fase 14.
+
+**IA aggiornata:** la IA conosce il Lanciafiamme: lo gioca nella copia, dove punta da solo il nemico più vicino entro 4 caselle,
+conta i secondi oltre l'orizzonte (1 punto l'uno, al massimo 8, mai più della vita che resta ai nemici). Il comando nuovo è
+escluso: mentre dura la IA si ferma, come nelle viste. Puzzle: `test_advisor_flame_on_three`, `test_advisor_no_flame_for_one`.
+
 ## 2026-11-04 — Regina: aspetto e suoni (solo laboratorio)
 
 Commit **«Piano IA, Fase 12 fatta: aspetto e suoni della Regina»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 12). Regole e

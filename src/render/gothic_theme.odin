@@ -27,7 +27,7 @@ GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 // Person Fencer, 35: First Person Archer, 36: Benvenuti a Napoli, 37: IA; 38-39 are
 // free).
 CARD_ICON_COLUMNS :: 4
-CARD_ICON_ROWS :: 10
+CARD_ICON_ROWS :: 11
 CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS
 // The figure atlas: four rows of four.
 GOTHIC_FIGURE_CELLS :: 16

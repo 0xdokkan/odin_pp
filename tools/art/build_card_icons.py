@@ -93,6 +93,7 @@ docs/piano-ia.md adds to it (its Fasi 0 and 8):
              left, cyan traces with white nodes on the right, a steel stem.
     cell 38  Nido di ragni: a cobweb, its spider at the middle.
     cell 39  Regina: a chess queen of ivory and dark gold.
+    cell 40  Lanciafiamme (provisional): a nozzle and its flame.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -112,7 +113,7 @@ ATLAS = os.path.join(ROOT, "assets", "gothic", "card-icons-pixel.png")
 
 COLUMNS = 4
 PAINTED_ROWS = 4
-ROWS = 10
+ROWS = 11
 # One pixel unit of the icon, in atlas pixels (the painted icons' own size).
 SCALE = 10
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -999,6 +1000,41 @@ CHESS_QUEEN = (
 assert all(len(row) == 28 for row in CHESS_QUEEN) and len(CHESS_QUEEN) == 28
 
 ICONS.update({39: CHESS_QUEEN})
+
+# docs/piano-ia.md, Fase 13: the Lanciafiamme's provisional icon, a nozzle and its flame (its Fase 14).
+FLAMETHROWER = (
+    "............................",
+    "............................",
+    "....................YY......",
+    "..................YYOOY.....",
+    "................YYOOOOYY....",
+    "..............YYOOFFOOOY....",
+    "............YYOOFFFFFOOY....",
+    "...........YOOFFFFFOOOY.....",
+    "..........KKKKFFOOOYY.......",
+    ".........KMMMKOOYYY.........",
+    "........KMMHMMKYY...........",
+    ".......KMMHMMMKK............",
+    "......KMMMMMMKmK............",
+    ".....KMMMMMMKmmmK...........",
+    "....KZZZZMMKmmmmK...........",
+    "...KZZZZZZKKmmmK............",
+    "...KZZZZZZZKKKK.............",
+    "...KZZZzZZZZK...............",
+    "....KZZZzZZZK...............",
+    "....KNnKZZZKK...............",
+    "....KNnnKKK.................",
+    ".....KNnnK..................",
+    "......KNnK..................",
+    ".......KKK..................",
+    "............................",
+    "............................",
+    "............................",
+    "............................",
+)
+assert all(len(row) == 28 for row in FLAMETHROWER) and len(FLAMETHROWER) == 28
+
+ICONS.update({40: FLAMETHROWER})
 
 
 def chunk(kind, body):

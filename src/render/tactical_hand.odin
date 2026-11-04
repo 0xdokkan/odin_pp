@@ -550,6 +550,7 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	// The fists' keys (Fase 3, the user's choice: the punches' keys too).
 	// The sword's keys (Fase 4): the cut and the grapple; the guard and Q/E are in the HUD's line.
 	// The bow's draw and its lowering (Fase 6).
+	if card.definition_id == .Flamethrower { reaction, rule = "SINISTRO TENUTO: FIAMMA", "NIENTE CARTE NE COLPI A MANO" }
 	if card.definition_id == .First_Person_Archer { reaction, rule = "DESTRO: TENDI E TIRA", "SINISTRO: ABBASSA" }
 	if card.definition_id == .First_Person_Fencer { reaction, rule = "CLIC TENUTO + MOUSE: TAGLIA", "CTRL: RAMPINO / SHIFT: SCHIVA" }
 	if card.definition_id == .First_Person_Brawler { reaction, rule = "SX JAB / DX CROSS / SHIFT GANCI", "WASD LIBERO / SPAZIO SALTA" }

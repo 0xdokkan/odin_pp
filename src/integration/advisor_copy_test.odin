@@ -109,6 +109,7 @@ advisor_test_real_frame :: proc(room: ^game.Room, dt: f32) {
 	for _ in 0..<run_session.LASSO_SPIN_BATCHES { if !game.tactical_lasso_due(room) || !world(room, .Lasso_Spin) { break } }
 	for _ in 0..<run_session.PINBALL_ROLL_BATCHES { if !game.tactical_pinball_due(room) || !world(room, .Pinball_Roll) { break } }
 	for _ in 0..<run_session.ENEMY_FLIGHT_BATCHES { if !game.tactical_flights_due(room) || !world(room, .Enemy_Flight) { break } }
+	advisor.flame_frame(room)
 	if game.tactical_tick(room, 0, true, false) {
 		if run_session.execute_gameplay_command(room, {kind = .Timeout, origin_phase = .Combat}).committed { room.player.tactical.metrics.timeouts += 1 }
 	}

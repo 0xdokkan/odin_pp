@@ -56,6 +56,7 @@ ADVISOR_CARDS := [game.Card_Id]Advisor_Card{
 	.First_Person_Brawler = VIEW, .First_Person_Fencer = VIEW, .First_Person_Archer = VIEW,
 	.Napoli = {use = .Never, why = "il D4 può aprire una vista (il bastone, il nonno): quanto vale non si simula", puzzle = EVERY_CARD},
 	.IA = {use = .Never, why = "la IA non consiglia se stessa: rigiocata ripartirebbe dai suoi secondi", puzzle = EVERY_CARD},
+	.Flamethrower = {use = .Advised, why = "fiamma sul tabellone: la copia punta il nemico più vicino; quando dura la IA si ferma", puzzle = "test_advisor_flame_on_three, test_advisor_no_flame_for_one"},
 	.Queen = {use = .Advised, why = "corre sulle sue linee e colpisce; ferma i passi anche a te", puzzle = "test_advisor_queen_hits_the_nearest, test_advisor_queen_closes_the_corridor, test_advisor_no_queen_in_the_corner"},
 	.Spider_Nest = {use = .Advised, why = "ragnetti che mordono; il nido attira chi gli sta accanto", puzzle = "test_advisor_nest_away_from_the_brute, test_advisor_nest_as_bait, test_advisor_strike_before_the_nest"},
 	.Count = {use = .Never, why = "nessuna carta"},

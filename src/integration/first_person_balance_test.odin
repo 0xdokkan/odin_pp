@@ -73,6 +73,8 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := fal
 			case .AK:
 				// Let go a frame now and then: a press held from before the view took the mouse fires nothing.
 				view.yaw, input.fire = yaw, frame%30 != 0
+			case .Flamethrower:
+				room.first_person.flame.yaw, input.fire = yaw, true
 			case .Fists:
 				view.yaw = yaw
 				input.walk[0] = best > 1
@@ -146,7 +148,7 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := fal
 
 @(test)
 test_first_person_weapons_side_by_side :: proc(t: ^testing.T) {
-	names := [game.First_Person_Weapon]string{.AK = "AK", .Fists = "pugni", .Sword = "spada", .Bow = "arco", .Club = "bastone", .Nonno = "nonno"}
+	names := [game.First_Person_Weapon]string{.AK = "AK", .Fists = "pugni", .Sword = "spada", .Bow = "arco", .Club = "bastone", .Nonno = "nonno", .Flamethrower = "lanciafiamme"}
 	for weapon in game.First_Person_Weapon {
 		r := balance_run(t, weapon)
 		dps := f32(r.dealt)/max(r.seconds, 1)

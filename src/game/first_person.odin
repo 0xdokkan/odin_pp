@@ -118,7 +118,8 @@ First_Person_Shot :: struct {
 // The Club is BENVENUTI A NAPOLI's face 1 (first_person_club.odin), seen from
 // behind his back; the Nonno its face 4, the player turned into the grandpa
 // (napoli_nonno.odin), seen so too.
-First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow, Club, Nonno}
+// The Flamethrower is the view's weapon that keeps the board's camera (first_person_flame.odin).
+First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow, Club, Nonno, Flamethrower}
 
 // What the rules ask of a weapon.
 First_Person_Weapon_Rules :: struct {
@@ -129,6 +130,8 @@ First_Person_Weapon_Rules :: struct {
 	// Whether the board looks from behind his back rather than from his eyes
 	// (render/first_person_club.odin).
 	third_person: bool,
+	// Whether the camera stays on the board, with no dive, the mouse free.
+	on_board: bool,
 }
 
 // The weapons whose cards are still to come name the AK's until then (Fasi 2,
@@ -142,6 +145,7 @@ FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
 	.Bow = {card = .First_Person_Archer},
 	.Club = {card = .Napoli, third_person = true},
 	.Nonno = {card = .Napoli, third_person = true},
+	.Flamethrower = {card = .Flamethrower, on_board = true},
 }
 
 // The AK's own.
@@ -171,6 +175,8 @@ First_Person_Arms :: struct #raw_union {
 	// BENVENUTI A NAPOLI's grandpa: the fists' body first, so the body's rules
 	// read it as theirs (napoli_nonno.odin).
 	nonno: First_Person_Nonno,
+	// LANCIAFIAMME's aim and pieces of flame (first_person_flame.odin).
+	flame: First_Person_Flame,
 }
 
 First_Person_State :: struct {
@@ -206,6 +212,8 @@ First_Person_Save :: struct {
 	club: First_Person_Club,
 	// The grandpa's body, health, club and keys (napoli_nonno.odin).
 	nonno: First_Person_Nonno,
+	// The flame's aim and pieces (first_person_flame.odin).
+	flame: First_Person_Flame,
 }
 
 first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save) {
@@ -218,6 +226,7 @@ first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save
 	case .Bow: save.bow = state.bow
 	case .Club: save.club = state.club
 	case .Nonno: save.nonno = state.nonno
+	case .Flamethrower: save.flame = state.flame
 	}
 	return
 }
@@ -234,6 +243,7 @@ first_person_load :: proc(save: First_Person_Save) -> (state: First_Person_State
 	case .Bow: state.bow = save.bow
 	case .Club: state.club = save.club
 	case .Nonno: state.nonno = save.nonno
+	case .Flamethrower: state.flame = save.flame
 	}
 	return state, true
 }
@@ -271,6 +281,7 @@ tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_P
 	if weapon == .Fists { first_person_fists_begin(room) }
 	if weapon == .Sword { first_person_sword_begin(room) }
 	if weapon == .Bow { first_person_bow_begin(room) }
+	if weapon == .Flamethrower { first_person_flame_begin(room) }
 	// The club's damage is its card's (napoli.odin sets it after).
 	if weapon == .Club { first_person_club_begin(room, NAPOLI_CLUB_DAMAGE) }
 	// So are the grandpa's numbers.
@@ -296,6 +307,7 @@ tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
 	if fp.weapon == .Bow { first_person_bow_tick(room, seconds) }
 	if fp.weapon == .Club { first_person_club_tick(&fp.club, seconds) }
 	if fp.weapon == .Nonno { napoli_nonno_tick(room, seconds) }
+	if fp.weapon == .Flamethrower { first_person_flame_tick(&fp.flame, seconds) }
 	if fp.remaining <= 0 {
 		fp.active = false
 		if fp.weapon == .AK { fp.trigger, fp.cooldown = false, 0 }

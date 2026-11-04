@@ -8,6 +8,8 @@ import level "../level"
 // explode and fire them; the tables say what an object still does past the horizon (the cannon's beats left, the
 // hole's, the coils' charges), which the evaluation counts.
 
+FLAME_WORTH_A_SECOND :: f32(1)
+
 Object_Knowledge :: struct {
 	// What one beat of it is worth to the player past the horizon, at its power (a cannon's shot, a hole's bite): the
 	// player's devices; 0 for the board's own things (the copy plays them out within the horizon).
@@ -55,6 +57,8 @@ objects_value :: proc(room: ^game.Room) -> (value: f32) {
 		worth := known.worth_a_beat*f32(min(beats, known.beats))*f32(power)
 		if object.kind == .Spider_Nest || object.kind == .Queen { bites += worth } else { value += worth }
 	}
+	// The flame's seconds past the horizon: a touch of 3 and its Bruciatura every 2 seconds, on one foe at least.
+	if game.first_person_flame_active(room) { bites += f32(min(room.first_person.remaining, 8))*FLAME_WORTH_A_SECOND }
 	// The spiderlings on their way: each a bite still to come. They bite no more than the foes have left.
 	spiders := &room.player.tactical.spiders
 	for spider in spiders.items[:spiders.count] { bites += f32(spider.bite) }

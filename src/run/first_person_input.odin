@@ -43,7 +43,8 @@ first_person_pause_pressed :: proc(room: ^game.Room, controls: Run_Input) -> boo
 // player's eyes, the board available and focused, nothing paused.
 first_person_wants_mouse :: proc(controller: ^Tactical_Controller, room: ^game.Room, available: bool,
 	input: Tactical_Controller_Input) -> bool {
-	return game.tactical_first_person_active(room) && available && input.focused && controller.was_focused && !controller.paused
+	return game.tactical_first_person_active(room) && !game.first_person_on_board(room) && available && input.focused &&
+	       controller.was_focused && !controller.paused
 }
 
 // Takes the mouse or gives it back as the frame leaves things; either way the
@@ -102,7 +103,7 @@ first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render
 route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
 	switch room.first_person.weapon {
 	case .AK: game.first_person_set_trigger(room, buttons.left)
-	case .Fists, .Sword, .Bow, .Club, .Nonno:
+	case .Fists, .Sword, .Bow, .Club, .Nonno, .Flamethrower:
 	}
 }
 
@@ -222,6 +223,17 @@ drive_first_person_nonno :: proc(controller: ^Tactical_Controller, room: ^game.R
 		nonno = {wish = wish, yaw = yaw, swing = buttons.left, heal = input.diagonals[0], pay = input.diagonals[1]}
 	}
 	command := Gameplay_Command{kind = .Napoli_Nonno, origin_phase = .Combat, nonno = nonno, seconds = seconds}
+	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
+}
+
+// LANCIAFIAMME (game/first_person_flame.odin): the left button held, the board's point under the free mouse; committed as a
+// world command each frame, which runs the flame on the world's seconds. The steps stay the lane's, on the board's keys.
+drive_first_person_flame :: proc(room: ^game.Room, renderer: ^render.Renderer, cards: ^Card_Interaction_State,
+	input: Tactical_Controller_Input, playtest: ^combatdebug.Playtest_Session) {
+	if !game.first_person_flame_active(room) { return }
+	flame := game.First_Person_Flame_Input{fire = input.fire}
+	flame.aim, flame.aimed = render.tactical_board_point(renderer, room, input.map_input.mouse)
+	command := Gameplay_Command{kind = .First_Person_Flame, origin_phase = .Combat, flame = flame}
 	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }
 

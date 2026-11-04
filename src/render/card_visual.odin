@@ -160,6 +160,9 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 	// REGINA (docs/piano-ia.md): a chess queen, REG.
 	.Queen = {icon = 39, short_name = "REG", accent = .Gold, sound = .Card_Queen, narrow_name = "Regina",
 		fill = {50, 42, 34, 245}, outline = {226, 214, 186, 255}},
+	// LANCIAFIAMME (docs/piano-ia.md): icon and sound provisional until its Fase 14 (LNF).
+	.Flamethrower = {icon = 40, short_name = "LNF", accent = .Red, sound = .Card_Flamethrower, narrow_name = "Lanciafiamme",
+		fill = {56, 30, 22, 245}, outline = {255, 140, 40, 255}},
 	.Count = {icon = 0, short_name = "", accent = .Red,
 		fill = {45, 49, 52, 245}, outline = {105, 116, 116, 255}},
 }

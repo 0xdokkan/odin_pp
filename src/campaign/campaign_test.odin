@@ -29,8 +29,8 @@ test_lab_only_cards_never_enter_the_campaign :: proc(t: ^testing.T) {
 		lab += 1
 		testing.expect(t, !c.discovered[id] && !discover(&c, id) && !c.discovered[id] && !card_in_pool(&c, id))
 	}
-	// The IA, the Nido di ragni and the Regina (docs/piano-ia.md) too: the user's choice keeps them in the lab.
-	testing.expect_value(t, lab, 12)
+	// The IA, the Nido di ragni, the Regina and the Lanciafiamme (docs/piano-ia.md) too: the user's choice keeps them in the lab.
+	testing.expect_value(t, lab, 13)
 	// Every card of the collection still comes to light one at a time; the lab's, the retired ones and those only an
 	// upgrade makes never do (docs/registro-carte.md).
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {

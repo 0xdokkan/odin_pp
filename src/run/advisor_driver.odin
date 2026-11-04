@@ -267,7 +267,7 @@ advisor_command_use :: proc(kind: Gameplay_Command_Kind) -> (use: Advisor_Comman
 	case .Timeout, .Continue_Pulse, .QTE_Fail, .Lasso_Spin, .Pinball_Roll, .Enemy_Flight:
 		return .World, "il mondo che va avanti da solo"
 	case .Fish: return .Outside, "la canna da pesca, a stanza vuota: fuori dal combattimento"
-	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club, .Napoli_Nonno:
+	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club, .First_Person_Flame, .Napoli_Nonno:
 		return .Outside, "le viste: la IA si ferma (scelta dell'utente)"
 	}
 	return .Outside, ""

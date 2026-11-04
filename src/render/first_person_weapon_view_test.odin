@@ -12,7 +12,7 @@ import level "../level"
 test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 	look := FIRST_PERSON_LOOKS[.AK]
 	testing.expect(t, look.tag == "FPS" && look.status == FIRST_PERSON_HUD_STATUS && look.hand == .AK)
-	tags := [game.First_Person_Weapon]string{.AK = "FPS", .Fists = "FPB", .Sword = "FPF", .Bow = "FPA", .Club = "BAN", .Nonno = "NONNO"}
+	tags := [game.First_Person_Weapon]string{.AK = "FPS", .Fists = "FPB", .Sword = "FPF", .Bow = "FPA", .Club = "BAN", .Nonno = "NONNO", .Flamethrower = "LNF"}
 	for weapon in game.First_Person_Weapon {
 		look = FIRST_PERSON_LOOKS[weapon]
 		testing.expect_value(t, look.tag, tags[weapon])
@@ -34,6 +34,11 @@ test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 		}
 		if weapon == .Nonno {
 			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_NONNO && look.hand == .Empty)
+			continue
+		}
+		// The Lanciafiamme stays on the board: its plate is a chip under VITA.
+		if weapon == .Flamethrower {
+			testing.expect(t, look.status == "LANCIAFIAMME" && look.hand == .Empty)
 			continue
 		}
 		testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_BOW && look.hand == .Bow)

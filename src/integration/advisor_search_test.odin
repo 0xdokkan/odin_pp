@@ -757,6 +757,55 @@ test_advisor_nest_as_bait :: proc(t: ^testing.T) {
 	testing.expectf(t, nest > walk, "the nest in the chaser's way is worth %.2f, walking and waiting %.2f", nest, walk)
 }
 
+// The card `from` in hand becomes `to` (a card that is not in the IA's arena's deck).
+@(private = "file")
+search_test_turn_card :: proc(room: ^game.Room, from, to: game.Card_Id) {
+	deck := &room.player.deck
+	for &card in deck.hand[:deck.hand_count] {
+		if card.definition_id != from { continue }
+		card.definition_id, card.upgrade_level = to, 0
+		if owned, found := game.owned_card_index_by_id(deck, card.id); found { deck.owned[owned] = card }
+	}
+}
+
+// Three chasers close by, nothing else in hand: the Lanciafiamme.
+@(test)
+test_advisor_flame_on_three :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 13, y = 11}, 30}, {.Chaser, {x = 13, y = 12}, 30}, {.Chaser, {x = 13, y = 13}, 30}}, {.Strike})
+	search_test_turn_card(&room, .Strike, .Flamethrower)
+	advice := search_test_advice(&search, &room)
+	ok := advice_is_card(&room, advice, .Flamethrower)
+	testing.expectf(t, ok, "the IA does not take the Lanciafiamme up: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// One foe alone at 2 of life beside the player: the blow by hand kills it, the flame would only cost him his hand.
+@(test)
+test_advisor_no_flame_for_one :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 12, y = 12}, 2}}, {.Strike})
+	search_test_turn_card(&room, .Strike, .Flamethrower)
+	advice := search_test_advice(&search, &room)
+	ok := advice.valid && advice.kind == .Bump
+	testing.expectf(t, ok, "the IA does not strike by hand: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
 // The cell of an advised Queen.
 @(private = "file")
 queen_test_cell :: proc(room: ^game.Room, advice: advisor.Advice) -> (cell: grid.Position, ok: bool) {

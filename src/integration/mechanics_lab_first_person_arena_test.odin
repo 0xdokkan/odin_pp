@@ -53,10 +53,10 @@ test_mechanics_lab_has_an_arena_for_the_first_person :: proc(t: ^testing.T) {
 	testing.expect(t, archer && brute)
 	// Its own deck: First Person Shooter, Brawler, Fencer and Archer and Benvenuti a Napoli in hand, the rod in Exhaust.
 	testing.expect_value(t, player.deck.owned_count, len(run_session.MECHANICS_LAB_FIRST_PERSON_DECK))
-	testing.expect_value(t, player.deck.hand_count, 5)
+	testing.expect_value(t, player.deck.hand_count, 6)
 	held: bit_set[game.Card_Id]
 	for card in player.deck.hand[:player.deck.hand_count] { held += {card.definition_id} }
-	testing.expect(t, held == {.First_Person, .First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Napoli})
+	testing.expect(t, held == {.First_Person, .First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Napoli, .Flamethrower})
 	testing.expect(t, player.deck.exhaust_count == 1 && player.deck.exhaust_pile[0].definition_id == .Fishing_Rod)
 	// F3: the flat arena, then this one, then the heights.
 	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Flat), run_session.Mechanics_Lab_Arena.First_Person)

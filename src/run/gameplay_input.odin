@@ -43,6 +43,8 @@ Gameplay_Command_Kind :: enum {
 	// BENVENUTI A NAPOLI's club: the frame's blow along `club` (a world command
 	// too; game/first_person_club.odin).
 	First_Person_Club,
+	// LANCIAFIAMME's frame: the button and the aim (game/first_person_flame.odin).
+	First_Person_Flame,
 	// BENVENUTI A NAPOLI's grandpa: the frame's `seconds` of his body, blow and
 	// keys along `nonno` (a world command too; game/napoli_nonno.odin).
 	Napoli_Nonno,
@@ -71,6 +73,8 @@ Gameplay_Command :: struct {
 	bow: game.First_Person_Bow_Input,
 	// What a First_Person_Club frame asks of the club.
 	club: game.First_Person_Club_Input,
+	// What a First_Person_Flame frame asks of the flame.
+	flame: game.First_Person_Flame_Input,
 	// What a Napoli_Nonno frame asks of the grandpa.
 	nonno: game.First_Person_Nonno_Input,
 	seconds: f32,
@@ -131,7 +135,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:
 		return command.origin_phase == .Loot && command.target.kind == .Cell
-	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club, .Napoli_Nonno:
+	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club, .First_Person_Flame, .Napoli_Nonno:
 		return command.origin_phase == .Combat
 	}
 	unreachable()

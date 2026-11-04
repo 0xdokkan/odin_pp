@@ -358,7 +358,7 @@ capture_gameplay_command_telemetry :: proc(
 		resolved_kind = .Wait
 	// An arrow is neither a step nor a bump nor a card, and the rod's cast is
 	// no card either; nor is a shot of the AK.
-	case .Ability, .Shoot, .Fish, .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club, .Napoli_Nonno:
+	case .Ability, .Shoot, .Fish, .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club, .First_Person_Flame, .Napoli_Nonno:
 		resolved_kind = .Ability
 	case .Play_Card:
 		resolved_kind = .Play_Card
@@ -489,6 +489,10 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		// A frame in which no blow began or struck has nothing to show.
 		result := game.first_person_club_move(room, command.club)
 		execution.committed = result != .Invalid_Phase && result != .None
+	case .First_Person_Flame:
+		// A frame in which the flame touched nothing has nothing to show.
+		result := game.first_person_flame_move(room, command.flame)
+		execution.committed = result != .Invalid_Phase && result != .None
 	case .Napoli_Nonno:
 		// A frame in which he neither stepped, struck nor used a key has nothing to show.
 		result := game.napoli_nonno_move(room, command.nonno, command.seconds)
@@ -547,7 +551,7 @@ commit_gameplay_command :: proc(
 	world_command := (command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin || command.kind == .Pinball_Roll || command.kind == .Enemy_Flight ||
 		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense) ||
 		 command.kind == .First_Person_Fire || command.kind == .First_Person_Fists || command.kind == .First_Person_Sword ||
-		 command.kind == .First_Person_Bow || command.kind == .First_Person_Club || command.kind == .Napoli_Nonno)
+		 command.kind == .First_Person_Bow || command.kind == .First_Person_Club || command.kind == .First_Person_Flame || command.kind == .Napoli_Nonno)
 	if world_command {
 		// Reserve a whole event log before mutating gameplay: no committed beat
 		// can lose its presentation when the bounded world bank is full.

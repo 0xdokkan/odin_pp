@@ -227,7 +227,7 @@ comunque nel momento in cui i rami si uniscono.
 | 10 | Nido di ragni: aspetto e suoni | 9 | Fatta | vedi Esito |
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Fatta | vedi Esito |
 | 12 | Regina: aspetto e suoni | 11 | Fatta | vedi Esito |
-| 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
+| 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
 | 14 | Lanciafiamme: aspetto e suoni | 13 | Da fare | — |
 | 15 | Nel gioco vero: le quattro carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12, 14 | Da fare | — |
 
@@ -1918,6 +1918,37 @@ Check della fase: i test della carta, delle armi della vista e del consigliere; 
 `prima_persona`.
 
 **Fatto quando:** nel laboratorio il lanciafiamme funziona come deciso e l'utente lo prova; i test sono verdi.
+
+### Esito (4 novembre 2026)
+
+Fatta, coi numeri proposti. Schivata e difesa a tasti restano come sempre; lasciato il tasto, la fiamma già uscita finisce la
+corsa e brucia ancora. Sigla `LNF`, icona provvisoria nella cella 40 (l'atlante ha ora una riga in più), suono provvisorio
+`card_flamethrower` ([tools/audio/sfx_flame.py](../tools/audio/sfx_flame.py)). Le regole stanno in
+[game/first_person_flame.odin](../src/game/first_person_flame.odin). **Manca la tua prova a mano**, che è la condizione della fase.
+
+**Cambiamenti rispetto al piano, spiegati:**
+
+- **Il ritmo:** sul tabellone valgono tutti i prezzi del Viandante, non solo i passi: anche il tempo di lancio della carta e la
+  schivata. Altrimenti la carta fermava il mondo per 2 secondi invece di 1.
+- **La tabella dei 2 s** tiene 8 nemici; con più di 8 nemici dentro la fiamma, gli altri aspettano un posto libero.
+- **Barili e ghiaccio fermano il pezzo di fiamma** che li tocca, come gli altri oggetti solidi. Anche il Nido e la Regina la
+  fermano.
+- **Il segnalino:** sotto VITA si legge «FIAMMA 14s». L'aspetto vero arriva con la Fase 14.
+- **La riga in alto** dice ancora «MIRA COL MOUSE / CLIC: SPARA / WASD: PASSI»: è giusta, ed è la stessa dell'AK.
+- **I puzzle della IA** trasformano una carta in mano nel Lanciafiamme, perché la carta sta nel mazzo dell'arena «Prima persona»
+  e non in quello dell'arena IA, come dice il piano.
+- **Il puzzle «nessuna fiamma per uno solo»** ha un solo nemico a 2 di vita accanto, come dice il piano: la IA lo colpisce a mano.
+  Con un secondo nemico lontano la fiamma le conviene davvero, e il consiglio cambia.
+
+- **L'arena «Prima persona»** ha ora 6 carte in mano e qualche scritta si stringe: l'atto `prima_persona` misura le parole delle
+  carte alla larghezza di 5, quella di una mano vera.
+
+**La IA:** nella copia il lanciafiamme punta da solo il nemico più vicino, se è entro 4 caselle. I secondi oltre l'orizzonte
+valgono 1 punto l'uno, al massimo 8, mai più della vita che resta ai nemici. Quando dura, la IA si ferma come nelle viste.
+
+**Da sapere:** nella prova di bilanciamento il lanciafiamme fa 1,8 danni diretti al secondo, il più basso delle viste, senza
+contare la bruciatura. È un numero scelto da te e ha un limite voluto, un colpo ogni 2 s per nemico, ma è meglio tenerlo
+d'occhio quando lo provi.
 
 ## Fase 14 — Lanciafiamme: aspetto e suoni
 

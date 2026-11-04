@@ -95,6 +95,8 @@ Card_Id :: enum {
 	Spider_Nest,
 	// REGINA: a chess queen on the board, along her eight lines (queen.odin, docs/piano-ia.md), lab only.
 	Queen,
+	// LANCIAFIAMME: a view that keeps the board's camera (first_person_flame.odin, docs/piano-ia.md), lab only.
+	Flamethrower,
 	Count,
 }
 
@@ -1348,6 +1350,19 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		reward_weight = 60, shop_base_price = 8, cost = 3,
 		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
 		effects = {{kind = .Place_Queen, target = .Player, base_amount = QUEEN_BASE_DAMAGE, amount_per_upgrade = 1, duration = QUEEN_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Flamethrower = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Lab_Only},
+		// LANCIAFIAMME: for 20 world seconds, +2 an upgrade, he holds a flamethrower on the board: no cards, no bumps, the
+		// left button fires where the mouse is; 3 damage and a Bruciatura, each foe at most every 2 seconds
+		// (first_person_flame.odin).
+		id = .Flamethrower, name = "Lanciafiamme", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FLAMETHROWER_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Flamethrower)}, {}, {}, {}},
 		effect_count = 1,
 	},
 	.Count = {id = .Count},

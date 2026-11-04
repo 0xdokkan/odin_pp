@@ -22,7 +22,7 @@ TACTICAL_PLAYER_PACE :: f32(2)
 // choice): the AK's and the fists' keep theirs.
 tactical_player_pace :: proc(room: ^Room, step := false) -> f32 {
 	if room == nil || room.player == nil || !room.player.tactical.config.timed_actions { return 1 }
-	if tactical_first_person_active(room) && !(step && (first_person_sword_active(room) || first_person_bow_active(room))) { return 1 }
+	if tactical_first_person_active(room) && !first_person_on_board(room) && !(step && (first_person_sword_active(room) || first_person_bow_active(room))) { return 1 }
 	return TACTICAL_PLAYER_PACE
 }
 

@@ -245,10 +245,27 @@ frame_room :: proc(room: ^game.Room, dt: f32, policy := Defense_Policy.None) {
 		if !game.tactical_flights_due(room) || !game.resolve_enemy_flights(room) { break }
 		game.tactical_end_combat(room)
 	}
+	flame_frame(room)
 	if game.tactical_tick(room, 0, true, false) && room.player.tactical.remaining <= 0 {
 		if game.tactical_expire_window(room) { room.player.tactical.metrics.timeouts += 1 }
 		game.tactical_end_combat(room)
 	}
+}
+
+// LANCIAFIAMME in a copy: nobody moves the mouse there, so the simple rule of the plan: it fires at the nearest foe.
+flame_frame :: proc(room: ^game.Room) {
+	if !game.first_person_flame_active(room) { return }
+	p := room.player.position
+	best := max(int)
+	input: game.First_Person_Flame_Input
+	for enemy in room.enemies {
+		distance := manhattan(enemy.position, p)
+		if distance >= best { continue }
+		best = distance
+		input.aimed, input.aim = true, {f32(enemy.position.x)+0.5, f32(enemy.position.y)+0.5}
+	}
+	input.fire = best <= 4
+	game.first_person_flame_move(room, input)
 }
 
 // Whether the player may act now: no defence keys up, no beat pending, and the rules let him step, strike or play.

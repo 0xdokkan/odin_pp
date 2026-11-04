@@ -129,7 +129,8 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	_, party := marley_chip(renderer, false)
 	_, ride := ride_chip(renderer, false)
 	_, ia := ia_chip(room, false)
-	count := ordered.count+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)+(1 if ia else 0)
+	_, flame := flame_chip(room, false)
+	count := ordered.count+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)+(1 if ia else 0)+(1 if flame else 0)
 	if count == 0 { return }
 	// The ball's place among the chips: after VELENO and BRUCIATURA.
 	bites := 0
@@ -146,7 +147,7 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	needed: f32
 	even := true
 	for index in 0..<chips.shown {
-		extras := (1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)+(1 if ia else 0)
+		extras := (1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)+(1 if ia else 0)+(1 if flame else 0)
 		if ball && index == bites {
 			chips.accents[index] = PINBALL_STEEL_LIGHT
 			chips.texts[index], _ = pinball_chip(room, short)
@@ -159,6 +160,9 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 		} else if ia && index == bites+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0) {
 			chips.accents[index] = ia_chip_color(room)
 			chips.texts[index], _ = ia_chip(room, short)
+		} else if flame && index == bites+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)+(1 if ia else 0) {
+			chips.accents[index] = FLAME_CHIP_COLOR
+			chips.texts[index], _ = flame_chip(room, short)
 		} else {
 			status := ordered.items[index if index < bites else index-extras]
 			_, chips.accents[index] = tactical_status_label(status.kind, short)

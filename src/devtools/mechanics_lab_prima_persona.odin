@@ -73,7 +73,7 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		if held.definition_id == .First_Person_Archer { archer = held.id }
 	}
 	// Benvenuti a Napoli is in its hand too (docs/piano-napoli.md, its own act: mechanics_lab_napoli).
-	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 5 || card == 0 || brawler == 0 ||
+	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 6 || card == 0 || brawler == 0 ||
 	   fencer == 0 || archer == 0 {
 		fmt.eprintln("mechanics lab: the first person arena is not the one drawn, or its deck is not its own"); return false
 	}
@@ -110,7 +110,8 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 
 	// FIRST PERSON BRAWLER from the hand: its words on the hand's own cards and in the inspector, at every level.
 	brawler_definition, _ := game.card_definition_by_id(.First_Person_Brawler)
-	width := render.tactical_hand_card_bounds(renderer, 0, player.deck.hand_count).width
+	// At the five cards of a hand: the arena's sixth, the Lanciafiamme, narrows them in the lab alone.
+	width := render.tactical_hand_card_bounds(renderer, 0, 5).width
 	for upgrade in i32(0)..=game.FIRST_PERSON_MAX_UPGRADE_LEVEL {
 		if misfit := render.tactical_card_text_misfit(renderer, {id = 1, definition_id = .First_Person_Brawler, upgrade_level = upgrade},
 			brawler_definition, width); misfit != "" {

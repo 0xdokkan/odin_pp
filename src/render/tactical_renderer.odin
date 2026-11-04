@@ -763,6 +763,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_advice_floor(renderer, room, active_card)
 	draw_advice_sweep(renderer, room)
 	draw_spiderlings(renderer, room)
+	draw_flame(renderer, room)
 	draw_enemy_arrow_courses(renderer, room)
 	draw_enemy_bomb_floor(renderer, room)
 	draw_marley_floor(renderer, room)
