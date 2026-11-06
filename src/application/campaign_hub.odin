@@ -100,7 +100,7 @@ hub_scan_slots :: proc(h:^Campaign_Hub) {
 		path:=campaign.slot_path(i);defer delete(path)
 		if path=="" {h.slot_status[i]=.Unreadable;continue}
 		c:campaign.Campaign
-		s:=new(Campaign_Save);defer free(s)
+		s:=new(Campaign_Save);defer { world.snapshot_destroy(&s.expedition); free(s) }
 		status:=campaign.load_slot_into(path,&c,s)
 		h.slot_status[i]=status
 		if status==.Loaded {
@@ -140,7 +140,7 @@ hub_destroy :: proc(data:rawptr) {
 	// newer inventory with an older world snapshot during parent teardown.
 	if h.progress.initialized && !h.progress.run.active {_=hub_save(h)}
 	_=hub_flush(h)
-	campaign.destroy(&h.progress);delete(h.path);delete(h.notice);free(h)
+	world.snapshot_destroy(&h.saved.expedition);campaign.destroy(&h.progress);delete(h.path);delete(h.notice);free(h)
 }
 
 @(private)
@@ -148,6 +148,7 @@ hub_open_slot :: proc(h:^Campaign_Hub,index:int,frame:^host.Frame) {
 	if h.slot_status[index]!=.Loaded && h.slot_status[index]!=.Missing {return}
 	if !hub_flush(h) {hub_notice(h,"Salvataggio non riuscito. Riprova prima di cambiare memoria.");return}
 	h.save_queue={}
+	world.snapshot_destroy(&h.saved.expedition)
 	campaign.destroy(&h.progress);delete(h.path);h.path=campaign.slot_path(index);h.slot=index
 	if h.slot_status[index]==.Missing {
 		campaign.initialize(&h.progress);h.saved={casino_random=h.options.seed~u64(time.now()._nsec)}

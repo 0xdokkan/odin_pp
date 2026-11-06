@@ -239,7 +239,7 @@ test_a_checkpoint_in_a_cave_comes_back_in_the_cave :: proc(t: ^testing.T) {
 	pool, _ := game.room_table_index(&room, grid.offset(arrival, 1, 0))
 	room.ground.pool[pool] = 3
 	s := new(Snapshot)
-	defer free(s)
+	defer { snapshot_destroy(s); free(s) }
 	testing.expect(t, capture(&w, &room, s))
 	testing.expect(t, valid_snapshot(s))
 	testing.expect(t, s.layer_cell_count > 0 && s.layer_pool_count == 1)

@@ -125,7 +125,7 @@ test_a_save_keeps_the_base_of_a_raised_biome :: proc(t: ^testing.T) {
 	game.end_expedition_encounter(&room)
 	room.phase = .Loot
 	s := new(Snapshot)
-	defer free(s)
+	defer { snapshot_destroy(s); free(s) }
 	testing.expect(t, capture(&w, &room, s))
 	testing.expect(t, valid_snapshot(s))
 	w2: World

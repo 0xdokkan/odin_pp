@@ -58,7 +58,7 @@ test_a_save_from_before_the_layers_is_refused_without_harm :: proc(t: ^testing.T
 		legacy, _ := strings.replace(string(bytes), "\"version\":2", "\"version\":1", 1, context.temp_allocator)
 		testing.expect(t, read_err == nil && os.write_entire_file(path, legacy) == nil)
 		loaded: campaign.Campaign; defer campaign.destroy(&loaded)
-		snapshot := new(Snapshot); defer free(snapshot)
+		snapshot := new(Snapshot); defer { snapshot_destroy(snapshot); free(snapshot) }
 		testing.expect_value(t, campaign.load_slot_into(path, &loaded, snapshot), campaign.Load_Status.Loaded)
 		testing.expect(t, loaded.discovered[game.Card_Id.Storm_Crown]); testing.expect_value(t, campaign.depot_credits(&loaded), i64(31))
 		testing.expect(t, !valid_snapshot(snapshot))

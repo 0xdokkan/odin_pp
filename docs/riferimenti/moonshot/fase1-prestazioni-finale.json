@@ -1,0 +1,712 @@
+{
+  "schema": 1,
+  "protocol": {
+    "acts": [
+      "Still",
+      "Walk",
+      "Climb",
+      "Flight"
+    ],
+    "warmup_per_act": 60,
+    "samples_per_act": 600,
+    "canvas": [
+      1920,
+      1080
+    ],
+    "percentiles": "nearest_rank",
+    "scopes_additive": false,
+    "gpu_timer": false
+  },
+  "runs": [
+    {
+      "log": "/Users/dokkan/Dev/odin_pp/build/moonshot/cardboard-performance/candidate-c/c2-r1.log",
+      "log_sha256": "16680e868adb3b0825ede46dc79c6e7b92e4e270d3e05d51321ee9f3cd1cbe83",
+      "log_bytes": 176116,
+      "complete": true,
+      "errors": [],
+      "observed_summary_lines": 4,
+      "observed_csv_lines": 2640,
+      "process_peak_rss_bytes": 146898944,
+      "rss_source": "Darwin /usr/bin/time -l; maximum resident set size in bytes",
+      "driver": {
+        "logical": "1920x1080",
+        "raster": "1920x1080",
+        "profile": "off",
+        "audio": "off"
+      },
+      "print_upload_check": {
+        "textures": 1,
+        "print_uploads": 1,
+        "print_bytes": 4672512,
+        "after_total_frames": [
+          660,
+          1320,
+          1980,
+          2640
+        ]
+      },
+      "stages": [
+        {
+          "stage": 0,
+          "act": "Still",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 8.6288126185,
+              "mean_ms": 9.57138577321,
+              "p95_ms": 14.391416684,
+              "p99_ms": 16.70466736,
+              "max_ms": 18.436959013
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 0.0190415,
+              "mean_ms": 0.02048779833333333,
+              "p95_ms": 0.031667,
+              "p99_ms": 0.037458,
+              "max_ms": 0.041833
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 8.0530625,
+              "mean_ms": 8.327763478333333,
+              "p95_ms": 9.913458,
+              "p99_ms": 12.603125,
+              "max_ms": 12.728417
+            }
+          },
+          "reported": {
+            "act": "Still",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 9.571386,
+            "p95_ms": 14.391417,
+            "p99_ms": 16.704667,
+            "max_ms": 18.436959,
+            "vertices": 5184,
+            "triangles": 8282,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 1,
+          "act": "Walk",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 10.5476249005,
+              "mean_ms": 11.428912314580002,
+              "p95_ms": 15.025833622,
+              "p99_ms": 16.201041639,
+              "max_ms": 16.933167353
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.432583,
+              "mean_ms": 2.485543561666667,
+              "p95_ms": 2.816292,
+              "p99_ms": 3.025917,
+              "max_ms": 3.106708
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 7.2039795,
+              "mean_ms": 7.26265964,
+              "p95_ms": 8.366625,
+              "p99_ms": 8.769209,
+              "max_ms": 8.976333
+            }
+          },
+          "reported": {
+            "act": "Walk",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 11.428912,
+            "p95_ms": 15.025834,
+            "p99_ms": 16.201042,
+            "max_ms": 16.933167,
+            "vertices": 5638,
+            "triangles": 9132,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 2,
+          "act": "Climb",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 11.043083388500001,
+              "mean_ms": 11.907239903996667,
+              "p95_ms": 16.309749335,
+              "p99_ms": 17.350833863,
+              "max_ms": 18.155708909
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.3683125,
+              "mean_ms": 2.4362519333333332,
+              "p95_ms": 2.990167,
+              "p99_ms": 3.558417,
+              "max_ms": 3.783292
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 7.3691665,
+              "mean_ms": 7.678137085,
+              "p95_ms": 9.623667,
+              "p99_ms": 11.137792,
+              "max_ms": 11.920042
+            }
+          },
+          "reported": {
+            "act": "Climb",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 11.90724,
+            "p95_ms": 16.309749,
+            "p99_ms": 17.350834,
+            "max_ms": 18.155709,
+            "vertices": 6484,
+            "triangles": 10770,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 3,
+          "act": "Flight",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 9.8064583725,
+              "mean_ms": 10.893474216583332,
+              "p95_ms": 14.791333117,
+              "p99_ms": 16.320791095,
+              "max_ms": 16.818374395
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.314292,
+              "mean_ms": 2.3386233499999998,
+              "p95_ms": 2.73175,
+              "p99_ms": 2.860167,
+              "max_ms": 2.900416
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 6.930896,
+              "mean_ms": 6.942940928333334,
+              "p95_ms": 8.136334,
+              "p99_ms": 8.267291,
+              "max_ms": 8.386959
+            }
+          },
+          "reported": {
+            "act": "Flight",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 10.893474,
+            "p95_ms": 14.791333,
+            "p99_ms": 16.320791,
+            "max_ms": 16.818374,
+            "vertices": 5184,
+            "triangles": 8282,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        }
+      ]
+    },
+    {
+      "log": "/Users/dokkan/Dev/odin_pp/build/moonshot/cardboard-performance/candidate-c/c2-r2.log",
+      "log_sha256": "84d3d1e9b2680fa922f4e5ea9b1e005af7d8881ccd1692ae91a651219426d21e",
+      "log_bytes": 175383,
+      "complete": true,
+      "errors": [],
+      "observed_summary_lines": 4,
+      "observed_csv_lines": 2640,
+      "process_peak_rss_bytes": 144916480,
+      "rss_source": "Darwin /usr/bin/time -l; maximum resident set size in bytes",
+      "driver": {
+        "logical": "1920x1080",
+        "raster": "1920x1080",
+        "profile": "off",
+        "audio": "off"
+      },
+      "print_upload_check": {
+        "textures": 1,
+        "print_uploads": 1,
+        "print_bytes": 4672512,
+        "after_total_frames": [
+          660,
+          1320,
+          1980,
+          2640
+        ]
+      },
+      "stages": [
+        {
+          "stage": 0,
+          "act": "Still",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 8.6682294495,
+              "mean_ms": 9.757566393048334,
+              "p95_ms": 14.681416564,
+              "p99_ms": 16.476333141,
+              "max_ms": 18.236624077
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 0.0189375,
+              "mean_ms": 0.02062401,
+              "p95_ms": 0.032834,
+              "p99_ms": 0.037334,
+              "max_ms": 0.041
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 8.086770999999999,
+              "mean_ms": 8.486084770000001,
+              "p95_ms": 10.024542,
+              "p99_ms": 12.5365,
+              "max_ms": 12.739542
+            }
+          },
+          "reported": {
+            "act": "Still",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 9.757566,
+            "p95_ms": 14.681417,
+            "p99_ms": 16.476333,
+            "max_ms": 18.236624,
+            "vertices": 5184,
+            "triangles": 8282,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 1,
+          "act": "Walk",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 9.258187375999999,
+              "mean_ms": 10.389381595881668,
+              "p95_ms": 15.352416784,
+              "p99_ms": 19.368749112,
+              "max_ms": 22.529125214
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.211646,
+              "mean_ms": 2.2989534716666666,
+              "p95_ms": 2.8875,
+              "p99_ms": 4.678166,
+              "max_ms": 4.762
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 6.4843335,
+              "mean_ms": 6.858770468333334,
+              "p95_ms": 8.54725,
+              "p99_ms": 13.806542,
+              "max_ms": 14.044292
+            }
+          },
+          "reported": {
+            "act": "Walk",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 10.389382,
+            "p95_ms": 15.352417,
+            "p99_ms": 19.368749,
+            "max_ms": 22.529125,
+            "vertices": 5638,
+            "triangles": 9132,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 2,
+          "act": "Climb",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 9.334437549,
+              "mean_ms": 9.9346197963,
+              "p95_ms": 14.08400014,
+              "p99_ms": 15.073166229,
+              "max_ms": 15.931749716
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.1021669999999997,
+              "mean_ms": 2.077159453333333,
+              "p95_ms": 2.300375,
+              "p99_ms": 2.379667,
+              "max_ms": 2.472917
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 6.6340835,
+              "mean_ms": 6.656547068333333,
+              "p95_ms": 7.268667,
+              "p99_ms": 7.346875,
+              "max_ms": 7.419375
+            }
+          },
+          "reported": {
+            "act": "Climb",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 9.93462,
+            "p95_ms": 14.084,
+            "p99_ms": 15.073166,
+            "max_ms": 15.93175,
+            "vertices": 6484,
+            "triangles": 10770,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 3,
+          "act": "Flight",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 8.390812668999999,
+              "mean_ms": 9.163916803278333,
+              "p95_ms": 13.474125415,
+              "p99_ms": 14.98516649,
+              "max_ms": 15.789000317
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 1.9665,
+              "mean_ms": 2.049373383333333,
+              "p95_ms": 2.326166,
+              "p99_ms": 2.395625,
+              "max_ms": 2.495042
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 5.9664995,
+              "mean_ms": 6.208527843333333,
+              "p95_ms": 6.935792,
+              "p99_ms": 7.020959,
+              "max_ms": 7.143792
+            }
+          },
+          "reported": {
+            "act": "Flight",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 9.163917,
+            "p95_ms": 13.474125,
+            "p99_ms": 14.985166,
+            "max_ms": 15.789,
+            "vertices": 5184,
+            "triangles": 8282,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        }
+      ]
+    },
+    {
+      "log": "/Users/dokkan/Dev/odin_pp/build/moonshot/cardboard-performance/candidate-c/c2-r3.log",
+      "log_sha256": "f9f0758d09cf69ef06b899dfe9c98dbaadaf48b42da79ac7f088c5ee177fe9cf",
+      "log_bytes": 176145,
+      "complete": true,
+      "errors": [],
+      "observed_summary_lines": 4,
+      "observed_csv_lines": 2640,
+      "process_peak_rss_bytes": 147226624,
+      "rss_source": "Darwin /usr/bin/time -l; maximum resident set size in bytes",
+      "driver": {
+        "logical": "1920x1080",
+        "raster": "1920x1080",
+        "profile": "off",
+        "audio": "off"
+      },
+      "print_upload_check": {
+        "textures": 1,
+        "print_uploads": 1,
+        "print_bytes": 4672512,
+        "after_total_frames": [
+          660,
+          1320,
+          1980,
+          2640
+        ]
+      },
+      "stages": [
+        {
+          "stage": 0,
+          "act": "Still",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 8.6299791,
+              "mean_ms": 9.671448124571667,
+              "p95_ms": 14.581458643,
+              "p99_ms": 16.155917197,
+              "max_ms": 17.958708107
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 0.018354,
+              "mean_ms": 0.020114848333333334,
+              "p95_ms": 0.032584,
+              "p99_ms": 0.040333,
+              "max_ms": 0.073667
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 8.0631665,
+              "mean_ms": 8.432504988333333,
+              "p95_ms": 9.964041,
+              "p99_ms": 12.584458,
+              "max_ms": 12.978208
+            }
+          },
+          "reported": {
+            "act": "Still",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 9.671448,
+            "p95_ms": 14.581459,
+            "p99_ms": 16.155917,
+            "max_ms": 17.958708,
+            "vertices": 5184,
+            "triangles": 8282,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 1,
+          "act": "Walk",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 11.085666716,
+              "mean_ms": 11.804057916936666,
+              "p95_ms": 15.930958092,
+              "p99_ms": 16.769541427,
+              "max_ms": 18.317999318
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.5062705000000003,
+              "mean_ms": 2.5502245666666665,
+              "p95_ms": 2.941416,
+              "p99_ms": 3.155417,
+              "max_ms": 3.256
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 7.3183955,
+              "mean_ms": 7.504537494999999,
+              "p95_ms": 8.542125,
+              "p99_ms": 9.286416,
+              "max_ms": 9.917291
+            }
+          },
+          "reported": {
+            "act": "Walk",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 11.804058,
+            "p95_ms": 15.930958,
+            "p99_ms": 16.769541,
+            "max_ms": 18.317999,
+            "vertices": 5638,
+            "triangles": 9132,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 2,
+          "act": "Climb",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 11.3183958455,
+              "mean_ms": 11.73414164999,
+              "p95_ms": 15.985000879,
+              "p99_ms": 16.717750579,
+              "max_ms": 17.213249579
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.365854,
+              "mean_ms": 2.40324709,
+              "p95_ms": 2.692667,
+              "p99_ms": 2.8305,
+              "max_ms": 3.115667
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 7.541937,
+              "mean_ms": 7.630714200000001,
+              "p95_ms": 8.491875,
+              "p99_ms": 8.6605,
+              "max_ms": 9.564084
+            }
+          },
+          "reported": {
+            "act": "Climb",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 11.734142,
+            "p95_ms": 15.985001,
+            "p99_ms": 16.717751,
+            "max_ms": 17.21325,
+            "vertices": 6484,
+            "triangles": 10770,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        },
+        {
+          "stage": 3,
+          "act": "Flight",
+          "warmup_count": 60,
+          "measured_count": 600,
+          "scopes": {
+            "frame": {
+              "count": 600,
+              "median_ms": 9.7966040485,
+              "mean_ms": 10.959433182143332,
+              "p95_ms": 14.561083168,
+              "p99_ms": 15.876999125,
+              "max_ms": 16.682917252
+            },
+            "update": {
+              "count": 600,
+              "median_ms": 2.3070625,
+              "mean_ms": 2.3321474983333332,
+              "p95_ms": 2.697292,
+              "p99_ms": 2.821,
+              "max_ms": 2.864542
+            },
+            "draw": {
+              "count": 600,
+              "median_ms": 6.9325209999999995,
+              "mean_ms": 6.959272094999999,
+              "p95_ms": 8.067667,
+              "p99_ms": 8.153917,
+              "max_ms": 8.210458
+            }
+          },
+          "reported": {
+            "act": "Flight",
+            "canvas": "1920x1080",
+            "samples": 600,
+            "mean_ms": 10.959433,
+            "p95_ms": 14.561083,
+            "p99_ms": 15.876999,
+            "max_ms": 16.682917,
+            "vertices": 5184,
+            "triangles": 8282,
+            "model_capacity_bytes": 5712064,
+            "context_capacity_bytes": 6447240,
+            "shaders": 1,
+            "meshes": 0,
+            "textures": 1,
+            "print_uploads": 1,
+            "print_bytes": 4672512
+          }
+        }
+      ]
+    }
+  ]
+}

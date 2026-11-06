@@ -4,6 +4,8 @@ import "core:testing"
 import rl "vendor:raylib"
 import audio "../engine/audio"
 import game "../game"
+import level "../level"
+import grid "../engine/grid"
 
 // Bruciatura and Rallentamento have their Italian names and colours; a stack
 // status's chip shows its stacks, never seconds.
@@ -22,6 +24,78 @@ test_status_labels_and_chips_show_stacks_without_seconds :: proc(t: ^testing.T) 
 	for kind in game.Status_Kind {
 		label, _ := tactical_status_label(kind, false)
 		testing.expectf(t, len(label) > 0, "%v has no name", kind)
+	}
+}
+
+@(test)
+test_status_anchor_and_pixel_follow_the_plateau_in_both_cameras :: proc(t: ^testing.T) {
+	data, made := level.create(8, 8, level.Tile{kind = .Floor})
+	testing.expect(t, made)
+	defer level.destroy(&data)
+	defer set_board_level(nil)
+	set_board_actors(nil)
+	defer clear(&board_actors)
+	r := new(Renderer)
+	defer free(r)
+	r.canvas_width, r.canvas_height = 960, 540
+	for perspective in ([2]bool{false, true}) {
+		r.tactical.camera = tactical_orbit_camera({yaw = 1.3, pitch = .7, distance = 9}, {3.5, 0, 3.5}, perspective)
+		flat_pixel := f32(0)
+		for steps in ([2]i32{0, 20}) {
+			for y in 0..<8 { for x in 0..<8 { level.set_height(&data, {x = x, y = y}, steps) } }
+			set_board_level(&data)
+			for entity in ([2]game.Entity_Ref{game.PLAYER_ENTITY, game.enemy_entity(7)}) {
+				actor := Presentation_Actor{entity = entity, position = {3, 3}, visible = true}
+				height := f32(steps)*game.HEIGHT_STEP_DRAWN
+				expected := rl.GetWorldToScreenEx({3.5, height, 3.5}, r.tactical.camera, 960, 540)
+				anchor := tactical_status_anchor(r, &actor)
+				testing.expect(t, abs(anchor.x-expected.x) < .00001 && abs(anchor.y-expected.y) < .00001)
+				pixel := tactical_status_tag_pixel(r, &actor)
+				if steps == 0 { flat_pixel = pixel }
+				else if perspective { testing.expect(t, pixel > flat_pixel, "the nearer plateau crosses the real perspective tag-size threshold") }
+				else { testing.expect_value(t, pixel, flat_pixel) }
+			}
+		}
+	}
+}
+
+@(test)
+test_status_anchor_keeps_actor_cave_and_bridge_layers :: proc(t: ^testing.T) {
+	data, made := level.create(8, 8, level.Tile{kind = .Floor})
+	testing.expect(t, made)
+	defer level.destroy(&data)
+	defer set_board_level(nil)
+	set_board_actors(nil)
+	defer clear(&board_actors)
+	data.base = level.LAYER_SPACING
+	for y in 0..<8 { for x in 0..<8 {
+		level.set_height(&data, {x = x, y = y}, level.LAYER_SPACING)
+		for layer in ([2]i8{-1, 1}) {
+			cell := grid.Position{x = x, y = y, layer = layer}
+			level.set_tile(&data, cell, {kind = .Floor})
+			level.set_height(&data, cell, i32(layer+1)*level.LAYER_SPACING)
+		}
+	} }
+	set_board_level(&data)
+	r := new(Renderer)
+	defer free(r)
+	r.canvas_width, r.canvas_height = 960, 540
+	r.tactical.camera = tactical_orbit_camera({yaw = 1.3, pitch = .7, distance = 9}, {3.5, 0, 3.5}, true)
+	for entity in ([2]game.Entity_Ref{game.PLAYER_ENTITY, game.enemy_entity(7)}) {
+		for layer in ([3]i8{-1, 0, 1}) {
+			clear(&board_actors)
+			append(&board_actors, Board_Actor{entity, {x = 3, y = 3, layer = layer}})
+			actor := Presentation_Actor{entity = entity, position = {3, 3}, visible = true}
+			height := f32(layer)*f32(level.LAYER_SPACING)*game.HEIGHT_STEP_DRAWN
+			expected := rl.GetWorldToScreenEx({3.5, height, 3.5}, r.tactical.camera, 960, 540)
+			anchor := tactical_status_anchor(r, &actor)
+			testing.expect(t, abs(anchor.x-expected.x) < .00001 && abs(anchor.y-expected.y) < .00001)
+			right := rl.Vector3Normalize(rl.Vector3CrossProduct({0, 1, 0}, r.tactical.camera.position-r.tactical.camera.target))*.5
+			a := rl.GetWorldToScreenEx(rl.Vector3{3.5, height, 3.5}-right, r.tactical.camera, 960, 540)
+			b := rl.GetWorldToScreenEx(rl.Vector3{3.5, height, 3.5}+right, r.tactical.camera, 960, 540)
+			pixel := f32(2) if rl.Vector2Distance(a, b) >= LIVING_HEART_DOUBLE else 1
+			testing.expect_value(t, tactical_status_tag_pixel(r, &actor), pixel)
+		}
 	}
 }
 

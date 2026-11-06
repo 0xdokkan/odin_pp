@@ -67,7 +67,7 @@ flow_fixture :: proc(t: ^testing.T, biome: campaign.Biome = .Cyber) -> ^Expediti
 flow_destroy :: proc(e: ^Expedition_Session) {
 	roguelike_destroy(e.rs)
 	campaign.destroy(e.progress)
-	free(e.progress); free(e.checkpoint); delete(e.message); free(e)
+	free(e.progress); world.snapshot_destroy(e.checkpoint); free(e.checkpoint); delete(e.message); free(e)
 }
 
 @(test)
@@ -103,7 +103,7 @@ test_running_slot_snapshot_restores_owned_room_pointers :: proc(t: ^testing.T) {
 	testing.expect(t, world.capture(&e.world, &e.rs.room, e.checkpoint))
 	testing.expect(t, campaign.save_slot_from(path, e.progress, e.checkpoint))
 	loaded: campaign.Campaign
-	checkpoint := new(world.Snapshot); defer free(checkpoint)
+	checkpoint := new(world.Snapshot); defer { world.snapshot_destroy(checkpoint); free(checkpoint) }
 	status := campaign.load_slot_into(path, &loaded, checkpoint)
 	defer campaign.destroy(&loaded)
 	testing.expect_value(t, status, campaign.Load_Status.Loaded)
@@ -225,15 +225,29 @@ test_focus_loss_flushes_once_and_preserves_previous_checkpoint_during_cast :: pr
 	before_health := e.checkpoint.player.health
 	e.rs.room.player.health -= 3
 	e.rs.room.tactical_pulse.pending = true
+	queued := Gameplay_Command{kind = .Move, origin_phase = e.rs.room.phase, direction = .East}
+	_, emitted := route_gameplay_command(&e.rs.gameplay_buffer, &e.rs.room, true, queued, true, 1.0/60)
+	testing.expect(t, !emitted && e.rs.gameplay_buffer.has_pending)
+	e.rs.card_interaction = {selected_card_id = 2, dragged_card_id = 2}
+	e.rs.iso_renderer.tactical.world_orbit.dragging = true
+	player_before_focus := e.rs.room.player^
 	frame := host.Frame{focused = false, window_focused = false}
 	expedition_update(e, &frame)
 	expedition_update(e, &frame)
+	testing.expect_value(t, e.rs.gameplay_buffer, Buffered_Gameplay_Command{})
+	testing.expect_value(t, e.rs.card_interaction, Card_Interaction_State{})
+	testing.expect(t, !e.rs.tactical_controller.was_focused && !e.rs.iso_renderer.tactical.world_orbit.dragging)
+	testing.expect_value(t, e.rs.room.player^, player_before_focus)
 	testing.expect_value(t, probe.writes, 0)
 	testing.expect_value(t, probe.flushes, 1)
 	testing.expect_value(t, e.checkpoint.player.health, before_health)
 	// Regaining OS focus while covered does not mutate or save the scene.
 	frame.window_focused = true
+	_, emitted = route_gameplay_command(&e.rs.gameplay_buffer, &e.rs.room, true, queued, true, 1.0/60)
+	testing.expect(t, !emitted && e.rs.gameplay_buffer.has_pending)
 	expedition_update(e, &frame)
+	testing.expect_value(t, e.rs.gameplay_buffer, Buffered_Gameplay_Command{})
+	testing.expect_value(t, e.rs.room.player^, player_before_focus)
 	e.rs.room.tactical_pulse.pending = false
 	frame.window_focused = false
 	expedition_update(e, &frame)

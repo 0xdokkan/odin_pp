@@ -1,0 +1,18 @@
+scale=8 biome=Cyber sample=0 side=1280 generated=true room=true gen_ms=379.617 room_ms=0.566 gen_heap=9834432 peak_heap=90399584 heap=90399584 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=8 biome=Cyber sample=1 side=1280 generated=true room=true gen_ms=337.748 room_ms=4.817 gen_heap=9834432 peak_heap=90399584 heap=90399584 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=8 biome=Cyber sample=2 side=1280 generated=true room=true gen_ms=368.202 room_ms=3.308 gen_heap=9834432 peak_heap=90399584 heap=90399584 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=8 biome=Snow sample=0 side=1536 generated=true room=true gen_ms=113.700 room_ms=1.605 gen_heap=14156608 peak_heap=129324768 heap=129324768 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=8 biome=Snow sample=1 side=1536 generated=true room=true gen_ms=112.171 room_ms=14.315 gen_heap=14156608 peak_heap=129324768 heap=129324768 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=8 biome=Snow sample=2 side=1536 generated=true room=true gen_ms=114.314 room_ms=8.166 gen_heap=14156608 peak_heap=129324768 heap=129324768 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=8 biome=Space sample=0 side=1792 generated=true room=true gen_ms=203.602 room_ms=2.061 gen_heap=16057152 peak_heap=172119776 heap=172119776 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=8 biome=Space sample=1 side=1792 generated=true room=true gen_ms=203.311 room_ms=27.766 gen_heap=16057152 peak_heap=172119776 heap=172119776 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=8 biome=Space sample=2 side=1792 generated=true room=true gen_ms=205.629 room_ms=12.310 gen_heap=16057152 peak_heap=172119776 heap=172119776 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0

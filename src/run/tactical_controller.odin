@@ -15,6 +15,8 @@ Tactical_Controller :: struct {
 	// before the view took the mouse, which fires nothing until it is let go
 	// (the left button's, the right one's).
 	look_captured: bool,
+	// A scene's panels can own the pointer while the world keeps advancing.
+	mouse_blocked: bool,
 	look_settle: int,
 	fire_latched, right_latched: bool,
 	// FIRST PERSON BRAWLER (first_person_input.odin): the buttons as last held

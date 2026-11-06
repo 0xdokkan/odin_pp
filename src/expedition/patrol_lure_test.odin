@@ -20,7 +20,7 @@ test_patrol_lure_routes_around_cover_waits_then_returns_and_survives_save :: pro
 	testing.expect_value(t,w.groups[0].lure_phase,Patrol_Lure_Phase.None)
 	for _ in 0..<3 {tick(&w,&room,1.4)}
 	testing.expect(t,g.members[0].enemy.position!=home)
-	snapshot:=new(Snapshot);defer free(snapshot);testing.expect(t,capture(&w,&room,snapshot))
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) };testing.expect(t,capture(&w,&room,snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer level.destroy(&data2);defer game.destroy_room(&room2)
 	testing.expect_value(t,w2.groups[1].lure_phase,g.lure_phase);testing.expect_value(t,w2.groups[1].lure_until,g.lure_until)

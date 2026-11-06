@@ -114,17 +114,18 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 		}
 	}
 	if faint || !renderer.has_hovered_cell { return }
+	aim := renderer.tactical.flood_aim
+	hovered := game.flood_card_anchor(room, card, renderer.hovered_cell, aim.active && aim.forced, aim.way)
 	// Hidden anchors fail before the game constructs a query: do not draw
 	// that empty query at (0,0). Self cards always anchor on the player.
-	if definition.targeting.shape != .None && (!tactical_render_visible(renderer, renderer.hovered_cell) ||
-	   !game.tactical_cell_visible(room, renderer.hovered_cell)) { return }
+	if definition.targeting.shape != .None && (!tactical_render_visible(renderer, hovered) ||
+	   !game.tactical_cell_visible(room, hovered)) { return }
 	preview.has_hover = true
-	preview.hover = game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, renderer.hovered_cell))
+	preview.hover = game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, hovered))
 	if preview.hover.error != .None { return }
 	// The foes this very cast would hit: the mark closes on them.
 	card_range_hits(renderer, room, preview, game.card_hit_enemies(room, card, &preview.hover), true)
 	anchor := preview.hover.query.anchor
-	aim := renderer.tactical.flood_aim
 	if game.card_is_wheel_aimed(card.definition_id) && aim.active {
 		// CANNONE and CANNONE LASER: the foes on the line it would fire along.
 		line := game.cannon_line(room, anchor, aim.way, card.definition_id == .Laser_Cannon)

@@ -44,7 +44,7 @@ first_person_pause_pressed :: proc(room: ^game.Room, controls: Run_Input) -> boo
 first_person_wants_mouse :: proc(controller: ^Tactical_Controller, room: ^game.Room, available: bool,
 	input: Tactical_Controller_Input) -> bool {
 	return game.tactical_first_person_active(room) && !game.first_person_on_board(room) && available && input.focused &&
-	       controller.was_focused && !controller.paused
+	       controller.was_focused && !controller.paused && !controller.mouse_blocked
 }
 
 // Takes the mouse or gives it back as the frame leaves things; either way the

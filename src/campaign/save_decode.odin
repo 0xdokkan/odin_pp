@@ -26,7 +26,9 @@ decode_save_value :: proc(p: ^json.Parser, value: any) -> json.Unmarshal_Error {
 		return json.unmarshal_value(p, value)
 	}
 	if err := json.expect_token(p, .Open_Brace); err != nil { return err }
-	seen := make(map[uintptr]bool, allocator = p.allocator)
+	seen, seen_err := make([]uintptr, int(structure.field_count), p.allocator)
+	if seen_err != nil { return .Out_Of_Memory }
+	seen_count := 0
 	defer delete(seen)
 	for p.curr_token.kind != .Close_Brace {
 		key, key_err := json.parse_object_key(p, p.allocator)
@@ -35,8 +37,8 @@ decode_save_value :: proc(p: ^json.Parser, value: any) -> json.Unmarshal_Error {
 		if err := json.expect_token(p, .Colon); err != nil { return err }
 		if field := save_json_field(value, key); field != nil {
 			offset := uintptr(field.data)-uintptr(value.data)
-			if seen[offset] { return .Multiple_Use_Field }
-			seen[offset] = true
+			for previous in seen[:seen_count] { if previous == offset { return .Multiple_Use_Field } }
+			seen[seen_count] = offset; seen_count += 1
 			if err := decode_save_value(p, field); err != nil { return err }
 		} else {
 			// Match the library's unknown-field handling without retaining its

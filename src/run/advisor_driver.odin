@@ -143,18 +143,7 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 		if !fresh.valid && s.advice.valid && s.advice.root == fingerprint { fresh = s.advice }
 	}
 	// THE HELD ADVICE.
-	danger := advisor.player_danger(room)
-	switch {
-	case p.acted || !p.shown.valid:
-		// The player acted (or nothing is shown): the next advice is the one, nothing old in the meantime.
-		if p.acted { p.shown = {} }
-		if fresh.valid { advisor_hold(p, room, fresh, danger) }
-	case danger != 0 && danger != p.held_danger && fresh.valid:
-		// A blow announced on the player's cell since the advice was held: the IA may change its mind, once.
-		advisor_hold(p, room, fresh, danger)
-	case fresh.valid && !advisor.advice_possible(room, p.shown, p.held_at):
-		advisor_hold(p, room, fresh, danger)
-	}
+	advisor_update_held(p, room, fresh)
 	if p.shown.kind != before.kind || p.shown.cell != before.cell || p.shown.move != before.move {
 		p.shown_age = 0
 		// A light tick when the advice changes, never more than one every 0.3 s.
@@ -166,6 +155,25 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	if p.shown.valid { shown = advisor_view(room, p.shown) }
 	shown.age = p.shown_age
 	shown.warning, shown.warning_left = p.warning, p.warning_left
+}
+
+// The hold policy is independent of the worker's scheduling. In particular an
+// impossible target disappears even when its replacement is still being searched.
+@(private)
+advisor_update_held :: proc(p: ^Advisor_Pilot, room: ^game.Room, fresh: advisor.Advice) {
+	danger := advisor.player_danger(room)
+	switch {
+	case p.acted || !p.shown.valid:
+		// The player acted (or nothing is shown): the next advice is the one, nothing old in the meantime.
+		if p.acted { p.shown = {} }
+		if fresh.valid { advisor_hold(p, room, fresh, danger) }
+	case danger != 0 && danger != p.held_danger && fresh.valid:
+		// A blow announced on the player's cell since the advice was held: the IA may change its mind, once.
+		advisor_hold(p, room, fresh, danger)
+	case !advisor.advice_possible(room, p.shown, p.held_at):
+		p.shown = {}
+		if fresh.valid { advisor_hold(p, room, fresh, danger) }
+	}
 }
 
 @(private = "file")
@@ -231,7 +239,7 @@ advisor_view :: proc(room: ^game.Room, advice: advisor.Advice) -> render.Advice_
 	case .Shoot: return {mark = .Bump, cell = advice.cell, word = "FRECCIA"}
 	case .Wait: return {mark = .Wait, cell = advice.cell, word = "ASPETTA"}
 	case .Refocus: return {mark = .Refocus, cell = advice.cell, word = "RIMESCOLA"}
-	case .Card: return {mark = .Card, cell = advice.cell, word = "CARTA", card_id = advice.move.card_id}
+	case .Card: return {mark = .Card, cell = advisor.target_cell(room, advice.move.target), word = "CARTA", card_id = advice.move.card_id}
 	case .Activate: return {mark = .Refocus, cell = advice.cell, word = "TESLA"}
 	case .Equip: return {mark = .Refocus, cell = advice.cell, word = "ARMA DI RISERVA"}
 	case .Defend:

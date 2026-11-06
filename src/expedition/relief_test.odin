@@ -171,7 +171,7 @@ test_the_relief_is_saved_and_an_old_snapshot_is_refused :: proc(t: ^testing.T) {
 	defer game.destroy_room(&room)
 	testing.expect(t, level.has_heights(&data))
 	s := new(Snapshot)
-	defer free(s)
+	defer { snapshot_destroy(s); free(s) }
 	testing.expect(t, capture(&w, &room, s))
 	testing.expect(t, valid_snapshot(s))
 	w2: World
@@ -191,6 +191,6 @@ test_the_relief_is_saved_and_an_old_snapshot_is_refused :: proc(t: ^testing.T) {
 	testing.expect(t, !restore(s, &w3, &data3, &p3, &room3))
 	// Nor one whose heights put the caves' rock too close over them.
 	s.layers_version = SNAPSHOT_LAYERS
-	s.heights = {}
+	clear(&s.heights)
 	testing.expect(t, !restore(s, &w3, &data3, &p3, &room3))
 }

@@ -15,7 +15,7 @@ test_expedition_snapshot_keeps_the_grandpas_table :: proc(t:^testing.T) {
 	p.position={x = w.groups[0].anchor.x-4, y = w.groups[0].anchor.y};testing.expect(t,engage(&w,&room,0))
 	table:=game.Grid_Object{id = room.next_object_id, kind = .Napoli_Table, position = {x = p.position.x, y = p.position.y-1}, power = 16, life = 1}
 	room.next_object_id+=1;append(&room.objects,table)
-	snapshot:=new(Snapshot);defer free(snapshot)
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer level.destroy(&data2);defer game.destroy_room(&room2)
@@ -45,7 +45,7 @@ test_expedition_snapshot_keeps_the_club_and_the_grandpa :: proc(t:^testing.T) {
 		testing.expect(t,room2.first_person.active && room2.first_person.weapon == weapon)
 		if weapon == .Club { testing.expect(t,room2.first_person.club == room.first_person.club) }
 		else { testing.expect(t,room2.first_person.nonno == room.first_person.nonno && room2.first_person.fists.body == room.first_person.fists.body) }
-		free(snapshot)
+		snapshot_destroy(snapshot); free(snapshot)
 		level.destroy(&data2);game.destroy_room(&room2)
 		level.destroy(&data);game.destroy_room(&room)
 	}

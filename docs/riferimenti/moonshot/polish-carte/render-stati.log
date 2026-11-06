@@ -1,0 +1,6 @@
+[INFO ] --- [2026-11-06 17:26:36] Starting test runner with 1 thread.
+[INFO ] --- [2026-11-06 17:26:36] The random seed sent to every test is: 5344597403486. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-11-06 17:26:36] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-11-06 17:26:36] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 856µs. All tests were successful.

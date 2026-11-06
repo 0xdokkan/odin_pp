@@ -1,0 +1,13 @@
+INFO: Initializing raylib 6.0
+INFO: Platform backend: DESKTOP (GLFW)
+INFO: Supported raylib modules:
+INFO:     > rcore:..... loaded (mandatory)
+INFO:     > rlgl:...... loaded (mandatory)
+INFO:     > rshapes:... loaded (optional)
+INFO:     > rtextures:. loaded (optional)
+INFO:     > rtext:..... loaded (optional)
+INFO:     > rmodels:... loaded (optional)
+INFO:     > raudio:.... loaded (optional)
+2026-11-04 04:58:46.205 graphics-1[27744:3843777] Connection Invalid error for service com.apple.hiservices-xpcservice.
+2026-11-04 04:58:46.205 graphics-1[27744:3843747] Error received in message reply handler: Connection invalid
+2026-11-04 04:58:46.216 graphics-1[27744:3843747] Failure on line 688 in function id scheduleApplicationNotification(LSNotificationCode, NSWorkspaceNotificationCenter *): noErr == _LSModifyNotification(notificationID, 1, &code, 0, NULL, NULL, NULL)

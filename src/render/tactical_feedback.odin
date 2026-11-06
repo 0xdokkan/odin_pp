@@ -77,12 +77,38 @@ tactical_cue_actor_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref
 @(private)
 tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, fallback: grid.Position) -> rl.Vector3 {
 	if position, found := tactical_cue_actor_position(renderer, entity); found {
-		return {position.x+0.5, 0.055, position.y+0.5}
+		return {position.x+0.5, 0.055+entity_point_ground(entity, position), position.y+0.5}
 	}
 	for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
-		if object.entity == entity { return {object.position.x+0.5, 0.055, object.position.y+0.5} }
+		if object.entity == entity { return {object.position.x+0.5, 0.055+entity_point_ground(entity, object.position), object.position.y+0.5} }
 	}
-	return {f32(fallback.x)+0.5, 0.055, f32(fallback.y)+0.5}
+	return {f32(fallback.x)+0.5, 0.055+cell_overlay_ground(fallback), f32(fallback.y)+0.5}
+}
+
+// Ground marks keep their whole rim above a slope; airborne feedback uses the
+// actor's exact floor instead. Both follow its layer, including a moving lift.
+@(private)
+tactical_feedback_rune_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, fallback: grid.Position, radius: f32) -> rl.Vector3 {
+	point := tactical_feedback_position(renderer, entity, fallback)
+	_, tracked := tactical_cue_actor_position(renderer, entity)
+	if !tracked {
+		for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
+			if object.entity == entity { tracked = true; break }
+		}
+	}
+	// An area impact or a vanished actor has no current floor binding. Its
+	// captured cell already supplies the whole surface top on the right layer;
+	// sampling an unbound entity would instead lift a cave's rune to the ground.
+	if !tracked { return point }
+	point.y = max(point.y, 0.055+rim_ground({point.x-0.5, point.z-0.5}, radius, entity))
+	return point
+}
+
+@(private)
+tactical_feedback_spell_ends :: proc(event: game.Game_Event) -> (from, to: rl.Vector3) {
+	from = {f32(event.from_position.x)+0.5, 0.65+cell_ground(event.from_position), f32(event.from_position.y)+0.5}
+	to = {f32(event.to_position.x)+0.5, 0.6+cell_ground(event.to_position), f32(event.to_position.y)+0.5}
+	return
 }
 
 @(private)
@@ -184,8 +210,7 @@ draw_tactical_spell_flight :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) 
 		return
 	}
 	p := presentation_cue_progress(cue)
-	from := rl.Vector3{f32(cue.event.from_position.x)+0.5, 0.65, f32(cue.event.from_position.y)+0.5}
-	to := rl.Vector3{f32(cue.event.to_position.x)+0.5, 0.6, f32(cue.event.to_position.y)+0.5}
+	from, to := tactical_feedback_spell_ends(cue.event)
 	color := tactical_feedback_spell_color(cue.event.card_definition)
 	arc := cue.event.card_definition == .Firebomb || cue.event.card_definition == .Prismatic_Barrage
 	for index in 0..<7 {
@@ -234,18 +259,20 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		alpha := tactical_feedback_alpha(p)
 		center := tactical_feedback_position(renderer, cue.event.target, cue.event.to_position)
 		if layer == .Ground {
+			center = tactical_feedback_rune_position(renderer, cue.event.target, cue.event.to_position, 0.64)
 			// A teleport leaves no trail of steps behind it.
 			if cue.kind == .Move && !game.event_is_teleport(cue.event) {
-				from := rl.Vector3{f32(cue.event.from_position.x)+0.5, 0.056, f32(cue.event.from_position.y)+0.5}
+				from := rl.Vector3{f32(cue.event.from_position.x)+0.5, 0, f32(cue.event.from_position.y)+0.5}
 				color := TACTICAL_FEEDBACK_BLUE if cue.event.target == game.PLAYER_ENTITY else TACTICAL_FEEDBACK_HIT
 				for index in 0..<3 {
 					point := from+(center-from)*(f32(index)+1)/4
+					point.y = 0.056+rim_ground({point.x-0.5, point.z-0.5}, 0.05, cue.event.target)
 					cell := grid.Position{x = int(math.floor(point.x)), y = int(math.floor(point.z))}
 					if !tactical_render_visible(renderer, cell) { continue }
 					rl.DrawCube(point, 0.09, 0.01, 0.09, color_with_opacity(color, alpha*0.4))
 				}
 			} else if cue.kind == .Card_Played || cue.kind == .Refocus {
-				center = tactical_feedback_position(renderer, game.PLAYER_ENTITY, cue.event.from_position)
+				center = tactical_feedback_rune_position(renderer, game.PLAYER_ENTITY, cue.event.from_position, 0.43)
 				draw_tactical_rune(center, 0.24+0.19*p, p*0.3, color_with_opacity(tactical_card_played_color(cue), alpha))
 				draw_tactical_rune(center+rl.Vector3{0, 0.002, 0}, 0.17+0.14*p, -p*0.3, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha*0.6))
 			} else if cue.kind == .Explosion || cue.kind == .Spell_Impact || cue.kind == .Room_Hazard_Triggered {
@@ -259,7 +286,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 						if cue.event.area_mask&(u16(1)<<u32((dy+1)*3+dx+1)) == 0 { continue }
 						cell := grid.offset(cue.event.to_position, dx, dy)
 						if !tactical_render_visible(renderer, cell) { continue }
-						point := rl.Vector3{f32(cell.x)+0.5, 0.057, f32(cell.y)+0.5}
+						point := rl.Vector3{f32(cell.x)+0.5, 0.057+cell_overlay_ground(cell), f32(cell.y)+0.5}
 						draw_tactical_rune(point, 0.34, 0, color_with_opacity(color, alpha*0.7))
 					} }
 				}
@@ -321,7 +348,7 @@ draw_tactical_status_rune :: proc(renderer: ^Renderer, actor: ^Presentation_Acto
 	cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 	if !tactical_render_visible(renderer, cell) { return }
 	if index, shielded := game.status_index(&actor.statuses, .Shield); shielded && actor.statuses.items[index].potency > 0 {
-		draw_tactical_rune({actor.position.x+0.5, 0.057, actor.position.y+0.5}, 0.34, 0,
+		draw_tactical_rune({actor.position.x+0.5, 0.057+rim_ground(actor.position, 0.34, actor.entity), actor.position.y+0.5}, 0.34, 0,
 			color_with_opacity(TACTICAL_FEEDBACK_BLUE, 0.42*actor.opacity))
 	}
 }

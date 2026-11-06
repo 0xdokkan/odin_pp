@@ -1,0 +1,126 @@
+[
+  {
+    "command": [
+      "/usr/bin/time",
+      "-l",
+      "./build/snapshot-capacity",
+      "224",
+      "build/moonshot/capacity-cardboard/snapshot-224-r3.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.707028625,
+    "max_rss_bytes": 12976128,
+    "record": {
+      "side": 224,
+      "cells": 50176,
+      "high_index": 49500,
+      "layer_pool_index": 200028,
+      "snapshot_bytes": 586128,
+      "file_bytes": 1288132,
+      "captured": true,
+      "valid": true,
+      "saved": true,
+      "loaded": true,
+      "restored": true,
+      "equal": true,
+      "capture_ms": 0.758833,
+      "save_ms": 52.770333,
+      "load_ms": 116.17287499999999,
+      "restore_ms": 1.304,
+      "error": ""
+    }
+  },
+  {
+    "command": [
+      "/usr/bin/time",
+      "-l",
+      "./build/snapshot-capacity",
+      "448",
+      "build/moonshot/capacity-cardboard/snapshot-448-r3.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.40621516599999996,
+    "max_rss_bytes": 27279360,
+    "record": {
+      "side": 448,
+      "cells": 200704,
+      "high_index": 199356,
+      "layer_pool_index": 801468,
+      "snapshot_bytes": 1489296,
+      "file_bytes": 3546052,
+      "captured": true,
+      "valid": true,
+      "saved": true,
+      "loaded": true,
+      "restored": true,
+      "equal": true,
+      "capture_ms": 1.209875,
+      "save_ms": 72.000208,
+      "load_ms": 318.488791,
+      "restore_ms": 5.218915999999999,
+      "error": ""
+    }
+  },
+  {
+    "command": [
+      "/usr/bin/time",
+      "-l",
+      "./build/snapshot-capacity",
+      "896",
+      "build/moonshot/capacity-cardboard/snapshot-896-r3.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.3957089169999999,
+    "max_rss_bytes": 92192768,
+    "record": {
+      "side": 896,
+      "cells": 802816,
+      "high_index": 800124,
+      "layer_pool_index": 3208572,
+      "snapshot_bytes": 5101968,
+      "file_bytes": 12577732,
+      "captured": true,
+      "valid": true,
+      "saved": true,
+      "loaded": true,
+      "restored": true,
+      "equal": true,
+      "capture_ms": 5.1687080000000005,
+      "save_ms": 262.219333,
+      "load_ms": 1094.795208,
+      "restore_ms": 19.0245,
+      "error": ""
+    }
+  },
+  {
+    "command": [
+      "/usr/bin/time",
+      "-l",
+      "./build/snapshot-capacity",
+      "1792",
+      "build/moonshot/capacity-cardboard/snapshot-1792-r3.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.5709095,
+    "max_rss_bytes": 315588608,
+    "record": {
+      "side": 1792,
+      "cells": 3211264,
+      "high_index": 3205884,
+      "layer_pool_index": 12839676,
+      "snapshot_bytes": 19552656,
+      "file_bytes": 48704462,
+      "captured": true,
+      "valid": true,
+      "saved": true,
+      "loaded": true,
+      "restored": true,
+      "equal": true,
+      "capture_ms": 20.46775,
+      "save_ms": 1009.5530829999999,
+      "load_ms": 4426.996,
+      "restore_ms": 77.923333,
+      "error": ""
+    }
+  }
+]

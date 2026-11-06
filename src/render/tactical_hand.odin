@@ -632,6 +632,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	// The Canna da Pesca waiting in Exhaust was never played.
 	gothic_text_fit(renderer, fmt.ctprintf("MAZZO %d / SCARTI %d / ESAURITE %d", deck.draw_count, deck.discard_count, game.deck_exhausted_count(deck)), {right-205, top+5, 205, 17}, 10, hud_muted(renderer))
 	hint: cstring = "ROTELLA: CARTA / CLIC: GIOCA" if room.player.tactical.config.expedition else ""
+	hint_color := GOTHIC_BLUE
 	if selected != 0 {
 		if index, found := game.hand_card_index_by_id(deck, selected); found {
 			definition, _ := game.card_definition_by_id(deck.hand[index].definition_id)
@@ -643,15 +644,6 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 		hint = fmt.ctprintf("CTRL+CLIC SU UN NEMICO: FRECCIA (%d)", arrows)
 	}
 	if renderer.tactical.arrow_aim { hint = "CLIC SU UN NEMICO EVIDENZIATO: FRECCIA" }
-	// PINBALL: bosses are too heavy, and only one ball can roll at a time.
-	if aimed := dragged if dragged != 0 else selected; aimed != 0 && renderer.has_hovered_cell {
-		if index, found := game.hand_card_index_by_id(deck, aimed); found && deck.hand[index].definition_id == .Pinball {
-			id := deck.hand[index].definition_id
-			definition, _ := game.card_definition_by_id(id)
-			evaluation := game.evaluate_card_targeting(room, deck.hand[index], game.card_target_request_at(definition, renderer.hovered_cell))
-			if said := pinball_aim_hint(room, evaluation.error); said != "" { hint = said }
-		}
-	}
 	if renderer.tactical.expedition_placement { hint = "ROTELLA: GIRA / CLIC: PIAZZA / DESTRO: TORNA" }
 	if room.player.tactical.dinosaur_remaining > 0 { hint = fmt.ctprintf("DINOSAURO %.0fs / URTO +%d E SPINTA", room.player.tactical.dinosaur_remaining, room.player.tactical.dinosaur_power) }
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
@@ -659,8 +651,15 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	if game.tactical_shadow_active(room) { hint = "OMBRA / SOLO PASSI" }
 	// The pivot holds the rope: only a dodge lets go, when one can be made.
 	if game.tactical_lasso_active(room) && !game.tactical_is_casting(room) { hint = lasso_hand_hint(room) }
+	if aimed := dragged if dragged != 0 else selected; aimed != 0 && available {
+		if index, found := game.hand_card_index_by_id(deck, aimed); found {
+			if said := tactical_card_aim_hint(room, deck.hand[index], renderer.has_hovered_cell, renderer.hovered_cell, renderer.tactical.flood_aim); said != "" {
+				hint, hint_color = said, GOTHIC_RED
+			}
+		}
+	}
 	hint_offset := f32(254) if room.player.tactical.config.expedition else 180
-	if right-left > 580 { gothic_text_fit(renderer, hint, {left+hint_offset, top+5, right-left-hint_offset-218, 17}, 10, GOTHIC_BLUE) }
+	if right-left > 580 { gothic_text_fit(renderer, hint, {left+hint_offset, top+5, right-left-hint_offset-218, 17}, 10, hint_color) }
 	// Left to right, each over the edge of the one before in an overlapping
 	// hand; the raised card last, over them all.
 	raised := tactical_hand_raised_card(deck, hovered, selected, dragged)

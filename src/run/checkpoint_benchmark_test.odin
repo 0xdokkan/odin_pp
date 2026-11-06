@@ -23,7 +23,7 @@ test_checkpoint_save_benchmark :: proc(t: ^testing.T) {
 			elapsed := time.duration_milliseconds(time.tick_since(started))
 			total += elapsed; peak = max(peak, elapsed)
 		}
-		fmt.printf("CHECKPOINT CAPTURE: %dx%d, %d-byte heap snapshot, 10 samples, mean %.3f ms, peak %.3f ms\n", world.size(&e.world), world.size(&e.world), size_of(world.Snapshot), total/10, peak)
+		fmt.printf("CHECKPOINT CAPTURE: %dx%d, %d-byte owned snapshot, 10 samples, mean %.3f ms, peak %.3f ms\n", world.size(&e.world), world.size(&e.world), world.snapshot_storage_bytes(e.checkpoint), total/10, peak)
 		total, peak = 0, 0
 		for i in 0..<10 {
 			e.checkpoint.world.clock = f32(i)

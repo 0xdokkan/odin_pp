@@ -150,6 +150,14 @@ expedition_enemy_costume_art :: proc(b:campaign.Biome,role:game.Enemy_Archetype,
 }
 
 @(private)
+expedition_costume_glow_tints :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (print_tint, paper_tint: rl.Color) {
+	// These are the existing non-cartoon billboard weights. The wardrobe is
+	// drawn afterwards, so it must receive the same canonical intent signal.
+	glow, amount := foe_glow(renderer, entity)
+	return foe_glow_mix(rl.WHITE, glow, amount*.6), foe_glow_mix(rl.WHITE, glow, amount*.5)
+}
+
+@(private)
 draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.Enemy_Archetype,position:view.Vec2,entity:game.Entity_Ref,time:f32,opacity:f32=1) {
 	if role>=.Count || opacity<=0 {return}
 	if b==.Cyber {return} // Whole animated Cyber figures own their printed equipment.
@@ -165,11 +173,13 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 		}
 	}
 	art:=expedition_enemy_costume_art(b,role,time)
+	print_tint, paper_tint := expedition_costume_glow_tints(renderer, entity)
 	right:=flipbook_camera_right(renderer);normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	base:=rl.Vector3{at.x+.5,.035+lift,at.y+.5}+normal*.065
 	if support:=expedition_costume_support(renderer.tactical.expedition_material,b,role);support!=nil {
-		draw_expedition_costume_sheet(right,support,&art,base,height,mirror,opacity,turn_width)
-	} else {draw_expedition_cutout(right,&art,base,height,mirror,opacity,turn_width,border_scale=EXPEDITION_COSTUME_BORDER_SCALE)}
+		draw_expedition_costume_sheet(right,support,&art,base,height,mirror,opacity,turn_width,print_tint,paper_tint)
+	} else {draw_expedition_cutout(right,&art,base,height,mirror,opacity,turn_width,
+		border_scale=EXPEDITION_COSTUME_BORDER_SCALE,print_tint=print_tint,paper_tint=paper_tint)}
 }
 
 @(private)

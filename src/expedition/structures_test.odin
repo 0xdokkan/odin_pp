@@ -138,7 +138,7 @@ test_the_structures_are_saved_and_an_old_snapshot_loads_without_any :: proc(t: ^
 	defer game.destroy_room(&room)
 	testing.expect(t, w.structure_count > 0)
 	s := new(Snapshot)
-	defer free(s)
+	defer { snapshot_destroy(s); free(s) }
 	testing.expect(t, capture(&w, &room, s))
 	testing.expect(t, valid_snapshot(s))
 	w2: World

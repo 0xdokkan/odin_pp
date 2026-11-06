@@ -1,0 +1,18 @@
+scale=1 biome=Cyber sample=0 side=160 generated=true room=true gen_ms=93.123 room_ms=0.062 gen_heap=157632 peak_heap=3308384 heap=3308384 snapshot_bytes=1814672 capture=true sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=1 biome=Cyber sample=1 side=160 generated=true room=true gen_ms=57.996 room_ms=0.060 gen_heap=157632 peak_heap=3308384 heap=3308384 snapshot_bytes=1814672 capture=true sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=1 biome=Cyber sample=2 side=160 generated=true room=true gen_ms=58.382 room_ms=0.053 gen_heap=157632 peak_heap=3308384 heap=3308384 snapshot_bytes=1814672 capture=true sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=1 biome=Snow sample=0 side=192 generated=true room=true gen_ms=13.054 room_ms=0.061 gen_heap=222016 peak_heap=3913440 heap=3913440 snapshot_bytes=1814672 capture=true sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=1 biome=Snow sample=1 side=192 generated=true room=true gen_ms=12.947 room_ms=0.053 gen_heap=222016 peak_heap=3913440 heap=3913440 snapshot_bytes=1814672 capture=true sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=1 biome=Snow sample=2 side=192 generated=true room=true gen_ms=12.931 room_ms=0.054 gen_heap=222016 peak_heap=3913440 heap=3913440 snapshot_bytes=1814672 capture=true sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=1 biome=Space sample=0 side=224 generated=true room=true gen_ms=23.579 room_ms=0.092 gen_heap=251712 peak_heap=4582112 heap=4582112 snapshot_bytes=1814672 capture=true sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=1 biome=Space sample=1 side=224 generated=true room=true gen_ms=23.555 room_ms=0.084 gen_heap=251712 peak_heap=4582112 heap=4582112 snapshot_bytes=1814672 capture=true sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=1 biome=Space sample=2 side=224 generated=true room=true gen_ms=23.828 room_ms=0.106 gen_heap=251712 peak_heap=4582112 heap=4582112 snapshot_bytes=1814672 capture=true sites=16 groups=12
+remaining_bytes=0 bad_free=0

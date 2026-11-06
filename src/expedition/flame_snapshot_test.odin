@@ -16,7 +16,7 @@ test_expedition_snapshot_keeps_the_flame :: proc(t:^testing.T) {
 	f.yaw,f.head,f.hits=1.25,7,2
 	f.pieces[7]={x = 3.5, y = 4.5, way = 1.25, alive = true}
 	f.memory[0]={enemy_id = 3, wait = 1.5}
-	snapshot:=new(Snapshot);defer free(snapshot)
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer level.destroy(&data2);defer game.destroy_room(&room2)

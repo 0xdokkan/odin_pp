@@ -5,9 +5,12 @@ import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:time"
+import "core:io"
+import virtual "core:mem/virtual"
 
 SLOT_VERSION :: 2
 MAX_SAVE_BYTES :: 128*1024*1024
+MAX_DECODE_BYTES :: 512*mem.Megabyte
 Load_Status :: enum { Loaded, Missing, Unreadable, Too_Large, Malformed, Wrong_Version, Checksum_Mismatch, Invalid_State }
 Saved_State :: struct($T: typeid) { campaign: Campaign, snapshot: T }
 @(private)
@@ -31,9 +34,8 @@ checksum :: proc(bytes: []u8) -> (hash: u64) {
 	return
 }
 
-// T is an owning, pointer-free snapshot supplied by the game runtime. Pointer
-// relationships (Room.player, world chunks, etc.) must be rebuilt after load;
-// serializing live addresses would make a save unusable after process restart.
+// T is serialization data: values and owned containers, never live addresses.
+// Synchronous saving borrows it for this call; queued saving makes a deep copy.
 save_slot :: proc(path: string, c: ^Campaign, snapshot: $T) -> bool {
 	copy := new(T)
 	defer free(copy)
@@ -44,7 +46,7 @@ save_slot :: proc(path: string, c: ^Campaign, snapshot: $T) -> bool {
 // Pointer form avoids copying a large world snapshot onto a caller's stack.
 save_slot_from :: proc(path: string, c: ^Campaign, snapshot: ^$T) -> bool {
 	if path == "" || !campaign_valid(c) { return false }
-	if snapshot == nil { return false }
+	if snapshot == nil || !save_owned_fits(snapshot) { return false }
 	now := time.to_unix_seconds(time.now())
 	scratch: mem.Dynamic_Arena
 	mem.dynamic_arena_init(&scratch)
@@ -91,18 +93,34 @@ load_slot :: proc(path: string, $T: typeid, allocator := context.allocator) -> (
 
 // Outputs are changed only after schema, checksum and campaign validation.
 // Callers with large world snapshots can allocate these outputs on the heap.
-load_slot_into :: proc(path: string, c: ^Campaign, snapshot: ^$T, allocator := context.allocator) -> Load_Status {
-	if c == nil || snapshot == nil { return .Invalid_State }
+load_slot_into :: proc(path: string, c: ^Campaign, snapshot: ^$T, allocator := context.allocator, decode_budget: int = MAX_DECODE_BYTES) -> Load_Status {
+	if c == nil || snapshot == nil || save_ownership(type_info_of(T)) == .Unsupported { return .Invalid_State }
 	if !os.exists(path) { return .Missing }
-	scratch: mem.Dynamic_Arena
-	mem.dynamic_arena_init(&scratch)
-	defer mem.dynamic_arena_destroy(&scratch)
-	staging := mem.dynamic_arena_allocator(&scratch)
-	bytes, read_err := os.read_entire_file(path, staging)
-	if read_err != nil { return .Unreadable }
-	if len(bytes) > MAX_SAVE_BYTES { return .Too_Large }
+	file, open_err := os.open(path, {.Read})
+	if open_err != nil { return .Unreadable }
+	defer os.close(file)
+	file_size, stat_err := os.file_size(file)
+	if stat_err != nil || file_size < 0 { return .Unreadable }
+	if file_size > MAX_SAVE_BYTES || decode_budget <= 0 { return .Too_Large }
+	scratch: virtual.Arena
+	if virtual.arena_init_static(&scratch, uint(decode_budget), uint(min(decode_budget, mem.Megabyte))) != nil { return .Too_Large }
+	defer virtual.arena_destroy(&scratch)
+	staging := virtual.arena_allocator(&scratch)
+	bytes, allocation_err := make([]u8, int(file_size), staging)
+	if allocation_err != nil { return .Too_Large }
+	read := 0
+	for read < len(bytes) {
+		n, err := os.read(file, bytes[read:])
+		read += n
+		if err != nil && err != io.Error.EOF { return .Unreadable }
+		if n == 0 { return .Unreadable }
+	}
+	extra: [1]u8
+	if n, err := os.read(file, extra[:]); n > 0 { return .Too_Large } else if err != nil && err != io.Error.EOF { return .Unreadable }
 	header: struct { version: int, checksum: u64 }
-	if json.unmarshal(bytes, &header, allocator = staging) != nil { return .Malformed }
+	if err := json.unmarshal(bytes, &header, allocator = staging); err != nil {
+		return .Too_Large if err == .Out_Of_Memory else .Malformed
+	}
 	if header.version < 1 || header.version > SLOT_VERSION { return .Wrong_Version }
 	payload, found := slot_payload(bytes)
 	if !found { return .Malformed }
@@ -110,11 +128,17 @@ load_slot_into :: proc(path: string, c: ^Campaign, snapshot: ^$T, allocator := c
 	// are introduced by decoding. Version 1 used this same canonical payload.
 	// Re-marshaling into today's type would reject every valid older schema.
 	if checksum(payload) != header.checksum { return .Checksum_Mismatch }
-	staged := new(Saved_State(T), staging)
-	if decode_save(payload, staged, staging) != nil { return .Malformed }
+	staged, staged_err := new(Saved_State(T), staging)
+	if staged_err != nil { return .Too_Large }
+	if err := decode_save(payload, staged, staging); err != nil { return .Too_Large if err == .Out_Of_Memory else .Malformed }
 	if !campaign_valid(&staged.campaign) { return .Invalid_State }
-	owned := new(Saved_State(T), staging)
-	if decode_save(payload, owned, allocator) != nil { return .Malformed }
+	if !save_owned_fits(staged) { return .Too_Large }
+	owned, owned_err := new(Saved_State(T), staging)
+	if owned_err != nil { return .Too_Large }
+	if !save_clone_owned(owned, staged, allocator) { return .Too_Large }
+	// Commit only after the detached copy is complete. Dynamic arrays remember
+	// their allocator; existing strings/slices must share the caller allocator.
+	save_destroy_owned(c, allocator); save_destroy_owned(snapshot, allocator)
 	c^ = owned.campaign; snapshot^ = owned.snapshot
 	return .Loaded
 }

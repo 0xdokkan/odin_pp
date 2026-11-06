@@ -1,6 +1,8 @@
 package campaign
 
 import "core:strings"
+import "core:mem"
+import "core:fmt"
 import "core:thread"
 
 // The main thread owns this queue. The worker touches only its immutable job.
@@ -15,6 +17,7 @@ Save_Queue :: struct {
 }
 @(private)
 Save_Job :: struct {
+	arena: mem.Dynamic_Arena,
 	path: string,
 	progress: Campaign,
 	snapshot: rawptr,
@@ -25,7 +28,7 @@ Save_Job :: struct {
 @(private)
 save_job_destroy :: proc(job: ^Save_Job) {
 	if job == nil { return }
-	destroy(&job.progress); delete(job.path); free(job.snapshot); free(job)
+	mem.dynamic_arena_destroy(&job.arena); free(job)
 }
 
 @(private)
@@ -69,8 +72,8 @@ save_queue_busy :: proc(queue: ^Save_Queue) -> bool {
 	return queue != nil && (queue.worker != nil || queue.pending != nil)
 }
 
-// Copies everything the worker needs. T has the same pointer-free snapshot
-// contract as save_slot_from. No live gameplay allocation crosses threads.
+// Deep-copies all serialization data into the job arena before enqueueing.
+// The source may change or be destroyed immediately; no gameplay buffer is borrowed.
 save_queue_enqueue :: proc(queue: ^Save_Queue, path: string, c: ^Campaign, snapshot: ^$T) -> bool {
 	if queue == nil || path == "" || snapshot == nil || !campaign_valid(c) { return false }
 	save_queue_poll(queue)
@@ -80,11 +83,14 @@ save_queue_enqueue :: proc(queue: ^Save_Queue, path: string, c: ^Campaign, snaps
 		if !save_queue_flush(queue) { return false }
 	}
 	job := new(Save_Job)
-	job.path = strings.clone(path)
-	job.progress = c^
-	job.progress.depot = make([dynamic]Inventory_Grid, len(c.depot))
-	copy(job.progress.depot[:], c.depot[:])
-	copy_snapshot := new(T); copy_snapshot^ = snapshot^
+	mem.dynamic_arena_init(&job.arena)
+	allocator := mem.dynamic_arena_allocator(&job.arena)
+	job.path = strings.clone(path, allocator)
+	copy_snapshot := new(T, allocator)
+	if !save_clone_owned(&job.progress, c, allocator) || !save_clone_owned(copy_snapshot, snapshot, allocator) {
+		fmt.eprintln("campaign save: unsupported snapshot ownership or allocation failure")
+		save_job_destroy(job); queue.failed = true; return false
+	}
 	job.snapshot = copy_snapshot
 	job.write = proc(path: string, progress: ^Campaign, value: rawptr) -> bool {
 		return save_slot_from(path, progress, cast(^T)value)

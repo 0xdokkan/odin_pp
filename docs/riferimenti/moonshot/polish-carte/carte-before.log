@@ -1,0 +1,17 @@
+[INFO ] --- [2026-11-06 17:08:31] Starting test runner with 1 thread.
+[INFO ] --- [2026-11-06 17:08:31] The random seed sent to every test is: 5318560023309. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-11-06 17:08:31] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-11-06 17:08:31] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:79:test_card_cancel_drops_pending_play_without_spending_or_replaying()] right-click cancellation kept or replayed the queued card
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:83:test_card_cancel_drops_pending_play_without_spending_or_replaying()] cancelling a queued card spent energy, time, or damaged its target
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:79:test_card_cancel_drops_pending_play_without_spending_or_replaying()] right-click cancellation kept or replayed the queued card
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:82:test_card_cancel_drops_pending_play_without_spending_or_replaying()] the cancelled card replayed when the busy lane reopened
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:83:test_card_cancel_drops_pending_play_without_spending_or_replaying()] cancelling a queued card spent energy, time, or damaged its target
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:112:test_card_change_during_placement_releases_orientation_for_keyboard_and_drag()] changing card retained the old card's placement and preview mode
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:122:test_card_change_during_placement_releases_orientation_for_keyboard_and_drag()] wheel rotated an abandoned placement instead of cycling the newly selected hand
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:112:test_card_change_during_placement_releases_orientation_for_keyboard_and_drag()] changing card retained the old card's placement and preview mode
+[ERROR] --- [2026-11-06 17:08:31] [card_interaction_polish_test.odin:122:test_card_change_during_placement_releases_orientation_for_keyboard_and_drag()] wheel rotated an abandoned placement instead of cycling the newly selected hand
+
+Finished 2 tests in 3.263ms. All tests failed.
+ - run.test_card_cancel_drops_pending_play_without_spending_or_replaying            	cancelling a queued card spent energy, time, or damaged its target
+ - run.test_card_change_during_placement_releases_orientation_for_keyboard_and_drag 	wheel rotated an abandoned placement instead of cycling the newly selected hand

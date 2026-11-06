@@ -1,20 +1,20 @@
 package expedition
 
+import "core:mem"
 import grid "../engine/grid"
 import game "../game"
 import level "../level"
 
+// Legacy presentation capacity is deliberately unchanged; saves own their buffers.
 MAX_CELLS :: 224*224
-// The cells of the layers other than the ground (level/layers.odin) a save keeps: they are few (the caves' rooms), so
-// they go in a list, one u32 each (layer_cell_pack); and the pools on them, as pairs of index and amount.
-MAX_LAYER_CELLS :: 4096
-MAX_LAYER_POOLS :: 1024
-// The layout of the map a save holds: SNAPSHOT_LAYERS since the caves are a layer of the map (Fase 5 of
-// docs/piano-profondita.md). A save from before has none and is refused, without being converted (the user's choice).
-SNAPSHOT_LAYERS :: u32(1)
+MAX_SNAPSHOT_SIDE :: 8*224
+MAX_SNAPSHOT_CELLS :: MAX_SNAPSHOT_SIDE*MAX_SNAPSHOT_SIDE
+MAX_SNAPSHOT_BYTES :: 256*mem.Megabyte
+SNAPSHOT_LAYERS_V1 :: u32(1)
+SNAPSHOT_LAYERS :: u32(2)
 
-// No address, allocator, GPU handle or borrowed slice is serialized. Dynamic
-// room storage is reconstructed after validating every active prefix.
+// The six dynamic buffers are owned, never borrowed from a live room. JSON
+// serializes their elements, not their pointers or allocators. Destroy explicitly.
 Snapshot :: struct {
 	valid: bool,
 	layers_version: u32,
@@ -22,16 +22,16 @@ Snapshot :: struct {
 	world: World,
 	player: game.Player,
 	phase: game.Room_Phase,
-	tiles: [MAX_CELLS]level.Tile,
+	tiles: [dynamic]level.Tile,
 	// The height of every cell in steps (all zero: a flat map, which is every save from before the
 	// expeditions had a relief: the key is simply missing there).
-	heights: [MAX_CELLS]u8,
+	heights: [dynamic]u8,
 	// The cells of the other layers (layer_cell_pack), and the pools on them (pool index, amount).
-	layer_cells: [MAX_LAYER_CELLS]u32,
+	layer_cells: [dynamic]u64,
 	layer_cell_count: int,
-	layer_pools: [MAX_LAYER_POOLS][2]i32,
+	layer_pools: [dynamic][2]i32,
 	layer_pool_count: int,
-	obstacles: [MAX_CELLS]game.Obstacle,
+	obstacles: [dynamic]game.Obstacle,
 	obstacle_count: int,
 	family: level.Room_Family,
 	encounter_kind: game.Encounter_Kind,
@@ -49,7 +49,7 @@ Snapshot :: struct {
 	loot_count: int,
 	next_enemy_id,next_trap_id,next_object_id:u32,
 	pulse_count:u64,
-	ground_pool:[MAX_CELLS]i32,
+	ground_pool:[dynamic]i32,
 	fires:[game.MAX_GROUND_FIRES]game.Ground_Fire,
 	fire_count:int,
 	next_fire_id:u32,
@@ -65,16 +65,19 @@ Snapshot :: struct {
 	lifts:game.Lift_State,
 }
 
-// A cell of a layer other than the ground, in 29 bits: its index on the map (16), its layer's slot (2), its tile's
-// kind (3) and its height (8).
+// V2: index(32), layer slot(2), kind(3), height(8). V1 values are decoded
+// separately, so their old high index bits cannot silently become layer bits.
 @(private)
-layer_cell_pack :: proc(index,slot:int,kind:level.Tile_Kind,height:u8)->u32 {
-	return u32(index)|u32(slot)<<16|u32(kind)<<18|u32(height)<<21
+layer_cell_pack :: proc(index, slot: int, kind: level.Tile_Kind, height: u8) -> u64 {
+	return u64(index)|u64(slot)<<32|u64(kind)<<34|u64(height)<<37
 }
 
 @(private)
-layer_cell_unpack :: proc(cell:u32)->(index,slot:int,kind:level.Tile_Kind,height:u8) {
-	return int(cell&0xFFFF),int((cell>>16)&3),level.Tile_Kind((cell>>18)&7),u8((cell>>21)&0xFF)
+layer_cell_unpack :: proc(cell: u64, version: u32 = SNAPSHOT_LAYERS) -> (index, slot: int, kind: level.Tile_Kind, height: u8) {
+	if version == SNAPSHOT_LAYERS_V1 {
+		return int(cell&0xFFFF), int((cell>>16)&3), level.Tile_Kind((cell>>18)&7), u8((cell>>21)&0xFF)
+	}
+	return int(cell&0xFFFFFFFF), int((cell>>32)&3), level.Tile_Kind((cell>>34)&7), u8((cell>>37)&0xFF)
 }
 
 stable :: proc(room:^game.Room) -> bool {
@@ -82,16 +85,39 @@ stable :: proc(room:^game.Room) -> bool {
 		!game.tactical_is_casting(room) && !room.player.deck.has_resolving_card && !game.lifts_carrying(room)
 }
 
-capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
-	if w==nil || out==nil || !stable(room) || room.level_data==nil || len(room.traps)>len(out.traps) || len(room.obstacles)>len(out.obstacles) || len(room.level_data.tiles.cells)>MAX_CELLS || len(room.enemies)>len(out.enemies) || len(room.objects)>len(out.objects) || len(room.loot)>len(out.loot) {return false}
-	side:=size(w)
-	if side!=legacy_map_size(w.biome) && side!=map_size(w.biome) {return false}
-	// Structures the enemies have broken are off the map's list: the world's list is what is saved.
-	sync_structures(w,room.level_data)
-	if room.level_data.tiles.width!=side || room.level_data.tiles.height!=side || len(room.level_data.tiles.cells)!=side*side || len(room.ground.pool)!=game.room_table_cells(room.level_data) {return false}
-	// Zero in place, then copy into the caller's heap snapshot. A large compound
-	// literal here would put the expanded tile and obstacle arrays on the stack.
-	out^={}
+capture :: proc(w: ^World, room: ^game.Room, out: ^Snapshot) -> bool {
+	if w == nil || out == nil || !stable(room) || room.level_data == nil || w.biome >= .Count ||
+		len(room.traps) > len(out.traps) || len(room.enemies) > len(out.enemies) ||
+		len(room.objects) > len(out.objects) || len(room.loot) > len(out.loot) { return false }
+	side := size(w)
+	if side <= 0 || side > MAX_SNAPSHOT_SIDE { return false }
+	cells := side*side
+	data := room.level_data
+	if data.tiles.width != side || data.tiles.height != side || len(data.tiles.cells) != cells ||
+		len(room.obstacles) > cells || len(room.ground.pool) != game.room_table_cells(data) ||
+		(len(data.heights) != 0 && len(data.heights) != cells) { return false }
+	layer_cells, layer_pools := 0, 0
+	for plane, slot in data.planes {
+		if len(plane.tiles) == 0 { continue }
+		if slot == level.layer_slot(grid.GROUND_LAYER) || len(plane.tiles) != cells ||
+			(len(plane.heights) != 0 && len(plane.heights) != cells) { return false }
+		for tile in plane.tiles { if tile.kind != .Void { layer_cells += 1 } }
+	}
+	for amount in room.ground.pool[cells:] { if amount != 0 { layer_pools += 1 } }
+	if !snapshot_capacity_allowed(cells, len(room.obstacles), layer_cells, layer_pools) { return false }
+	// Reserve every buffer before touching saved values or lengths. A failed
+	// allocation may enlarge capacity, but preserves the previous checkpoint.
+	if reserve(&out.tiles, cells) != nil || reserve(&out.heights, cells) != nil ||
+		reserve(&out.obstacles, len(room.obstacles)) != nil || reserve(&out.ground_pool, cells) != nil ||
+		reserve(&out.layer_cells, layer_cells) != nil || reserve(&out.layer_pools, layer_pools) != nil { return false }
+	tiles, heights, obstacles := out.tiles, out.heights, out.obstacles
+	ground_pool, saved_layers, saved_pools := out.ground_pool, out.layer_cells, out.layer_pools
+	out^ = {}
+	out.tiles, out.heights, out.obstacles = tiles, heights, obstacles
+	out.ground_pool, out.layer_cells, out.layer_pools = ground_pool, saved_layers, saved_pools
+	resize(&out.tiles, cells); resize(&out.heights, cells); resize(&out.obstacles, len(room.obstacles))
+	resize(&out.ground_pool, cells); resize(&out.layer_cells, layer_cells); resize(&out.layer_pools, layer_pools)
+	sync_structures(w, data)
 	out.valid=true;out.layers_version=SNAPSHOT_LAYERS;out.width=side;out.height=side
 	out.world=w^;out.player=room.player^;out.phase=room.phase
 	out.enemy_count=len(room.enemies);out.trap_count=len(room.traps);out.object_count=len(room.objects);out.loot_count=len(room.loot)
@@ -102,23 +128,21 @@ capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
 	for &platform in out.lifts.platforms[:out.lifts.count] {platform={at=platform.at}}
 	out.family=room.family;out.encounter_kind=room.encounter_kind;out.modifier=room.modifier;out.exit_position=room.exit_position;out.endless=room.endless
 	out.tactical_pulse=room.tactical_pulse;out.obstacle_count=len(room.obstacles)
-	copy(out.tiles[:],room.level_data.tiles.cells[:]);copy(out.heights[:],room.level_data.heights[:]);copy(out.obstacles[:],room.obstacles[:])
+	copy(out.tiles[:],data.tiles.cells[:]);copy(out.obstacles[:],room.obstacles[:])
+	for &height in out.heights { height = 0 }
+	copy(out.heights[:],data.heights[:])
 	copy(out.enemies[:],room.enemies[:]);copy(out.traps[:],room.traps[:]);copy(out.objects[:],room.objects[:]);copy(out.loot[:],room.loot[:])
-	cells:=side*side
 	copy(out.ground_pool[:],room.ground.pool[:cells])
-	// The other layers: their cells, and the pools on them.
-	for &plane,slot in room.level_data.planes {
-		for tile,index in plane.tiles {
-			if tile.kind==.Void {continue}
-			if out.layer_cell_count>=MAX_LAYER_CELLS {return false}
-			height:=plane.heights[index] if index<len(plane.heights) else 0
-			out.layer_cells[out.layer_cell_count]=layer_cell_pack(index,slot,tile.kind,height);out.layer_cell_count+=1
+	for plane, slot in data.planes {
+		for tile, index in plane.tiles {
+			if tile.kind == .Void { continue }
+			height := plane.heights[index] if index < len(plane.heights) else 0
+			out.layer_cells[out.layer_cell_count] = layer_cell_pack(index, slot, tile.kind, height); out.layer_cell_count += 1
 		}
 	}
-	for amount,index in room.ground.pool[cells:] {
-		if amount==0 {continue}
-		if out.layer_pool_count>=MAX_LAYER_POOLS {return false}
-		out.layer_pools[out.layer_pool_count]={i32(cells+index),amount};out.layer_pool_count+=1
+	for amount, index in room.ground.pool[cells:] {
+		if amount == 0 { continue }
+		out.layer_pools[out.layer_pool_count] = {i32(cells+index), amount}; out.layer_pool_count += 1
 	}
 	return true
 }
@@ -135,15 +159,26 @@ valid_statuses :: proc(value:game.Status_Set)->bool {
 }
 
 valid_snapshot :: proc(s:^Snapshot) -> bool {
-	if s==nil || !s.valid || s.layers_version!=SNAPSHOT_LAYERS || s.phase<.Combat || s.phase>.Defeat || s.obstacle_count<0 || s.obstacle_count>MAX_CELLS || s.world.biome>=.Count || s.enemy_count<0 || s.enemy_count>len(s.enemies) || s.trap_count<0 || s.trap_count>len(s.traps) || s.object_count<0 || s.object_count>len(s.objects) || s.loot_count<0 || s.loot_count>len(s.loot) || s.fire_count<0 || s.fire_count>len(s.fires) {return false}
+	if s==nil || !s.valid || (s.layers_version!=SNAPSHOT_LAYERS && s.layers_version!=SNAPSHOT_LAYERS_V1) || s.phase<.Combat || s.phase>.Defeat || s.obstacle_count<0 || s.obstacle_count>len(s.obstacles) || s.world.biome>=.Count || s.enemy_count<0 || s.enemy_count>len(s.enemies) || s.trap_count<0 || s.trap_count>len(s.traps) || s.object_count<0 || s.object_count>len(s.objects) || s.loot_count<0 || s.loot_count>len(s.loot) || s.fire_count<0 || s.fire_count>len(s.fires) {return false}
 	w:=&s.world
 	if w.cave_count<0 || w.cave_count>MAX_CAVES || w.in_cave<0 || w.in_cave>w.cave_count {return false}
 	if w.site_count<0 || w.site_count>MAX_SITES || w.group_count<0 || w.group_count>MAX_GROUPS || w.drop_count<0 || w.drop_count>MAX_DROPS || w.reward_count<0 || w.reward_count>3 || w.reward_site < -1 || w.reward_site>=w.site_count {return false}
 	size:=size(w)
-	if size!=legacy_map_size(w.biome) && size!=map_size(w.biome) {return false}
-	// Version 1 omitted dimensions; its World.side_length also defaults to 0.
-	if (s.width!=0 || s.height!=0) && (s.width!=size || s.height!=size) {return false}
-	if size<=0 || size*size>MAX_CELLS || s.obstacle_count>size*size {return false}
+	if size <= 0 || size > MAX_SNAPSHOT_SIDE { return false }
+	cells := size*size
+	if s.obstacle_count > cells { return false }
+	if s.layers_version == SNAPSHOT_LAYERS_V1 {
+		if len(s.tiles) > MAX_CELLS || len(s.heights) > MAX_CELLS || len(s.ground_pool) > MAX_CELLS ||
+			len(s.obstacles) > MAX_CELLS || len(s.layer_cells) > 4096 || len(s.layer_pools) > 1024 { return false }
+		if size != legacy_map_size(w.biome) && size != map_size(w.biome) { return false }
+		if (s.width != 0 || s.height != 0) && (s.width != size || s.height != size) { return false }
+		if len(s.tiles) < cells || len(s.ground_pool) < cells || (len(s.heights) != 0 && len(s.heights) < cells) { return false }
+	} else {
+		if s.width != size || s.height != size || len(s.tiles) != cells || len(s.heights) != cells ||
+			len(s.ground_pool) != cells || len(s.obstacles) != s.obstacle_count ||
+			len(s.layer_cells) != s.layer_cell_count || len(s.layer_pools) != s.layer_pool_count { return false }
+	}
+	if !snapshot_capacity_allowed(cells, len(s.obstacles), len(s.layer_cells), len(s.layer_pools)) { return false }
 	inside :: proc(p:grid.Position,n:int)->bool {return p.x>=0 && p.y>=0 && p.x<n && p.y<n && level.layer_in_range(p.layer)}
 	if w.pending_xp<0 || (w.pending_xp>0 && !inside(w.pending_xp_position,size)) || !inside(s.exit_position,size) || !game.expedition_player_valid(&s.player) || !valid_statuses(s.player.statuses) ||
 	   s.player.stats.max_health<=0 || s.player.stats.attack<=0 || s.player.stats.defense<0 || s.player.gold<0 ||
@@ -151,13 +186,34 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	   !game.m8_profile_valid(s.player.m8_profile) || s.player.deck.has_resolving_card || s.tactical_pulse.pending ||
 	   s.tactical_pulse.count<0 || s.tactical_pulse.count>game.MAX_ENEMIES_PER_ROOM ||
 	   s.reactions.count<0 || s.reactions.count>game.MAX_REACTION_BINDINGS_PER_ROOM {return false}
-	for tile in s.tiles[:size*size] {if tile.kind>.Fence {return false}}
-	if s.layer_cell_count<0 || s.layer_cell_count>MAX_LAYER_CELLS || s.layer_pool_count<0 || s.layer_pool_count>MAX_LAYER_POOLS {return false}
-	for packed in s.layer_cells[:s.layer_cell_count] {
-		index,slot,kind,_:=layer_cell_unpack(packed)
-		if index>=size*size || slot==level.layer_slot(grid.GROUND_LAYER) || kind==.Void || kind>.Fence {return false}
+	spawn_count, exit_count := 0, 0
+	for tile, index in s.tiles[:cells] {
+		if tile.kind > .Fence { return false }
+		if tile.kind == .Player_Spawn { spawn_count += 1 }
+		if tile.kind == .Exit {
+			exit_count += 1
+			if s.exit_position != (grid.Position{x = index%size, y = index/size}) { return false }
+		}
 	}
-	for pool in s.layer_pools[:s.layer_pool_count] {if int(pool[0])<size*size || int(pool[0])>=size*size*level.LAYER_COUNT || pool[1]<0 {return false}}
+	if spawn_count == 0 || exit_count != 1 { return false }
+	if s.layer_cell_count<0 || s.layer_cell_count>len(s.layer_cells) || s.layer_pool_count<0 || s.layer_pool_count>len(s.layer_pools) {return false}
+	previous_layer := -1
+	for packed in s.layer_cells[:s.layer_cell_count] {
+		if (s.layers_version == SNAPSHOT_LAYERS_V1 && packed>>29 != 0) || (s.layers_version == SNAPSHOT_LAYERS && packed>>45 != 0) { return false }
+		index, slot, kind, _ := layer_cell_unpack(packed, s.layers_version)
+		if index >= cells || slot >= level.LAYER_COUNT || slot == level.layer_slot(grid.GROUND_LAYER) || kind == .Void || kind > .Fence { return false }
+		key := slot*cells+index
+		if key <= previous_layer { return false }
+		previous_layer = key
+	}
+	previous_pool := cells-1
+	for pool in s.layer_pools[:s.layer_pool_count] {
+		if int(pool[0]) <= previous_pool || int(pool[0]) >= cells*level.LAYER_COUNT || pool[1] < 0 { return false }
+		layer := game.room_slot_layer(int(pool[0])/cells)
+		if !snapshot_has_layer_cell(s, int(pool[0])%cells, level.layer_slot(layer), cells) { return false }
+		previous_pool = int(pool[0])
+	}
+	for amount in s.ground_pool[:cells] { if amount < 0 { return false } }
 	for cave in w.caves[:w.cave_count] {if cave.site<0 || cave.site>=w.site_count || w.sites[cave.site].kind!=.Cave || cave.state>.Looted {return false}}
 	if w.complex_count<0 || w.complex_count>MAX_COMPLEXES || w.lift_count<0 || w.lift_count>MAX_WORLD_LIFTS || w.gate_count<0 || w.gate_count>MAX_WORLD_GATES || w.base<0 || w.base>level.LAYER_SPACING*4 {return false}
 	for c in w.complexes[:w.complex_count] {if c.kind==.None || c.kind>max(Complex_Kind) || !inside(c.origin,size) {return false}}
@@ -187,7 +243,8 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	return true
 }
 
-restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:^game.Room) -> bool {
+@(private)
+snapshot_restore_into_empty :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:^game.Room) -> bool {
 	if w==nil || data==nil || player==nil || room==nil || !valid_snapshot(s) {return false}
 	side:=size(&s.world)
 	created,allocated:=level.create(side,side,{.Void})
@@ -196,10 +253,10 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	// The base the world's ground was raised by (0 in a save from before there was one, whose ground is not raised).
 	data.base=s.world.base
 	copy(data.tiles.cells[:],s.tiles[:side*side])
-	_=level.set_height_table(data,s.heights[:side*side])
+	if len(s.heights) > 0 && !level.set_height_table(data,s.heights[:side*side]) { level.destroy(data); return false }
 	// The other layers before the room, whose tables are made for them; a map that breaks their rule is not one.
 	for packed in s.layer_cells[:s.layer_cell_count] {
-		index,slot,kind,height:=layer_cell_unpack(packed)
+		index,slot,kind,height:=layer_cell_unpack(packed, s.layers_version)
 		cell:=grid.Position{x = index%side, y = index/side, layer = i8(slot+grid.LOWEST_LAYER)}
 		if !level.set_tile(data,cell,{kind=kind}) || !level.set_height(data,cell,i32(height)) {level.destroy(data);return false}
 	}
@@ -225,7 +282,7 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	append(&room.enemies,..s.enemies[:s.enemy_count]);append(&room.traps,..s.traps[:s.trap_count]);append(&room.objects,..s.objects[:s.object_count]);append(&room.loot,..s.loot[:s.loot_count])
 	room.next_enemy_id=s.next_enemy_id;room.next_trap_id=s.next_trap_id;room.next_object_id=s.next_object_id;room.pulse_count=s.pulse_count
 	copy(room.ground.pool,s.ground_pool[:side*side])
-	for pool in s.layer_pools[:s.layer_pool_count] {if int(pool[0])<len(room.ground.pool) {room.ground.pool[pool[0]]=pool[1]}}
+	for pool in s.layer_pools[:s.layer_pool_count] { room.ground.pool[pool[0]] = pool[1] }
 	room.ground.fires=s.fires;room.ground.fire_count=s.fire_count;room.ground.next_fire_id=s.next_fire_id
 	room.fishing=s.fishing;room.pinball=s.pinball;room.pinball_random=s.pinball_random;room.lasso=s.lasso;room.first_person,_=game.first_person_load(s.first_person);room.reaction_bindings=s.reactions
 	if s.lifts.count==room.lifts.count {room.lifts=s.lifts}

@@ -94,13 +94,15 @@ expedition_costume_support :: proc(m:^Expedition_Material,b:campaign.Biome,role:
 }
 
 @(private)
-draw_expedition_costume_sheet :: proc(right:rl.Vector3,support,print:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,width:f32) {
+draw_expedition_costume_sheet :: proc(right:rl.Vector3,support,print:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,width:f32,
+	print_tint: rl.Color = rl.WHITE, paper_tint: rl.Color = rl.WHITE) {
 	normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	// Both facings belong to one stationary sheet. Only the printed wardrobe
 	// turns or animates, exactly as the underlying living rig does.
 	for pass in 0..<2 {
 		border:=EXPEDITION_COSTUME_INK_MARGIN if pass==0 else EXPEDITION_COSTUME_IVORY_MARGIN
 		color:=EXPEDITION_PAPER_INK if pass==0 else EXPEDITION_PAPER_EDGE
+		if pass == 1 { color = expedition_paper_tint(color, paper_tint) }
 		for flip in ([2]f32{-1,1}) {for &part,i in support.parts[:support.count] {
 			draw_cutout_piece(&part,base,right,normal,scale,flip,1,border,-.004+f32(pass)*.002,color_with_opacity(color,opacity),true,i)
 		}}
@@ -109,7 +111,7 @@ draw_expedition_costume_sheet :: proc(right:rl.Vector3,support,print:^Expedition
 	for &part,i in print.parts[:print.count] {
 		depth:=.0001*f32(i)
 		if part.edge {draw_cutout_piece(&part,base,right,normal,scale,flip,width,.022,depth,color_with_opacity(EXPEDITION_PAPER_INK,opacity))}
-		draw_cutout_piece(&part,base,right,normal,scale,flip,width,0,depth+.0005,color_with_opacity(part.color,opacity))
+		draw_cutout_piece(&part,base,right,normal,scale,flip,width,0,depth+.0005,color_with_opacity(expedition_paper_tint(part.color,print_tint),opacity))
 	}
 }
 

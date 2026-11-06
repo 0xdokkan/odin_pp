@@ -11,6 +11,14 @@ Expedition_Paper :: struct { parts:[EXPEDITION_PAPER_PARTS]Expedition_Paper_Part
 EXPEDITION_PAPER_EDGE :: rl.Color{255,242,209,255}
 EXPEDITION_PAPER_INK :: rl.Color{20,29,43,255}
 
+// Match a textured quad's vertex tint without changing its authored alpha.
+@(private)
+expedition_paper_tint :: proc(color, tint: rl.Color) -> rl.Color {
+	if tint == rl.WHITE || color == EXPEDITION_PAPER_INK { return color }
+	return {u8(u32(color.r)*u32(tint.r)/255), u8(u32(color.g)*u32(tint.g)/255),
+		u8(u32(color.b)*u32(tint.b)/255), color.a}
+}
+
 @(private)
 paper_polygon :: proc(model:^Expedition_Paper,points:[]rl.Vector2,color:rl.Color,edge:bool=true) {
 	assert(len(points)>=3 && len(points)<=12 && model.count<EXPEDITION_PAPER_PARTS)
@@ -105,12 +113,14 @@ draw_cutout_piece :: proc(part:^Expedition_Paper_Part,base,right,normal:rl.Vecto
 // All cream silhouettes are drawn before any print, so overlapping pieces
 // merge into one cut sheet instead of looking like separately edged metal.
 @(private)
-draw_expedition_cutout :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,horizontal_scale:f32,border_scale:f32=1) {
+draw_expedition_cutout :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,horizontal_scale:f32,border_scale:f32=1,
+	print_tint: rl.Color = rl.WHITE, paper_tint: rl.Color = rl.WHITE) {
 	normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	flip:f32=-1 if mirror else 1
 	for pass in 0..<2 {
 		width:=(f32(.070) if pass==0 else .053)*border_scale
 		color:=EXPEDITION_PAPER_INK if pass==0 else EXPEDITION_PAPER_EDGE
+		if pass == 1 { color = expedition_paper_tint(color, paper_tint) }
 		for &part,i in m.parts[:m.count] {
 			if !part.edge {continue}
 			draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,width,-.004+f32(pass)*.002,color_with_opacity(color,opacity),true,i)
@@ -119,6 +129,6 @@ draw_expedition_cutout :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vect
 	for &part,i in m.parts[:m.count] {
 		depth:=.0001*f32(i)
 		if part.edge {draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,.022,depth,color_with_opacity(EXPEDITION_PAPER_INK,opacity))}
-		draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,0,depth+.0005,color_with_opacity(part.color,opacity))
+		draw_cutout_piece(&part,base,right,normal,scale,flip,horizontal_scale,0,depth+.0005,color_with_opacity(expedition_paper_tint(part.color,print_tint),opacity))
 	}
 }

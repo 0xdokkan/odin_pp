@@ -37,6 +37,8 @@ Expedition_Session :: struct {
 	save_data:rawptr,
 	inventory:campaignui.State,
 	inventory_open,character_open,map_open,paused,abandon_confirm:bool,
+	// A panel owns its entire opening/closing frame, even if it closes immediately.
+	input_consumed:bool,
 	// The plate the stacked map shows (expedition_hologram.odin): the robot's layer when it opens; W and S change it.
 	map_layer:i8,
 	// The map's plates and what of them is on the video card, kept between frames (expedition_hologram.odin).
@@ -201,7 +203,7 @@ expedition_collect :: proc(e:^Expedition_Session,manual:bool=false) {
 			if drop.item.kind==.Credits && !manual {
 				accepted:=campaign.backpack_credit(&c.backpack,drop.item.quantity)
 				if accepted>0 {w.drops[i].item.quantity-=accepted;c.revision+=1;taken=w.drops[i].item.quantity==0}
-			} else {result:=campaign.pickup(&c.backpack,drop.item,manual);taken=result!=.Rejected;if result==.Pending {e.inventory_open=true;expedition_message(e,"Oggetto in sospeso: trova un posto nello zaino.")}}
+			} else {result:=campaign.pickup(&c.backpack,drop.item,manual);taken=result!=.Rejected;if result==.Pending {expedition_set_inventory_open(e,true,e.inventory.panel);expedition_message(e,"Oggetto in sospeso: trova un posto nello zaino.")}}
 		}
 		if taken {w.drop_count-=1;w.drops[i]=w.drops[w.drop_count];c.revision+=1}
 		else {i+=1}
@@ -223,7 +225,7 @@ expedition_drop_inventory_item :: proc(e:^Expedition_Session,item:campaign.Item)
 	}
 	assert(restored,"An inventory drop must leave a slot where it can be restored")
 	campaign.apply_equipment(bag,room.player)
-	e.inventory_open=true
+	expedition_set_inventory_open(e,true,e.inventory.panel)
 	expedition_message(e,"Il terreno e pieno: l'oggetto e rimasto nel tuo equipaggiamento.")
 	return false
 }
@@ -242,6 +244,7 @@ expedition_reward :: proc(e:^Expedition_Session,index:int) {
 	profile:=game.M8_Profile{ring_wins=3}
 	if !game.generate_weighted_card_choices(&r.state,&node,w.reward_cards[:],&profile,excluded) {return}
 	w.reward_count=3
+	expedition_consume_gameplay_input(e)
 	w.sites[index].reward_pending=false
 	if w.sites[index].kind==.Trial {_=world.add_drop(w,w.sites[index].position,campaign.make_item(.Relic,1,1+i32(rng.next_u64(&r)%(u64(game.Relic_Id.Count)-1))))}
 	_=campaign.add_xp(e.progress,4+i32(world.rank(w.biome))*2)
@@ -282,7 +285,7 @@ expedition_interact :: proc(e:^Expedition_Session,frame:^host.Frame) {
 		else {expedition_message(e,"Archivio completo. La memoria non ha piu segreti.")}
 		s.state=.Resolved
 	case .Spring:room.player.health=min(room.player.stats.max_health,room.player.health+16);s.state=.Resolved;expedition_message(e,"Fonte esaurita. +16 vita.")
-	case .Workshop:e.site=index
+	case .Workshop:e.site=index;expedition_consume_gameplay_input(e)
 	case .Memory:
 		if !world.add_drop(w,s.position,campaign.make_item(.Memory,1,i32(w.biome))) {expedition_message(e,"Raccogli un oggetto a terra prima di recuperare il frammento.");return}
 		s.state=.Resolved;expedition_collect(e,true);expedition_message(e,"Frammento recuperato. Estrai per ascoltarlo nell'hub.")
@@ -316,10 +319,102 @@ expedition_discovery :: proc(c:^campaign.Campaign,b:campaign.Biome,seed:u64) -> 
 	return {},false
 }
 
+// Input ownership only: no room, advisor or renderer clock is suspended.
+// Map/backpack time keeps flowing under the existing character_pause policy.
+@(private)
+expedition_consume_gameplay_input :: proc(e: ^Expedition_Session) {
+	e.input_consumed = true
+	clear_gameplay_command_buffer(&e.rs.gameplay_buffer)
+	clear_card_interaction(&e.rs.card_interaction)
+	controller := &e.rs.tactical_controller
+	controller.mouse_blocked = true
+	first_person_follow_capture(controller, &e.rs.room, true, {focused = e.rs.frame_input.focused})
+	game.first_person_set_trigger(&e.rs.room, false)
+	if e.rs.attached { sync_first_person_cursor(controller) }
+}
+
+@(private)
+expedition_drop_stale_gameplay_input :: proc(e: ^Expedition_Session) {
+	buffer := &e.rs.gameplay_buffer
+	if !buffer.has_pending && buffer.walk == 0 { return }
+	if e.rs.room.phase != .Combat || (buffer.has_pending && buffer.pending.origin_phase != e.rs.room.phase) {
+		clear_gameplay_command_buffer(buffer)
+	}
+}
+
+@(private)
+expedition_begin_input_frame :: proc(e: ^Expedition_Session) {
+	e.input_consumed = false
+	e.rs.tactical_controller.mouse_blocked = false
+	if expedition_gameplay_input_blocked(e) { expedition_consume_gameplay_input(e) }
+	expedition_drop_stale_gameplay_input(e)
+}
+
+// Panel entry points shared by keyboard, HUD and automatic backpack opening.
+@(private)
+expedition_set_inventory_open :: proc(e: ^Expedition_Session, open: bool, panel: campaignui.Panel = .Inventory) {
+	e.inventory_open = open
+	if open { e.inventory.panel = panel }
+	expedition_consume_gameplay_input(e)
+}
+
+@(private)
+expedition_set_map_open :: proc(e: ^Expedition_Session, open: bool) {
+	e.map_open = open
+	e.map_layer = e.rs.room.player.position.layer
+	expedition_consume_gameplay_input(e)
+}
+
+@(private)
+expedition_gameplay_input_blocked :: proc(e: ^Expedition_Session) -> bool {
+	return e.input_consumed || e.inventory_open || e.map_open || e.site >= 0 || e.world.reward_count > 0 ||
+	       e.paused || e.placing || e.rs.effect_window.open
+}
+
+@(private)
+expedition_gameplay_controls :: proc(e: ^Expedition_Session) -> Run_Input {
+	controls := e.rs.frame_input
+	controls.actions.pressed -= {.Pause, .Map, .Cancel, .Route_Map, .Restart}
+	if expedition_gameplay_input_blocked(e) {
+		controls = {focused = controls.focused}
+	}
+	return controls
+}
+
+// HUD hit testing stays with the renderer; ownership and keyboard edges are
+// independent of a window, and both entry points follow the same path.
+@(private)
+expedition_panel_input :: proc(e: ^Expedition_Session, devices: ^input.Device_Snapshot, map_clicked, character_clicked: bool) {
+	if !e.inventory_open && !e.map_open && e.site < 0 && e.world.reward_count == 0 {
+		if map_clicked { expedition_set_map_open(e, true); e.rs.frame_input.left_pressed = false }
+		else if character_clicked { expedition_set_inventory_open(e, true, .Character); e.rs.frame_input.left_pressed = false }
+	}
+	if input.key_pressed(devices, .Z) && !e.inventory_open { expedition_set_inventory_open(e, true) }
+	if input.key_pressed(devices, .U) && !e.inventory_open { expedition_set_inventory_open(e, true, .Character) }
+	if input.key_pressed(devices, .TAB) && !e.inventory_open { expedition_set_map_open(e, !e.map_open) }
+	if e.map_open && input.key_pressed(devices, .ESCAPE) { expedition_set_map_open(e, false) }
+}
+
+@(private)
+expedition_finish_inventory_action :: proc(e: ^Expedition_Session, seconds: f32) {
+	if seconds <= 0 { return }
+	game.finish_player_combat_command(&e.rs.room, seconds)
+	advisor_note_action()
+}
+
+// The expedition owns its pause menu, before the ordinary tactical
+// controller runs. Keep this boundary independent from window/UI resources.
+@(private)
+expedition_toggle_pause :: proc(e: ^Expedition_Session) {
+	e.paused = !e.paused
+	expedition_consume_gameplay_input(e)
+}
+
 @(private)
 expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 	e:=cast(^Expedition_Session)data;rs:=e.rs;room:=&rs.room;c:=e.progress;w:=&e.world
 	if e.finished {return}
+	expedition_begin_input_frame(e)
 	rs.frame_input=map_run_input(&rs.actions,frame.devices,frame.focused&&frame.window_focused,&rs.input_history)
 	rs.frame_time=frame.dt;rs.mouse_canvas={frame.mouse.x,frame.mouse.y};rs.mouse_inside=frame.mouse_inside
 	if !frame.window_focused {
@@ -335,12 +430,12 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		if expedition_save(e,true) {host.pop(frame)} else {expedition_message(e,"Attendi la fine dell'azione prima di tornare all'hub.")}
 		return
 	}
-	if input.key_pressed(frame.devices,.P) || (input.key_pressed(frame.devices,.ESCAPE) && !e.inventory_open && !e.map_open && !e.placing && e.site<0 && w.reward_count==0) {e.paused=!e.paused;clear_card_interaction(&rs.card_interaction)}
+	if input.key_pressed(frame.devices,.P) || (input.key_pressed(frame.devices,.ESCAPE) && !e.inventory_open && !e.map_open && !e.placing && e.site<0 && w.reward_count==0) {expedition_toggle_pause(e)}
 	if e.paused {
 		ctx:=frame.ui;p:=ctx.theme.palette
 		ui.dim(ctx,frame.canvas,.65);box:=ui.panel(ctx,ui.center(frame.canvas,430,280),"MEMORIA SOSPESA")
 		ui.paragraph(ctx,ui.cut_top(&box,55),"Puoi chiudere il gioco: riprenderai da qui.\nAbbandonare perde lo zaino e azzera la serie.",.Small,p.text_dim)
-		if ui.button(ctx,ui.cut_top(&box,42),"Riprendi",primary=true) {e.paused=false}
+		if ui.button(ctx,ui.cut_top(&box,42),"Riprendi",primary=true) {expedition_toggle_pause(e)}
 		ui.cut_top(&box,10)
 		if ui.button(ctx,ui.cut_top(&box,38),"Salva e torna agli slot") {if expedition_save(e,true) {host.pop(frame)};return}
 		ui.cut_top(&box,10)
@@ -351,22 +446,24 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		return
 	}
 	if e.placing && !e.inventory_open {expedition_placing_update(e,frame);return}
+	map_clicked, character_clicked: bool
 	if !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && rs.frame_input.left_pressed {
 		layout:=render.tactical_hud_layout(&rs.iso_renderer)
-		if rl.CheckCollisionPointRec(frame.mouse,layout.map_button) {e.map_open=true;e.map_layer=room.player.position.layer;rs.frame_input.left_pressed=false}
-		else if render.m8_control_at_point(&rs.iso_renderer,room,rs.mouse_canvas)==.Character {e.inventory_open=true;e.inventory.panel=.Character;rs.frame_input.left_pressed=false}
+		map_clicked=rl.CheckCollisionPointRec(frame.mouse,layout.map_button)
+		character_clicked=render.m8_control_at_point(&rs.iso_renderer,room,rs.mouse_canvas)==.Character
 	}
-	if input.key_pressed(frame.devices,.Z) && !e.inventory_open {e.inventory_open=true;e.inventory.panel=.Inventory}
-	if input.key_pressed(frame.devices,.U) && !e.inventory_open {e.inventory_open=true;e.inventory.panel=.Character}
-	if input.key_pressed(frame.devices,.TAB) && !e.inventory_open {e.map_open=!e.map_open;e.map_layer=room.player.position.layer;clear_card_interaction(&rs.card_interaction)}
-	if e.map_open && input.key_pressed(frame.devices,.ESCAPE) {e.map_open=false}
+	expedition_panel_input(e,frame.devices,map_clicked,character_clicked)
+	// Claim the backpack HUD click before polling the board underneath it.
+	if !expedition_gameplay_input_blocked(e) && room.phase==.Loot {
+		if ui.button(frame.ui,{788,450,150,28},"ZAINO  [Z]") {expedition_set_inventory_open(e,true)}
+	}
 	// The stacked map: W and the up arrow show the plate over, S and the down arrow the one under (the robot stays still).
 	if e.map_open {
 		if input.key_pressed(frame.devices,.W) || input.key_pressed(frame.devices,.UP) {e.map_layer=hologram_next_plate(&rs.level_data,e.map_layer,1)}
 		if input.key_pressed(frame.devices,.S) || input.key_pressed(frame.devices,.DOWN) {e.map_layer=hologram_next_plate(&rs.level_data,e.map_layer,-1)}
 	}
-	if input.key_pressed(frame.devices,.M) && room.phase==.Loot && !e.inventory_open {w.mounted=!w.mounted;expedition_message(e,world.metadata(w.biome).mount if w.mounted else "A piedi")}
-	if !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && render.tactical_inspector_effect_ready(&rs.iso_renderer,room) {
+	if input.key_pressed(frame.devices,.M) && room.phase==.Loot && !expedition_gameplay_input_blocked(e) {w.mounted=!w.mounted;expedition_message(e,world.metadata(w.biome).mount if w.mounted else "A piedi")}
+	if !expedition_gameplay_input_blocked(e) && render.tactical_inspector_effect_ready(&rs.iso_renderer,room) {
 		cards:=&rs.card_interaction
 		card,effect:=render.tactical_inspector_effect(&rs.iso_renderer,room,cards.hovered_card_id,cards.selected_card_id,cards.dragged_card_id)
 		if effect!=.None && (run_pressed(rs.frame_input,.Inspect) || effect==.Button && rs.frame_input.left_pressed && render.point_in_rectangle(rs.mouse_canvas,render.tactical_inspector_effect_bounds())) {
@@ -381,17 +478,17 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		if !render.renderer_frame_held(&rs.iso_renderer) {render.advance_sprite_assets(&rs.iso_renderer.sprite_assets,frame.dt)}
 		render.update_tactical_atmosphere(&rs.iso_renderer,frame.dt)
 		render.set_living_cards(&rs.iso_renderer,true)
-		render.update_tactical_view(&rs.iso_renderer,room,rs.mouse_canvas,rs.mouse_inside&&!e.inventory_open&&!e.map_open,input={wheel=0})
-		controls:=rs.frame_input
-		controls.actions.pressed-={.Pause,.Map,.Cancel,.Route_Map,.Restart}
-		if e.inventory_open || e.map_open || e.site>=0 || w.reward_count>0 {controls.left_pressed=false;controls.right_pressed=false;controls.wheel=0;controls.actions.pressed={};controls.actions.down={}}
+		render.update_tactical_view(&rs.iso_renderer,room,rs.mouse_canvas,rs.mouse_inside&&!expedition_gameplay_input_blocked(e),input={wheel=0})
+		controls:=expedition_gameplay_controls(e)
 		// The IA's game state: the expedition's groups, places and backpack (advisor_context.odin).
 		advisor_set_context(advisor_context_expedition(w,&c.backpack,room))
-		blocked:=update_tactical_controller(&rs.tactical_controller,room,&rs.iso_renderer,&rs.card_interaction,&rs.gameplay_buffer,frame.dt,true,rs.mouse_canvas,!e.inventory_open&&!e.map_open&&rs.mouse_inside,nil,controls)
+		blocked:=update_tactical_controller(&rs.tactical_controller,room,&rs.iso_renderer,&rs.card_interaction,&rs.gameplay_buffer,frame.dt,true,rs.mouse_canvas,!expedition_gameplay_input_blocked(e)&&rs.mouse_inside,nil,controls)
+		expedition_drop_stale_gameplay_input(e)
 		world_runs:=!game.tactical_is_casting(room) && room.qte.kind==.None && !game.tactical_shadow_active(room) && render.presentation_time_policy(&rs.iso_renderer.timeline)!=.Cinematic && !render.renderer_frame_held(&rs.iso_renderer)
 		if world_runs {
 			_=world.sync(w,room)
 			world.tick(w,room,frame.dt)
+			expedition_drop_stale_gameplay_input(e)
 			for site,i in w.sites[:w.site_count] {
 				// A cave's arch is hidden again in every run: the secrets the campaign remembers are the map's own.
 				if site.secret && site.kind!=.Cave && site.state!=.Unvisited {if campaign.discover_secret(c,w.biome,i) {expedition_message(e,"SEGRETO TROVATO / Un luogo che non dimenticherai.")}}
@@ -399,20 +496,20 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 			}
 		}
 		// Exploration glides freely; encounters bring the cell steps back.
-		walking:=!blocked && !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && room.phase==.Loot
+		walking:=!blocked && !expedition_gameplay_input_blocked(e) && room.phase==.Loot
 		world.roam_step(w,room,&e.roam,expedition_walk_wish(rs,frame) if walking else {},frame.dt if world_runs else 0)
 		// Waiting only for the player's own action, the encounter's lane still keeps its newest press (beat_input.odin).
 		lane:=blocked && rs.tactical_controller.lane_busy && room.phase==.Combat
-		if (!blocked || lane) && !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 {
+		if (!blocked || lane) && !expedition_gameplay_input_blocked(e) {
 			if room.phase==.Loot {
 				if input.key_pressed(frame.devices,.E) {expedition_interact(e,frame)}
-				if !w.mounted {
+				if !expedition_gameplay_input_blocked(e) && !w.mounted {
 					fishing_controls:=controls;fishing_controls.actions.pressed={};fishing_controls.actions.down={}
 					command,has:=poll_gameplay_command(room,&rs.iso_renderer,&rs.card_interaction,rs.mouse_canvas,rs.mouse_inside,!render.renderer_blocks_player_input(&rs.iso_renderer),false,fishing_controls)
 					if has&&command.kind==.Fish {_=commit_gameplay_command(room,&rs.iso_renderer,&rs.card_interaction,command)}
 				}
 				// A deliberate click on a resting enemy starts an encounter.
-				if controls.left_pressed && rs.iso_renderer.has_hovered_cell {for &g,i in w.groups[:w.group_count] {for m in g.members[:g.count] {if m.alive && world.distance(m.enemy.position,rs.iso_renderer.hovered_cell)<=1 && world.distance(room.player.position,m.enemy.position)<=8 {_=world.engage(w,room,i);w.mounted=false;break}}}}
+				if !expedition_gameplay_input_blocked(e) && controls.left_pressed && rs.iso_renderer.has_hovered_cell {for &g,i in w.groups[:w.group_count] {for m in g.members[:g.count] {if m.alive && world.distance(m.enemy.position,rs.iso_renderer.hovered_cell)<=1 && world.distance(room.player.position,m.enemy.position)<=8 {_=world.engage(w,room,i);w.mounted=false;break}}}}
 			} else if room.phase==.Combat {
 				busy:=lane||render.renderer_blocks_player_input(&rs.iso_renderer)||game.tactical_player_busy(room)
 				command,has:=poll_gameplay_command(room,&rs.iso_renderer,&rs.card_interaction,rs.mouse_canvas,rs.mouse_inside,true,false,controls)
@@ -420,6 +517,7 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 			}
 		}
 		_=world.sync(w,room);expedition_collect(e)
+		expedition_drop_stale_gameplay_input(e)
 		// Tunnels and forced moves this frame are adopted before drawing.
 		world.roam_sync(&e.roam,room)
 		r:=&e.roam
@@ -435,12 +533,12 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 	if e.inventory_open {
 		can_use:=room.phase!=.Combat || (game.tactical_allows_action(room) && !render.renderer_blocks_player_input(&rs.iso_renderer))
 		out:=campaignui.update_inventory(c,room.player,&e.inventory,frame,room.phase==.Combat,false,can_use)
-		if out.closed {e.inventory_open=false;clear_card_interaction(&rs.card_interaction)}
+		if out.closed {expedition_set_inventory_open(e,false)}
 		for item in out.drops[:out.drop_count] {
 			_=expedition_drop_inventory_item(e,item)
 		}
 		if out.place_structure {expedition_begin_placement(e,out.structure)}
-		if out.action_seconds>0 {game.finish_player_combat_command(room,out.action_seconds)}
+		expedition_finish_inventory_action(e,out.action_seconds)
 		if out.decoy {
 			if world.lure_patrol(w,room,room.player.position) {expedition_message(e,"Esca attiva. La pattuglia vicina sta seguendo il segnale.")}
 			else {expedition_message(e,"Nessuna pattuglia libera ha raccolto il segnale dell'esca.")}
@@ -449,9 +547,6 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 	}
 	if w.reward_count>0 && !e.inventory_open {expedition_reward_ui(e,frame)}
 	if e.site>=0 && !e.inventory_open {expedition_workshop_ui(e,frame)}
-	if !e.inventory_open && !e.map_open && room.phase==.Loot {
-		if ui.button(frame.ui,{788,450,150,28},"ZAINO  [Z]") {e.inventory_open=true;e.inventory.panel=.Inventory}
-	}
 	if e.save_timer>=10 || c.revision!=e.last_revision || room.pulse_count!=e.last_pulse {if world.stable(room) && !render.renderer_timeline_is_busy(&rs.iso_renderer) {_=expedition_save(e)}}
 }
 
@@ -462,12 +557,14 @@ expedition_begin_placement :: proc(e:^Expedition_Session,id:i32) {
 	if e.rs.room.player.position.layer!=grid.GROUND_LAYER {expedition_message(e,world.player_placement_text(.In_Cave,.None));return}
 	e.placing=true;e.place_cached=false;e.place_id=level.Structure_Id(id);e.place_rotation=0;e.place_mirror=false
 	e.map_open=false;e.site=-1
+	expedition_consume_gameplay_input(e)
 	expedition_message(e,"Rotella ruota, R specchia, clic posa, tasto destro annulla.")
 }
 
 @(private)
 expedition_end_placement :: proc(e:^Expedition_Session) {
 	e.placing=false;e.place_cached=false
+	expedition_consume_gameplay_input(e)
 	render.set_structure_ghost(&e.rs.iso_renderer,{})
 }
 
@@ -522,11 +619,11 @@ expedition_reward_ui :: proc(e:^Expedition_Session,frame:^host.Frame) {
 		if ui.button(ctx,ui.cut_top(&inside,32),"Mostra effetto") {_=open_effect_window_in_run(e.rs,{id=1,definition_id=id},.Reward)}
 		if ui.button(ctx,ui.cut_bottom(&inside,30),"Prendi",primary=true) {
 			_,result:=game.add_owned_card(&e.rs.room.player.deck,id)
-			if result {w.reward_count=0;e.progress.revision+=1;break}
+			if result {w.reward_count=0;expedition_consume_gameplay_input(e);e.progress.revision+=1;break}
 			expedition_message(e,"Mazzo pieno: rimuovi una carta in officina o salta il premio.")
 		}
 	}
-	if ui.button(ctx,ui.cut_bottom(&box,30),"Salta") {w.reward_count=0;e.progress.revision+=1}
+	if ui.button(ctx,ui.cut_bottom(&box,30),"Salta") {w.reward_count=0;expedition_consume_gameplay_input(e);e.progress.revision+=1}
 }
 
 @(private)
@@ -592,7 +689,7 @@ expedition_workshop_ui :: proc(e:^Expedition_Session,frame:^host.Frame) {
 	}
 	ui.cut_top(&box,10)
 	ui.paragraph(ctx,box,"I potenziamenti richiedono punti esperienza. Apri PERSONAGGIO fuori dagli scontri per spenderli.",.Small,p.text_dim)
-	if ui.button(ctx,footer,"Torna al bioma") || input.key_pressed(frame.devices,.ESCAPE) {e.site=-1}
+	if ui.button(ctx,footer,"Torna al bioma") || input.key_pressed(frame.devices,.ESCAPE) {e.site=-1;expedition_consume_gameplay_input(e)}
 }
 
 @(private)

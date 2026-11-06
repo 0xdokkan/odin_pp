@@ -15,7 +15,7 @@ test_expedition_snapshot_keeps_the_queen :: proc(t:^testing.T) {
 	queen:=game.Grid_Object{id = room.next_object_id, kind = .Queen, position = {x = p.position.x, y = p.position.y-1}, power = 5, life = 11}
 	room.next_object_id+=1;append(&room.objects,queen)
 	p.tactical.queen_wait=1.25
-	snapshot:=new(Snapshot);defer free(snapshot)
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer level.destroy(&data2);defer game.destroy_room(&room2)

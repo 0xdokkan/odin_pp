@@ -223,7 +223,15 @@ advice_possible :: proc(room: ^game.Room, advice: Advice, at: grid.Position) -> 
 		return alive && game.player_charges(room, .Arrows) > 0
 	case .Card:
 		index, held := game.hand_card_index_by_id(&room.player.deck, move.card_id)
-		return held && room.player.deck.energy >= game.card_energy_cost(room, room.player.deck.hand[index].definition_id)
+		if !held { return false }
+		card := room.player.deck.hand[index]
+		if room.player.deck.energy < game.card_energy_cost(room, card.definition_id) { return false }
+		definition, known := game.card_definition_by_id(card.definition_id)
+		if !known { return false }
+		request, resolved := game.card_target_request_from_target(room, definition, move.target)
+		// Resolve the held entity or cell through the same query as preview and
+		// play. Time alone does not release advice; a target that became illegal does.
+		return resolved && game.evaluate_card_targeting(room, card, request).error == .None
 	case .Defend: return room.qte.kind == .Defense && !room.qte.selected
 	case .Key: return room.qte.kind != .None && room.qte.selected
 	}

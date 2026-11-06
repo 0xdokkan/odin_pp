@@ -4,6 +4,7 @@ import "core:testing"
 import "core:os"
 import _ "../engine/teststack"
 import campaign "../campaign"
+import world "../expedition"
 import host "../engine/host"
 import input "../engine/input"
 import ui "../engine/ui"
@@ -74,7 +75,7 @@ test_window_focus_loss_flushes_latest_hub_state :: proc(t: ^testing.T) {
 	hub_update(h, &frame)
 	testing.expect(t, !campaign.save_queue_busy(&h.save_queue) && !h.save_failed)
 	loaded: campaign.Campaign
-	snapshot := new(Campaign_Save); defer free(snapshot)
+	snapshot := new(Campaign_Save); defer { world.snapshot_destroy(&snapshot.expedition); free(snapshot) }
 	status := campaign.load_slot_into(path, &loaded, snapshot)
 	defer campaign.destroy(&loaded)
 	testing.expect_value(t, status, campaign.Load_Status.Loaded)

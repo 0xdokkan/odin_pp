@@ -152,7 +152,7 @@ test_a_broken_structure_is_off_the_saved_list_and_a_cave_leaves_the_rest_standin
 	cart_cell := data.structures[cart].origin
 	testing.expect_value(t, game.strike_structures(&room, cart_cell, {cart_cell}, 99), 1)
 	snapshot := new(Snapshot)
-	defer free(snapshot)
+	defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t, capture(&w, &room, snapshot))
 	testing.expect_value(t, snapshot.world.structure_count, count-1)
 	testing.expect_value(t, snapshot.world.placed_by_player, 1)

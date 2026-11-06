@@ -1,0 +1,116 @@
+[INFO ] --- [2026-11-06 17:39:47] Starting test runner with 1 thread.
+[INFO ] --- [2026-11-06 17:39:47] The random seed sent to every test is: 5363583964508. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-11-06 17:39:47] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-11-06 17:39:47] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+INFO: IMAGE: Data loaded successfully (28x14 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (20x10 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (24x14 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (32x16 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (14x12 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (8x7 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (44x22 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (9x8 | R8G8B8A8 | 1 mipmaps)
+INFO: IMAGE: Data loaded successfully (9x9 | R8G8B8A8 | 1 mipmaps)
+relief Cyber: tallest 14 steps, 6% of the cells above ground
+relief West: tallest 18 steps, 10% of the cells above ground
+relief Jungle: tallest 14 steps, 6% of the cells above ground
+relief City: tallest 14 steps, 5% of the cells above ground
+relief Egypt: tallest 18 steps, 18% of the cells above ground
+relief Vietnam: tallest 14 steps, 10% of the cells above ground
+relief Snow: tallest 94 steps, 9% of the cells above ground
+relief Inferno: tallest 18 steps, 9% of the cells above ground
+relief Gothic: tallest 14 steps, 13% of the cells above ground
+relief Sky: tallest 17 steps, 83% of the cells above ground
+relief Space: tallest 14 steps, 11% of the cells above ground
+relief Secret: tallest 14 steps, 1% of the cells above ground
+complex Data_Node of Cyber at Position{x = 39, y = 142, layer = 0}, floor 0
+complex Train_Bridge of West at Position{x = 107, y = 11, layer = 0}, floor 0
+complex Giant_Trees of Jungle at Position{x = 102, y = 8, layer = 0}, floor 0
+complex Rooftops of City at Position{x = 30, y = 141, layer = 0}, floor 14
+complex Pyramids of Egypt at Position{x = 26, y = 164, layer = 0}, floor 14
+complex Bamboo_Bridges of Vietnam at Position{x = 19, y = 162, layer = 0}, floor 14
+complex Crevasse of Snow at Position{x = 130, y = 66, layer = 0}, floor 14
+complex Bone_Bridge of Inferno at Position{x = 33, y = 84, layer = 0}, floor 0
+complex Ruined_House of Gothic at Position{x = 86, y = 72, layer = 0}, floor 14
+complex Floating_Island of Sky at Position{x = 148, y = 127, layer = 0}, floor 3
+complex Station of Space at Position{x = 49, y = 192, layer = 0}, floor 14
+complex Crater_Lift of Space at Position{x = 59, y = 75, layer = 0}, floor 14
+complex Crater_Hall of Space at Position{x = 23, y = 82, layer = 0}, floor 14
+complex Crater_Stair of Space at Position{x = 35, y = 131, layer = 0}, floor 14
+complex Boulder_Hill of Secret at Position{x = 170, y = 14, layer = 0}, floor 0
+WARNING: IMAGE: Failed to load image data
+[INFO ] --- [2026-11-06 17:39:58] [advisor_special_test.odin:221:test_advisor_advice_is_always_possible()] advice possible: 200 situations, 0 refused
+[INFO ] --- [2026-11-06 17:40:00] [advisor_special_test.odin:107:test_advisor_copy_plays_every_card_as_the_game()] cards played by the copy as by the game: 55
+[INFO ] --- [2026-11-06 17:40:00] [advisor_copy_test.odin:350:measure()] ADVISOR IA arena: snapshot 2 us, rehearsal 2 us, a try's copy 0.5 us (4 foes), a second of the world 42 us (100.0 s simulated)
+[INFO ] --- [2026-11-06 17:40:00] [advisor_copy_test.odin:350:measure()] ADVISOR structures arena: snapshot 3 us, rehearsal 2 us, a try's copy 0.5 us (3 foes), a second of the world 93 us (100.0 s simulated)
+[INFO ] --- [2026-11-06 17:40:01] [advisor_copy_test.odin:350:measure()] ADVISOR expedition Space 224x224: snapshot 127 us, rehearsal 152 us, a try's copy 0.7 us (4 foes), a second of the world 1156 us (100.0 s simulated)
+[INFO ] --- [2026-11-06 17:40:06] [advisor_special_test.odin:264:test_advisor_measures_the_largest_expedition()] ADVISOR largest expedition 224x224: root 0.79 ms, first advice 82.7 ms, 1238 nodes in 5244 ms (236 a second), round 5
+[INFO ] --- [2026-11-06 17:40:07] [advisor_view_test.odin:141:test_advisor_pilot_holds_its_advice_until_the_player_acts()] the held advice: 150 frames kept, 0 changes, each for a blow announced or an advice no longer possible
+[INFO ] --- [2026-11-06 17:40:07] [advisor_worker_test.odin:139:test_advisor_pilot_never_waits_and_thinks_ahead()] advisor pilot, worker held: the longest frame of the pilot 0.025 ms
+[INFO ] --- [2026-11-06 17:40:07] [advisor_worker_test.odin:156:test_advisor_pilot_never_waits_and_thinks_ahead()] advisor pilot: the first advice 6.4 ms after the change
+[INFO ] --- [2026-11-06 17:40:14] [advisor_search_test.odin:269:test_advisor_search_looks_ahead_out_of_a_corner()] the corner, six seconds: the fast rule lost 0 life, the IA 0
+[INFO ] --- [2026-11-06 17:40:14] [advisor_search_test.odin:583:test_advisor_search_measures()] advisor search after 1 ms: 7 nodes, advice of depth 0 at horizon 0 s
+[INFO ] --- [2026-11-06 17:40:14] [advisor_search_test.odin:583:test_advisor_search_measures()] advisor search after 10 ms: 74 nodes, advice of depth 1 at horizon 3 s
+[INFO ] --- [2026-11-06 17:40:14] [advisor_search_test.odin:583:test_advisor_search_measures()] advisor search after 100 ms: 660 nodes, advice of depth 2 at horizon 3 s
+[INFO ] --- [2026-11-06 17:40:15] [advisor_search_test.odin:588:test_advisor_search_measures()] advisor search whole: 1477 nodes in 360.5 ms (4098 nodes a second), 457 seen again
+[INFO ] --- [2026-11-06 17:40:15] [advisor_search_test.odin:596:test_advisor_search_measures()] advisor frame slice of 3 work: at most 1.22 ms
+[INFO ] --- [2026-11-06 17:40:31] [advisor_search_test.odin:537:test_advisor_tournament()] tournament IA: 4 fights, life lost 0, foes killed 32, rooms cleared 0, 160 s
+[INFO ] --- [2026-11-06 17:40:31] [advisor_search_test.odin:537:test_advisor_tournament()] tournament Kiting: 4 fights, life lost 0, foes killed 0, rooms cleared 0, 160 s
+[INFO ] --- [2026-11-06 17:40:31] [advisor_search_test.odin:537:test_advisor_tournament()] tournament Nearest: 4 fights, life lost 1, foes killed 27, rooms cleared 0, 160 s
+[INFO ] --- [2026-11-06 17:40:31] [advisor_search_test.odin:537:test_advisor_tournament()] tournament Kiting_Defending: 4 fights, life lost 0, foes killed 0, rooms cleared 0, 160 s
+[INFO ] --- [2026-11-06 17:40:31] [advisor_search_test.odin:537:test_advisor_tournament()] tournament Nearest_Defending: 4 fights, life lost 1, foes killed 27, rooms cleared 0, 160 s
+[INFO ] --- [2026-11-06 17:40:33] [advisor_search_test.odin:555:test_advisor_tournament_in_the_special_arenas()] tournament Heights: the IA lost 0 and killed 3, the nearest-foe player lost 0 and killed 3
+[INFO ] --- [2026-11-06 17:40:37] [advisor_search_test.odin:555:test_advisor_tournament_in_the_special_arenas()] tournament Structures: the IA lost 0 and killed 3, the nearest-foe player lost 0 and killed 3
+[INFO ] --- [2026-11-06 17:40:54] [advisor_search_test.odin:555:test_advisor_tournament_in_the_special_arenas()] tournament Layers: the IA lost 0 and killed 3, the nearest-foe player lost 0 and killed 1
+[INFO ] --- [2026-11-06 17:41:03] [advisor_search_test.odin:555:test_advisor_tournament_in_the_special_arenas()] tournament Lifts: the IA lost 0 and killed 2, the nearest-foe player lost 0 and killed 2
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE AK: 286 dealt, 21 taken in 59.9 s of the view: 4.77 a second dealt, 0.35 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE pugni: 857 dealt, 3 taken in 59.9 s of the view: 14.30 a second dealt, 0.05 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE spada: 187 dealt, 16 taken in 59.9 s of the view: 3.12 a second dealt, 0.27 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE arco: 536 dealt, 17 taken in 59.9 s of the view: 8.94 a second dealt, 0.28 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE bastone: 384 dealt, 14 taken in 59.9 s of the view: 6.41 a second dealt, 0.23 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE nonno: 704 dealt, 0 taken in 59.9 s of the view: 11.75 a second dealt, 0.00 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:156:test_first_person_weapons_side_by_side()] BALANCE lanciafiamme: 108 dealt, 21 taken in 59.9 s of the view: 1.80 a second dealt, 0.35 taken
+[INFO ] --- [2026-11-06 17:41:13] [first_person_balance_test.odin:161:test_first_person_weapons_side_by_side()] BALANCE arco a raffica: 182 dealt, 21 taken in 59.9 s of the view: 3.04 a second dealt, 0.35 taken
+Cyber: foes 2, rode a lift false, the robot's health 400 to 400
+West: foes 2, rode a lift false, the robot's health 400 to 380
+Jungle: foes 2, rode a lift false, the robot's health 400 to 400
+City: foes 2, rode a lift false, the robot's health 400 to 400
+Egypt: foes 3, rode a lift false, the robot's health 400 to 362
+Vietnam: foes 3, rode a lift false, the robot's health 400 to 400
+Snow: foes 3, rode a lift false, the robot's health 400 to 393
+Inferno: foes 3, rode a lift false, the robot's health 400 to 400
+Gothic: foes 3, rode a lift false, the robot's health 400 to 376
+Sky: foes 3, rode a lift false, the robot's health 400 to 364
+Space: foes 4, rode a lift false, the robot's health 400 to 379
+Secret: foes 4, rode a lift false, the robot's health 400 to 358
+mappe: /var/folders/t0/pm5gfxp92dv78tky6y6zz7zc0000gn/T/odin_pp_mapeditor/andata/sotto_altezze.png is 20x14, not 21x14: left out
+mappe: /var/folders/t0/pm5gfxp92dv78tky6y6zz7zc0000gn/T/odin_pp_mapeditor/andata/sotto_tipi.png is 20x14, not 21x14: left out
+mappe: /var/folders/t0/pm5gfxp92dv78tky6y6zz7zc0000gn/T/odin_pp_mapeditor/andata/terra_altezze.png is 20x14, not 21x14: left out
+mappe: the retouches of the Flat arena do not go on it: left out
+Casino: 1000000 rounds per game; Ranch 0.9799..0.9775, crash 0.9674, roulette 0.9731, dice 0.9503 RTP
+Memory Lightcycles: autoplay wins 2/16
+Memory Showdown: autoplay wins 16/16
+Memory Trex: autoplay wins 16/16
+Memory Karaoke: autoplay wins 16/16
+Memory Helicopter: autoplay wins 16/16
+Memory Descent: autoplay wins 14/16
+BUILDING ENVELOPE Cyber Hut inside=1074 outside=1602 vertices
+BUILDING ENVELOPE Cyber Cottage inside=852 outside=1236 vertices
+BUILDING ENVELOPE Cyber Temple inside=3258 outside=3726 vertices
+BUILDING ENVELOPE West Hut inside=1134 outside=1650 vertices
+BUILDING ENVELOPE West Cottage inside=882 outside=1230 vertices
+BUILDING ENVELOPE West Temple inside=3258 outside=3726 vertices
+BUILDING ENVELOPE Jungle Hut inside=948 outside=1182 vertices
+BUILDING ENVELOPE Jungle Cottage inside=708 outside=870 vertices
+BUILDING ENVELOPE Jungle Temple inside=3258 outside=3726 vertices
+PAGE LAB SHADOW EQUIVALENCE act=Still time=0.000000 sampled_casters=125 receivers=1456 old_xz_pairs=1060 light_pairs=1060 positive_pairs=248
+PAGE LAB SHADOW EQUIVALENCE act=Walk time=0.700000 sampled_casters=125 receivers=1564 old_xz_pairs=1138 light_pairs=1138 positive_pairs=206
+PAGE LAB SHADOW EQUIVALENCE act=Turn time=1.300000 sampled_casters=123 receivers=1802 old_xz_pairs=1041 light_pairs=1041 positive_pairs=202
+PAGE LAB SHADOW EQUIVALENCE act=Climb time=0.630000 sampled_casters=125 receivers=1990 old_xz_pairs=1820 light_pairs=898 positive_pairs=215
+PAGE LAB SHADOW EQUIVALENCE act=Climb time=2.000000 sampled_casters=125 receivers=1980 old_xz_pairs=1807 light_pairs=895 positive_pairs=210
+PAGE LAB SHADOW EQUIVALENCE act=Climb time=3.983333 sampled_casters=125 receivers=2064 old_xz_pairs=2074 light_pairs=988 positive_pairs=208
+PAGE LAB SHADOW EQUIVALENCE act=Death time=1.400000 sampled_casters=125 receivers=1456 old_xz_pairs=1065 light_pairs=1065 positive_pairs=252
+PAGE LAB SHADOW EQUIVALENCE act=Death time=3.200000 sampled_casters=125 receivers=1456 old_xz_pairs=1076 light_pairs=1076 positive_pairs=240
+PAGE LAB SHADOW EQUIVALENCE act=Flight time=1.400000 sampled_casters=125 receivers=1456 old_xz_pairs=1049 light_pairs=1049 positive_pairs=239
+
+Finished 2138 tests in 1m35.693198s. All tests were successful.

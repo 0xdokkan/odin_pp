@@ -3,6 +3,7 @@ package application
 import "core:fmt"
 import "core:os"
 import "core:slice"
+import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 import artifacts "../devtools/artifacts"
@@ -83,6 +84,10 @@ EXPEDITION_BENCHMARK :: #config(EXPEDITION_BENCHMARK,false)
 EXPEDITION_BENCHMARK_FIRST :: #config(EXPEDITION_BENCHMARK_FIRST,0)
 EXPEDITION_BENCHMARK_LAST :: #config(EXPEDITION_BENCHMARK_LAST,EXPEDITION_SMOKE_LAST)
 #assert(EXPEDITION_BENCHMARK_FIRST>=0 && EXPEDITION_BENCHMARK_FIRST<=EXPEDITION_BENCHMARK_LAST && EXPEDITION_BENCHMARK_LAST<=EXPEDITION_SMOKE_LAST)
+// Empty selects the whole range; otherwise delimit every stage with commas, e.g. ",25,26,39,40,195,".
+EXPEDITION_BENCHMARK_STAGES :: #config(EXPEDITION_BENCHMARK_STAGES,"")
+EXPEDITION_BENCHMARK_CSV :: #config(EXPEDITION_BENCHMARK_CSV,false)
+EXPEDITION_BENCHMARK_FIXED_DT :: #config(EXPEDITION_BENCHMARK_FIXED_DT,false)
 // Every scene draws into a canvas of this many pixels, whatever the window and the display's scaling, so measures
 // taken on different screens compare. Zero by zero follows the window, as before.
 EXPEDITION_BENCHMARK_CANVAS_WIDTH :: #config(EXPEDITION_BENCHMARK_CANVAS_WIDTH,1920)
@@ -92,21 +97,53 @@ EXPEDITION_BENCHMARK_WARMUP :: #config(EXPEDITION_BENCHMARK_WARMUP,20)
 @(private)
 EXPEDITION_BENCHMARK_SAMPLES :: #config(EXPEDITION_BENCHMARK_SAMPLES,120)
 @(private)
-EXPEDITION_BENCHMARK_WALK_SAMPLES :: 240
+EXPEDITION_BENCHMARK_WALK_SAMPLES :: #config(EXPEDITION_BENCHMARK_WALK_SAMPLES,240)
+#assert(EXPEDITION_BENCHMARK_WARMUP>=1 && EXPEDITION_BENCHMARK_SAMPLES>0 && EXPEDITION_BENCHMARK_WALK_SAMPLES>0)
+@(private)
+EXPEDITION_BENCHMARK_BUDGET_MS :: f64(16.67)
+when EXPEDITION_BENCHMARK && EXPEDITION_BENCHMARK_CSV {
+	@(private)
+	EXPEDITION_BENCHMARK_CSV_CAPACITY :: EXPEDITION_BENCHMARK_WARMUP+max(EXPEDITION_BENCHMARK_WALK_SAMPLES,EXPEDITION_BENCHMARK_SAMPLES)
+} else {
+	@(private)
+	EXPEDITION_BENCHMARK_CSV_CAPACITY :: 0
+}
+@(private)
+Expedition_Benchmark_Frame :: struct {
+	frame_ms,draw_ms:f64,
+	simulation_dt,world_clock:f32,
+	position:[2]f32,
+	cell:grid.Position,
+	camera:rl.Camera3D,
+	geometry:[2]u64,
+	sun_renders:u64,
+	phase:game.Room_Phase,
+	mounted:bool,
+}
+@(private)
+Expedition_Benchmark_Statistics :: struct {
+	mean,median,p95,p99,maximum:f64,
+	over_budget:int,
+}
 @(private)
 Expedition_Benchmark :: struct {
 	frame_ms,draw_ms:[max(EXPEDITION_BENCHMARK_WALK_SAMPLES,EXPEDITION_BENCHMARK_SAMPLES)]f64,
 	scene_sum:[5]f64,
 	world_sum:[10]f64,
 	geometry_start,geometry_measured:[2]u64,
+	sun_start,sun_measured:u64,
 	count,post_count:int,
 	post_sum:render.Expedition_Post_Timing,
+	frames:[EXPEDITION_BENCHMARK_CSV_CAPACITY]Expedition_Benchmark_Frame,
+	frame_count:int,
 }
 Expedition_Capture :: struct {
 	wrapped:host.Scene,
 	frame,stage,held,measured:int,
 	seconds,draw_ms:f64,
+	simulation_dt:f32,
 	benchmark:Expedition_Benchmark,
+	benchmark_completed:bool,
 	cartoon_textures:[6]u32,
 	ground_stock:u32,
 	costume_biome:campaign.Biome, // Cyber disables the optional eleven-biome actor gallery.
@@ -205,6 +242,33 @@ expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
 	return {m.geometry.rebuilds,m.geometry.uploads}
 }
 
+@(private)
+expedition_benchmark_sun :: proc(e:^run.Expedition_Session)->u64 {
+	m:=e.rs.iso_renderer.tactical.expedition_material
+	return m.sun.renders if m!=nil else 0
+}
+
+@(private)
+expedition_benchmark_stage_matches :: proc(stage:int,stages:string)->bool {
+	if len(stages)==0 {return true}
+	buffer:[32]u8
+	return strings.contains(stages,fmt.bprintf(buffer[:],",%d,",stage))
+}
+
+// Nearest-rank percentiles, matching the historical p95; the caller sorts its own copy.
+@(private)
+expedition_benchmark_statistics :: proc(sorted:[]f64)->(r:Expedition_Benchmark_Statistics) {
+	n:=len(sorted)
+	if n==0 {return}
+	for ms in sorted {
+		r.mean+=ms
+		if ms>EXPEDITION_BENCHMARK_BUDGET_MS {r.over_budget+=1}
+	}
+	r.mean/=f64(n);r.median=(sorted[(n-1)/2]+sorted[n/2])*.5
+	r.p95=sorted[(n*95+99)/100-1];r.p99=sorted[(n*99+99)/100-1];r.maximum=sorted[n-1]
+	return
+}
+
 // Frame intervals include real update, submission, presentation and any
 // driver stalls. The post breakdown is CPU submission time, never GPU time.
 // Statistics and captures happen after the final measured sample; the next
@@ -212,12 +276,23 @@ expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
 @(private)
 expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Session,frame:^host.Frame)->bool {
 	// A stage before the first measured one sets its scene up, is drawn and moves on.
-	if s.stage<EXPEDITION_BENCHMARK_FIRST {return s.held>=2}
+	if s.stage<EXPEDITION_BENCHMARK_FIRST || !expedition_benchmark_stage_matches(s.stage,EXPEDITION_BENCHMARK_STAGES) {return s.held>=2}
+	b:=&s.benchmark
+	when EXPEDITION_BENCHMARK && EXPEDITION_BENCHMARK_CSV {
+		// Fixed-capacity storage only. Formatting/I/O happens after the final measured frame.
+		b.frames[b.frame_count]={frame_ms=f64(rl.GetFrameTime())*1000,draw_ms=s.draw_ms,
+			simulation_dt=s.simulation_dt,world_clock=e.world.clock,position={e.roam.position.x,e.roam.position.y},
+			cell=e.rs.room.player.position,camera=e.rs.iso_renderer.tactical.camera,geometry=expedition_benchmark_geometry(e),
+			sun_renders=expedition_benchmark_sun(e),phase=e.rs.room.phase,mounted=e.world.mounted}
+		b.frame_count+=1
+	}
 	if s.held<=EXPEDITION_BENCHMARK_WARMUP {
-		if s.held==EXPEDITION_BENCHMARK_WARMUP {s.benchmark.geometry_measured=expedition_benchmark_geometry(e)}
+		if s.held==EXPEDITION_BENCHMARK_WARMUP {
+			s.benchmark.geometry_measured=expedition_benchmark_geometry(e);s.benchmark.sun_measured=expedition_benchmark_sun(e)
+		}
 		return false
 	}
-	b:=&s.benchmark;target:=EXPEDITION_BENCHMARK_SAMPLES
+	target:=EXPEDITION_BENCHMARK_SAMPLES
 	if s.stage==EXPEDITION_SMOKE_WALK || s.stage==EXPEDITION_SMOKE_ENGAGE {target=EXPEDITION_BENCHMARK_WALK_SAMPLES}
 	b.frame_ms[b.count]=f64(rl.GetFrameTime())*1000;b.draw_ms[b.count]=s.draw_ms;b.count+=1
 	scene:=e.draw_timing;draw:=e.rs.iso_renderer.tactical.draw_timing
@@ -231,17 +306,15 @@ expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Ses
 	}
 	if b.count<target {return false}
 	ordered:=b.frame_ms;values:=ordered[:b.count];slice.sort(values)
-	total:f64;for ms in values {total+=ms}
-	mean:=total/f64(b.count);median:=(values[(b.count-1)/2]+values[b.count/2])*.5
-	p95:=values[(b.count*95+99)/100-1];maximum:=values[b.count-1]
+	stats:=expedition_benchmark_statistics(values)
 	draw_ordered:=b.draw_ms;draw_values:=draw_ordered[:b.count];slice.sort(draw_values)
 	draw_total:f64;for ms in draw_values {draw_total+=ms}
 	draw_mean:=draw_total/f64(b.count);draw_p95:=draw_values[(b.count*95+99)/100-1]
 	post_divisor:=f64(max(b.post_count,1));p:=b.post_sum
 	pixels:=[2]int{}
 	if frame.window!=nil {pixels={int(frame.window.canvas.texture.width),int(frame.window.canvas.texture.height)}}
-	fmt.printf("EXPEDITION BENCHMARK stage=%d biome=%d canvas_px=%dx%d samples=%d warmup=%d mean_ms=%.3f median_ms=%.3f p95_ms=%.3f max_ms=%.3f mean_fps=%.2f\n",
-		s.stage,int(e.world.biome),pixels.x,pixels.y,b.count,EXPEDITION_BENCHMARK_WARMUP,mean,median,p95,maximum,1000/max(mean,.000001))
+	fmt.printf("EXPEDITION BENCHMARK stage=%d biome=%d canvas_px=%dx%d samples=%d warmup=%d mean_ms=%.3f median_ms=%.3f p95_ms=%.3f max_ms=%.3f mean_fps=%.2f p99_ms=%.3f over_16_67_ms=%d\n",
+		s.stage,int(e.world.biome),pixels.x,pixels.y,b.count,EXPEDITION_BENCHMARK_WARMUP,stats.mean,stats.median,stats.p95,stats.maximum,1000/max(stats.mean,.000001),stats.p99,stats.over_budget)
 	fmt.printf("CPU SUBMISSION stage=%d samples=%d wrapped_draw_mean_ms=%.3f wrapped_draw_p95_ms=%.3f reflection_ms=%.3f reflection_blur_ms=%.3f bloom_ms=%.3f resolve_ms=%.3f (post means; not GPU timings)\n",
 		s.stage,b.post_count,draw_mean,draw_p95,p.reflection_ms/post_divisor,p.reflection_blur_ms/post_divisor,p.bloom_ms/post_divisor,p.resolve_ms/post_divisor)
 	frame_divisor:=f64(b.count)
@@ -255,6 +328,7 @@ expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Ses
 		vertices,lines,chunks:=0,0,0
 		for chunk in material.geometry.chunks {vertices+=int(chunk.mesh.vertexCount);lines+=len(chunk.lines);if chunk.ready {chunks+=1}}
 		for chunk in material.geometry.sites {vertices+=int(chunk.mesh.vertexCount);lines+=len(chunk.lines);if chunk.ready {chunks+=1}}
+		for chunk in material.geometry.structures {vertices+=int(chunk.mesh.vertexCount);lines+=len(chunk.lines);if chunk.ready {chunks+=1}}
 		// Uploaded positions, normals, UV and RGBA, excluding driver overhead
 		// and the CPU mirror retained by Raylib. Lines remain CPU owned.
 		fmt.printf("GEOMETRY RESIDENT stage=%d map=%dx%d chunks=%d vertices=%d mesh_payload_bytes=%d line_bytes=%d\n",
@@ -264,8 +338,30 @@ expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Ses
 		s.stage,geometry[0],geometry[1],i64(geometry[0])-i64(b.geometry_start[0]),i64(geometry[1])-i64(b.geometry_start[1]),
 		i64(geometry[0])-i64(b.geometry_measured[0]),i64(geometry[1])-i64(b.geometry_measured[1]),
 		geometry[0]<b.geometry_start[0] || geometry[1]<b.geometry_start[1])
+	sun:=expedition_benchmark_sun(e)
+	fmt.printf("SUN CACHE stage=%d renders_total=%d renders_stage_delta=%d renders_measured_delta=%d counter_reset=%v\n",
+		s.stage,sun,i64(sun)-i64(b.sun_start),i64(sun)-i64(b.sun_measured),sun<b.sun_start)
+	expedition_benchmark_write_frames(s,e)
 	b^={}
 	return true
+}
+
+// Used for both a completed stage and an interrupted scene. A partial stage has no summary;
+// its INCOMPLETE record and nonzero exit keep it distinct from a complete measurement.
+@(private)
+expedition_benchmark_write_frames :: proc(s:^Expedition_Capture,e:^run.Expedition_Session) {
+	when EXPEDITION_BENCHMARK && EXPEDITION_BENCHMARK_CSV {
+		b:=&s.benchmark
+		for sample,i in b.frames[:b.frame_count] {
+			fmt.printf("EXPEDITION FRAME CSV,%d,%d,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%d,%d,%d,%d,%d,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%d,%d,%d\n",
+				s.stage,i+1,int(i>=EXPEDITION_BENCHMARK_WARMUP),int(e.world.biome),sample.frame_ms,sample.draw_ms,
+				sample.simulation_dt,sample.world_clock,sample.position.x,sample.position.y,
+				sample.cell.x,sample.cell.y,sample.cell.layer,int(sample.phase),int(sample.mounted),
+				sample.camera.position.x,sample.camera.position.y,sample.camera.position.z,
+				sample.camera.target.x,sample.camera.target.y,sample.camera.target.z,
+				sample.geometry[0],sample.geometry[1],sample.sun_renders)
+		}
+	}
 }
 
 // A fresh world of biome `b` for the per-biome captures, mounted.
@@ -367,7 +463,13 @@ expedition_smoke_behind_wall :: proc(e:^run.Expedition_Session) {
 }
 
 expedition_enable_smoke :: proc(scene:^host.Scene) {
-	if only,_:=os.lookup_env("ODIN_PP_SMOKE_ONLY",context.temp_allocator);only=="objects" {
+	if only,_:=os.lookup_env("ODIN_PP_SMOKE_ONLY",context.temp_allocator);only=="polish-cards" {
+		expedition_enable_cards_smoke(scene);return
+	} else if only=="polish-cards-raised" {
+		expedition_enable_cards_smoke(scene,true);return
+	} else if only=="polish-input-glow" {
+		expedition_enable_polish_smoke(scene);return
+	} else if only=="objects" {
 		expedition_enable_objects_smoke(scene);return
 	} else if only=="actor-shadow" {
 		expedition_enable_objects_smoke(scene,true);return
@@ -383,9 +485,19 @@ expedition_enable_smoke :: proc(scene:^host.Scene) {
 		expedition_enable_sun_fps_smoke(scene);return
 	}
 	when EXPEDITION_BENCHMARK {
+		selected:=false
+		for stage in EXPEDITION_BENCHMARK_FIRST..=EXPEDITION_BENCHMARK_LAST {
+			if expedition_benchmark_stage_matches(stage,EXPEDITION_BENCHMARK_STAGES) {selected=true;break}
+		}
+		assert(selected,"EXPEDITION_BENCHMARK_STAGES selects no stage in the benchmark range")
 		rl.SetTargetFPS(0);rl.ClearWindowState({.VSYNC_HINT})
 		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; stages %d..%d; canvas %dx%d (0x0 follows the window); no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",
 			rl.IsWindowState({.VSYNC_HINT}),EXPEDITION_BENCHMARK_FIRST,EXPEDITION_BENCHMARK_LAST,EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT)
+		fmt.printfln("EXPEDITION BENCHMARK protocol: stages=%q fixed_simulation_dt=%v seconds_per_update=%.9f csv=%v walk_samples=%d; CSV includes warmup, summaries exclude it; logging occurs after each stage.",
+			EXPEDITION_BENCHMARK_STAGES,EXPEDITION_BENCHMARK_FIXED_DT,f32(1)/60,EXPEDITION_BENCHMARK_CSV,EXPEDITION_BENCHMARK_WALK_SAMPLES)
+		when EXPEDITION_BENCHMARK_CSV {
+			fmt.println("EXPEDITION FRAME CSV,stage,stage_frame,measured,biome,frame_ms,wrapped_draw_ms,simulation_dt,world_clock,roam_x,roam_y,cell_x,cell_y,layer,phase,mounted,camera_x,camera_y,camera_z,target_x,target_y,target_z,geometry_rebuilds,geometry_uploads,sun_renders")
+		}
 	}
 	state:=new(Expedition_Capture);state.wrapped=scene^
 	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, =caves at the caves' act, =complessi at the complexes', =reti
@@ -409,50 +521,83 @@ expedition_enable_smoke :: proc(scene:^host.Scene) {
 		rl.SetWindowSize(1024,576)
 		expedition_smoke_workshop(cast(^run.Expedition_Session)scene.data,.Cyber)
 	}
-	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=proc(data:rawptr){s:=cast(^Expedition_Capture)data;s.wrapped.destroy(s.wrapped.data);free(s)}}
+	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=expedition_capture_destroy}
+}
+
+@(private)
+expedition_capture_destroy :: proc(data:rawptr) {
+	s:=cast(^Expedition_Capture)data
+	incomplete:=false
+	when EXPEDITION_BENCHMARK {
+		incomplete=!s.benchmark_completed
+		if incomplete {
+			e:=cast(^run.Expedition_Session)s.wrapped.data
+			fmt.printf("EXPEDITION BENCHMARK INCOMPLETE stage=%d held=%d measured_samples=%d captured_frames=%d health=%d phase=%v finished=%v extracting=%v world_extracting=%v\n",
+				s.stage,s.held,s.benchmark.count,s.benchmark.frame_count,e.rs.room.player.health,e.rs.room.phase,e.finished,e.extracting,e.world.extracting)
+			expedition_benchmark_write_frames(s,e)
+		}
+	}
+	s.wrapped.destroy(s.wrapped.data);free(s)
+	// A lost expedition normally returns to the hub. A benchmark must instead terminate with its incomplete evidence.
+	if incomplete {os.exit(2)}
 }
 
 @(private)
 expedition_capture_update :: proc(data:rawptr,frame:^host.Frame) {
 	s:=cast(^Expedition_Capture)data;e:=cast(^run.Expedition_Session)s.wrapped.data
+	update_frame:=frame^
 	when EXPEDITION_BENCHMARK {
-		if s.held==0 {s.benchmark.geometry_start=expedition_benchmark_geometry(e)}
+		if s.held==0 {
+			s.benchmark.geometry_start=expedition_benchmark_geometry(e);s.benchmark.sun_start=expedition_benchmark_sun(e)
+		}
+		when EXPEDITION_BENCHMARK_FIXED_DT {
+			// Include setup stages and static animation warmup: they prepare the moving scene's initial state.
+			// Only the scene's clock changes. Raylib still measures the real presented frame.
+			update_frame.dt=f32(1)/60;update_frame.time=f64(s.frame+1)/60
+			update_frame.focused=true;update_frame.window_focused=true
+			update_frame.mouse={-1,-1};update_frame.mouse_inside=false
+		}
 	}
+	s.simulation_dt=update_frame.dt
 	if s.stage>EXPEDITION_SMOKE_CARTOON && s.stage<=EXPEDITION_SMOKE_LAST && frame.devices!=nil {
 		// Real movement, enemy AI and combat timeline in the same world.
 		// Walk away, turn back, then stand long enough for attacks to land.
 		keys:=frame.devices^
+		when EXPEDITION_BENCHMARK && EXPEDITION_BENCHMARK_FIXED_DT {keys={};keys.focused=true}
 		if s.held<45 {
 			if s.stage==EXPEDITION_SMOKE_CARTOON+1 {keys.keys_down[.W]=true;keys.keys_down[.D]=true}
 			else {keys.keys_down[.S]=true;keys.keys_down[.A]=true}
 		}
-		walk:=frame^;walk.devices=&keys;s.wrapped.update(s.wrapped.data,&walk)
+		walk:=update_frame;walk.devices=&keys;s.wrapped.update(s.wrapped.data,&walk)
 		return
 	}
 	if (s.stage==EXPEDITION_SMOKE_WALK || s.stage==EXPEDITION_SMOKE_ENGAGE) && frame.devices!=nil {
 		// The real scene walks with held keys: free roaming end to end, then
 		// on foot toward the boss until its lair engages the robot.
 		keys:=frame.devices^
+		when EXPEDITION_BENCHMARK && EXPEDITION_BENCHMARK_FIXED_DT {keys={};keys.focused=true}
 		if s.stage==EXPEDITION_SMOKE_WALK {keys.keys_down[.W]=true;keys.keys_down[.D]=true}
 		else {keys.keys_down[.S]=true;keys.keys_down[.D]=true}
-		walk:=frame^;walk.devices=&keys
+		walk:=update_frame;walk.devices=&keys
 		s.wrapped.update(s.wrapped.data,&walk)
 		when !EXPEDITION_BENCHMARK {
 			if s.held%15==0 {fmt.printfln("walk %d/%d: position %.3f %.3f cell %v phase %v mounted %v dt %.4f",s.stage,s.held,e.roam.position.x,e.roam.position.y,e.rs.room.player.position,e.rs.room.phase,e.world.mounted,frame.dt)}
 		}
 		return
 	}
-	e.rs.frame_input.focused=true;e.rs.frame_time=frame.dt
+	e.rs.frame_input.focused=true;e.rs.frame_time=update_frame.dt
 	render.set_living_cards(&e.rs.iso_renderer,true)
-	render.update_tactical_atmosphere(&e.rs.iso_renderer,frame.dt)
-	_=render.update_renderer_frame_timeline(&e.rs.iso_renderer,frame.dt)
-	if e.inventory_open {_=campaignui.update_inventory(e.progress,e.rs.room.player,&e.inventory,frame,false,false)}
+	render.update_tactical_atmosphere(&e.rs.iso_renderer,update_frame.dt)
+	_=render.update_renderer_frame_timeline(&e.rs.iso_renderer,update_frame.dt)
+	if e.inventory_open {_=campaignui.update_inventory(e.progress,e.rs.room.player,&e.inventory,&update_frame,false,false)}
 }
 @(private)
 expedition_capture_draw :: proc(data:rawptr,frame:^host.Frame) {
 	s:=cast(^Expedition_Capture)data
 	when EXPEDITION_BENCHMARK {
-		started:=rl.GetTime();s.wrapped.draw(s.wrapped.data,frame);s.draw_ms=(rl.GetTime()-started)*1000
+		draw_frame:=frame^
+		when EXPEDITION_BENCHMARK_FIXED_DT {draw_frame.dt=f32(1)/60;draw_frame.time=f64(s.frame+1)/60}
+		started:=rl.GetTime();s.wrapped.draw(s.wrapped.data,&draw_frame);s.draw_ms=(rl.GetTime()-started)*1000
 	} else {s.wrapped.draw(s.wrapped.data,frame)}
 }
 @(private)
@@ -552,7 +697,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_centro_%02d.png",s.stage-EXPEDITION_SMOKE_CENTER))}
 	}
 	when EXPEDITION_BENCHMARK {
-		if s.stage>=EXPEDITION_BENCHMARK_LAST {host.quit(frame);return}
+		if s.stage>=EXPEDITION_BENCHMARK_LAST {s.benchmark_completed=true;host.quit(frame);return}
 	}
 	when !EXPEDITION_BENCHMARK {if s.last_stage>0 && s.stage>=s.last_stage {host.quit(frame);return}}
 	if s.costume_biome!=.Cyber && s.stage>=EXPEDITION_SMOKE_LAST {

@@ -22,6 +22,7 @@ import render "../render"
 Launch_Options :: struct {
 	run:        bool,   // --run: straight into the roguelike
 	minigame:   string, // --minigame=<id>: open one minigame on top of the menu
+	minigame_requested: bool,
 	// --smoke-menu: capture odin_pp_menu.png after a few frames and quit.
 	smoke_menu: bool,
 	// --smoke-minigame=<id>: play <id> without the intro, capture
@@ -30,6 +31,8 @@ Launch_Options :: struct {
 	expedition, smoke_expedition, smoke_hub, smoke_hub_world: bool,
 	// --editor-mappe: the map editor (Fase 6 of docs/piano-profondita.md); --smoke-editor-mappe: its smoke act.
 	map_editor, smoke_map_editor: bool,
+	// A visual workshop: it owns its scene and never changes the run's rules.
+	page_lab, smoke_page_lab: bool,
 }
 
 split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]string) {
@@ -37,6 +40,10 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 	rest := make([dynamic]string, 0, len(args))
 	for arg in args {
 		switch {
+		case arg == "--page-lab":
+			launch.page_lab = true
+		case arg == "--smoke-page-lab":
+			launch.page_lab, launch.smoke_page_lab = true, true
 		case arg == "--expedition":
 			launch.expedition = true
 		case arg == "--smoke-expedition":
@@ -52,10 +59,12 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 		case arg == "--run":
 			launch.run = true
 		case strings.has_prefix(arg, "--minigame="):
+			launch.minigame_requested = true
 			launch.minigame = arg[len("--minigame="):]
 		case arg == "--smoke-menu":
 			launch.smoke_menu = true
 		case strings.has_prefix(arg, "--smoke-minigame="):
+			launch.minigame_requested = true
 			launch.smoke_minigame = arg[len("--smoke-minigame="):]
 			launch.minigame = launch.smoke_minigame
 		case:
@@ -63,6 +72,18 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 		}
 	}
 	return launch, rest
+}
+
+// Validate before direct-run routing: otherwise a runtime lab/smoke could
+// consume the invocation and silently ignore the requested visual workshop.
+@(private)
+page_lab_launch_error :: proc(launch: Launch_Options, options: ^Runtime_Options) -> string {
+	if !launch.page_lab { return "" }
+	if launch.run || launch.minigame_requested || launch.smoke_menu || launch.expedition ||
+	   launch.smoke_hub || launch.smoke_hub_world || launch.map_editor || roguelike_requires_direct_start(options) {
+		return "Scegli --page-lab o --smoke-page-lab senza altre modalita di avvio, laboratorio o smoke."
+	}
+	return ""
 }
 
 profile_path :: proc() -> string {
@@ -74,14 +95,14 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	rs_config.options = options.gameplay
 	window := run_session.roguelike_window_config(rs_config)
 	run_session.roguelike_destroy(rs_config)
-	window.title = "Odin PP - editor delle mappe" if launch.map_editor else "Odin PP"
+	window.title = "Odin PP - La pagina prende vita" if launch.page_lab else ("Odin PP - editor delle mappe" if launch.map_editor else "Odin PP")
 	h, ok := host.create(host.Config{
 		window          = window,
-		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_hub_world && !launch.smoke_expedition && !launch.smoke_map_editor else "",
-		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_map_editor,
+		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_hub_world && !launch.smoke_expedition && !launch.smoke_map_editor && !launch.smoke_page_lab else "",
+		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_map_editor && !launch.smoke_page_lab,
 		letterbox_color = render.LETTERBOX_COLOR,
-		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world || launch.smoke_map_editor,
-		keep_running    = launch.smoke_minigame != "" || launch.smoke_menu || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world || launch.smoke_map_editor,
+		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world || launch.smoke_map_editor || launch.smoke_page_lab,
+		keep_running    = launch.smoke_minigame != "" || launch.smoke_menu || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world || launch.smoke_map_editor || launch.smoke_page_lab,
 	})
 	if !ok {
 		fmt.eprintln("could not open the window")
@@ -91,6 +112,7 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	menu := launcher_create(options)
 	menu.smoke = launch.smoke_menu
 	host.push_scene(h, launcher_scene(menu))
+	if launch.page_lab { host.push_scene(h, run_session.page_lab_scene(launch.smoke_page_lab)) }
 	// The map editor, a program of its own over the menu: Esc closes the program.
 	if launch.map_editor { host.push_scene(h, mapeditor.editor_scene(launch.smoke_map_editor)) }
 	if launch.expedition || launch.smoke_hub || launch.smoke_hub_world {
@@ -259,8 +281,9 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 	start := ui.cut_bottom(&run, 42)
 	ui.cut_bottom(&run, 8)
 	lab := ui.cut_bottom(&run, 32)
+	ui.cut_bottom(&run, 6)
+	page_lab := ui.cut_bottom(&run, 32)
 	ui.cut_bottom(&run, 8)
-	ui.paragraph(ctx, run, "Le cose si perdono.\nCio che scopri rimane.\nLa collina ti aspetta.", .Small, p.text_dim)
 	if ui.button(ctx, start, "Gioca", primary = true) {
 		audio.play(frame.audio, .Confirm)
 		host.push(frame, campaign_hub_scene(l.options))
@@ -269,6 +292,11 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 	if ui.button(ctx, lab, "Prova meccaniche") {
 		audio.play(frame.audio, .Confirm)
 		launcher_start_run(l, frame, true)
+	}
+	if ui.button(ctx, page_lab, "La pagina prende vita") {
+		audio.play(frame.audio, .Confirm)
+		audio.stop_music(frame.audio)
+		host.push(frame, run_session.page_lab_scene())
 	}
 
 	count := min(6, activities.MINIGAME_COUNT-l.arcade_page*6)

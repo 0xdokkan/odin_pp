@@ -18,7 +18,7 @@ test_inferno_eruption_cracks_floor_after_warning_and_persists_lava :: proc(t:^te
 	testing.expect(t,w.lane_warning&&w.lane_vertical&&w.lane==45)
 	testing.expect_value(t,w.lane_center,p.position)
 	testing.expect(t,game.expedition_ground(&room,p.position)==.Plain,"Warning must leave time to move")
-	warning:=new(Snapshot);defer free(warning)
+	warning:=new(Snapshot);defer { snapshot_destroy(warning); free(warning) }
 	testing.expect(t,capture(&w,&room,warning))
 	testing.expect(t,warning.world.lane_warning)
 	tick(&w,&room,2)
@@ -29,7 +29,7 @@ test_inferno_eruption_cracks_floor_after_warning_and_persists_lava :: proc(t:^te
 	testing.expect(t,p.health==health-1,"Fractured lava damages standing explorers each beat")
 	testing.expect(t,walk(&w,&room,{x = 1, y = 0}));health=p.health
 	testing.expect(t,walk(&w,&room,{x = -1, y = 0}));testing.expect(t,p.health==health-2,"Re-entering the persistent fracture applies lava entry damage")
-	finished:=new(Snapshot);defer free(finished)
+	finished:=new(Snapshot);defer { snapshot_destroy(finished); free(finished) }
 	testing.expect(t,capture(&w,&room,finished));testing.expect(t,valid_snapshot(finished))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(finished,&w2,&data2,&p2,&room2))

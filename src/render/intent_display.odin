@@ -176,8 +176,8 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if !found { continue }
 			ally := room.enemies[ally_index].position
 			if !tactical_render_visible(renderer, enemy.position) || !tactical_render_visible(renderer, ally) { continue }
-			a := rl.Vector3{f32(enemy.position.x)+0.5, 0.7, f32(enemy.position.y)+0.5}
-			b := rl.Vector3{f32(ally.x)+0.5, 0.7, f32(ally.y)+0.5}
+			a := intent_protection_endpoint(renderer, &enemy)
+			b := intent_protection_endpoint(renderer, &room.enemies[ally_index])
 			tether := color_with_opacity(color, (0.5+0.5*loud)*lit)
 			rl.DrawLine3D(a, b, tether)
 			rl.DrawLine3D(a+{0, 0.02, 0}, b+{0, 0.02, 0}, tether)
@@ -194,6 +194,14 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if tactical_render_visible(renderer, cell) { draw_intent_cell(cell, 1, {255, 250, 235, 255}, 0.75*(1-t)) }
 		}
 	}
+}
+
+@(private)
+intent_protection_endpoint :: proc(renderer: ^Renderer, enemy: ^game.Enemy) -> rl.Vector3 {
+	entity := game.enemy_entity(enemy.id)
+	position, found := tactical_cue_actor_position(renderer, entity)
+	if !found { position = {f32(enemy.position.x), f32(enemy.position.y)} }
+	return {position.x+0.5, 0.7+entity_point_ground(entity, position), position.y+0.5}
 }
 
 // A cell striking: a frame that closes in from the edges to the middle.

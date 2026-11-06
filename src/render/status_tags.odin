@@ -105,11 +105,18 @@ tactical_status_lane :: proc(feet: view.Vec2, tags: rl.Rectangle) -> rl.Rectangl
 // The tags' pixel at a figure's feet on the 3D board: doubled with the hearts
 // (tactical_enemy_head), once a world unit there is LIVING_HEART_DOUBLE wide.
 @(private)
-tactical_status_tag_pixel :: proc(renderer: ^Renderer, position: view.Vec2) -> f32 {
-
+tactical_status_tag_pixel :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> f32 {
 	right := flipbook_camera_right(renderer)*0.5
-	feet := view.Vec2{position.x+0.5, position.y+0.5}
-	a := tactical_project(renderer, {feet.x-right.x, feet.y-right.z})
-	b := tactical_project(renderer, {feet.x+right.x, feet.y+right.z})
+	feet := view.Vec2{actor.position.x+0.5, actor.position.y+0.5}
+	ground := entity_point_ground(actor.entity, actor.position)
+	a := tactical_project(renderer, {feet.x-right.x, feet.y-right.z}, ground)
+	b := tactical_project(renderer, {feet.x+right.x, feet.y+right.z}, ground)
 	return 2 if math.hypot(b.x-a.x, b.y-a.y) >= LIVING_HEART_DOUBLE else 1
+}
+
+// These glyphs are a 2D annotation, but belong to the figure's actual feet,
+// including its slope, bridge, cave or lift; not the board's zero plane.
+@(private)
+tactical_status_anchor :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> view.Vec2 {
+	return tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5}, entity_point_ground(actor.entity, actor.position))
 }

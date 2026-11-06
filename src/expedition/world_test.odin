@@ -127,7 +127,7 @@ test_expedition_snapshot_restores_dynamic_terrain_and_exact_room_state :: proc(t
 	room.tactical_pulse.deferred_draws=2;p.deck.energy=37;p.tactical.energy_fraction=0.6
 	_=level.set_tile(&data,{x = 8, y = 8},{.Void});append(&room.obstacles,game.Obstacle{{x = 9, y = 9}})
 	room.ground.pool[42]=3;w.clock=31.25;w.beat=31
-	snapshot:=new(Snapshot);defer free(snapshot)
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer level.destroy(&data2);defer game.destroy_room(&room2)
@@ -170,7 +170,7 @@ test_expedition_vietnam_traps_trigger_in_exploration_and_persist_disarmed :: pro
 	w.mounted=true;before:=p.health
 	testing.expect(t,walk(&w,&room,{x = 1, y = 0}));testing.expect_value(t,p.health,before-4)
 	testing.expect(t,!room.traps[0].armed && !w.mounted)
-	snapshot:=new(Snapshot);defer free(snapshot);testing.expect(t,capture(&w,&room,snapshot))
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) };testing.expect(t,capture(&w,&room,snapshot))
 	testing.expect(t,!snapshot.traps[0].armed)
 }
 
@@ -184,7 +184,7 @@ test_expedition_full_drop_capacity_preserves_and_restores_pending_xp :: proc(t:^
 	clear(&room.enemies);earned:=sync(&w,&room)
 	testing.expect(t,earned>0);testing.expect_value(t,w.pending_xp,earned)
 	testing.expect_value(t,w.drop_count,MAX_DROPS);testing.expect_value(t,sync(&w,&room),i32(0))
-	snapshot:=new(Snapshot);defer free(snapshot)
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer game.destroy_room(&room2);defer level.destroy(&data2)

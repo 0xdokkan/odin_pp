@@ -1,0 +1,7 @@
+[INFO ] --- [2026-11-06 17:22:07] Starting test runner with 1 thread.
+[INFO ] --- [2026-11-06 17:22:07] The random seed sent to every test is: 5338146425142. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-11-06 17:22:07] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-11-06 17:22:07] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-11-06 17:22:08] [advisor_view_test.odin:141:test_advisor_pilot_holds_its_advice_until_the_player_acts()] the held advice: 150 frames kept, 0 changes, each for a blow announced or an advice no longer possible
+
+Finished 6 tests in 836.959ms. All tests were successful.

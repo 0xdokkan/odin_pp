@@ -16,7 +16,7 @@ test_expedition_snapshot_keeps_the_nest_and_its_spiders :: proc(t:^testing.T) {
 	room.next_object_id+=1;append(&room.objects,nest)
 	p.tactical.spiders.items[0]={position = nest.position, from = nest.position, travelled = 0.5, age = 1.5, bite = 3, nest = nest.id}
 	p.tactical.spiders.count,p.tactical.spiders.pending=1,0.25
-	snapshot:=new(Snapshot);defer free(snapshot)
+	snapshot:=new(Snapshot);defer { snapshot_destroy(snapshot); free(snapshot) }
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
 	w2:World;data2:level.Level;p2:game.Player;room2:game.Room
 	testing.expect(t,restore(snapshot,&w2,&data2,&p2,&room2));defer level.destroy(&data2);defer game.destroy_room(&room2)

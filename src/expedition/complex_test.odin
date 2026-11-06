@@ -124,7 +124,7 @@ test_a_save_keeps_a_complexs_gate_and_its_lifts_platform :: proc(t: ^testing.T) 
 	game.lift_tick(&room, 10)
 	testing.expect(t, room.lifts.platforms[0].at == 0 && !room.lifts.platforms[0].moving)
 	s := new(Snapshot)
-	defer free(s)
+	defer { snapshot_destroy(s); free(s) }
 	testing.expect(t, capture(&w, &room, s))
 	testing.expect(t, valid_snapshot(s))
 	w2: World

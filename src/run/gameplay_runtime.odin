@@ -33,6 +33,27 @@ active_targeting_card_id :: proc(state: Card_Interaction_State) -> u32 {
 	return state.selected_card_id
 }
 
+// Orientation belongs to the card being aimed, never to the next card
+// selected from the hand. Merely changing selection pays no gameplay time.
+@(private)
+reset_card_targeting_for_selection :: proc(state: ^Card_Interaction_State, card_id: u32) {
+	if active_targeting_card_id(state^) == card_id { return }
+	state.placing, state.flood_way_set = false, false
+	state.placement_direction, state.flood_way = {}, {}
+}
+
+// Synchronize after every early return too: keyboard/drag selection and
+// cancellation must draw their new preview in this very frame.
+@(private)
+sync_card_interaction_preview :: proc(room: ^game.Room, renderer: ^render.Renderer, state: ^Card_Interaction_State) {
+	deck, _ := render.renderer_hand_deck(renderer, room)
+	index, found := game.hand_card_index_by_id(deck, active_targeting_card_id(state^))
+	if !found || !game.card_requires_orientation(deck.hand[index].definition_id) { state.placing = false }
+	renderer.tactical.expedition_placement = state.placing
+	renderer.tactical.expedition_direction = state.placement_direction
+	update_flood_aim(room, renderer, state, deck, 0)
+}
+
 // The card under the mouse in the hand while none is chosen or dragged: its
 // range and the foes it would hit show faintly, to help decide (render.draw_tactical_world).
 hovered_preview_card_id :: proc(state: Card_Interaction_State) -> u32 {
@@ -144,6 +165,7 @@ poll_gameplay_command :: proc(
 	controls: Run_Input = {},
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
+	defer sync_card_interaction_preview(room, renderer, card_interaction)
 	// INONDAZIONE's aim is set again below whenever the card is held.
 	render.set_flood_aim(renderer, false, false, .East)
 	// FIRST PERSON SHOOTER: the mouse is the view's and the hand is put away;
@@ -197,6 +219,7 @@ poll_gameplay_command :: proc(
 			card_interaction.selected_card_id,
 		)
 		if !selected_found {
+			reset_card_targeting_for_selection(card_interaction, 0)
 			card_interaction.selected_card_id = 0
 		}
 	}
@@ -275,6 +298,7 @@ poll_gameplay_command :: proc(
 				if card_command, immediate := immediate_card_command(input_deck.hand[index]); immediate { return card_command, true }
 			}
 		}
+		reset_card_targeting_for_selection(card_interaction, card_interaction.hovered_card_id)
 		card_interaction.dragged_card_id = card_interaction.hovered_card_id
 		card_interaction.hovered_card_id = 0
 		card_interaction.selected_card_id = 0
@@ -288,6 +312,7 @@ poll_gameplay_command :: proc(
 		if !spatial_interaction_enabled {
 			return
 		}
+		reset_card_targeting_for_selection(card_interaction, card.id)
 		card_interaction.selected_card_id = card.id
 		return
 	}
@@ -565,6 +590,7 @@ commit_gameplay_command :: proc(
 	after := render.capture_room_presentation(room)
 	if execution.clears_card_interaction || room.phase != .Combat {
 		clear_card_interaction(card_interaction)
+		sync_card_interaction_preview(room, renderer, card_interaction)
 	}
 	if room.recent_events.count > 0 {
 		started := render.begin_renderer_world_timeline(renderer, before, room.recent_events, &after) if world_command else

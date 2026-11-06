@@ -4,6 +4,119 @@ Questa sezione conserva la cronologia delle implementazioni e delle verifiche.
 I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precedenti;
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
+## 2026-11-06 — Carte e leggibilità degli scontri nella spedizione
+
+- Annullare una carta con il destro elimina anche il suo comando accodato durante un’azione,
+  senza consumare carta, energia o tempo; passi e attese già accodati mantengono il loro contratto.
+  Cambiare carta con tastiera o trascinamento azzera l’orientamento del piazzamento precedente
+  e aggiorna subito l’anteprima. I test riproducono entrambi i difetti prima della correzione.
+- La mano spiega energia insufficiente, bersaglio fuori portata, linea di tiro o percorso bloccati
+  e altri rifiuti usando la stessa query del lancio. L’Inondazione orientata con la rotella condivide
+  il calcolo del bersaglio fra comando, anteprima sul terreno e messaggio.
+- Danni, scudi, rune, traiettorie delle magie e legami di protezione seguono rilievi e piani della
+  spedizione. Gli impatti senza attore associato conservano anche il piano sotterraneo dell’evento.
+  Anche i glifi 2D degli stati, compreso l’anello Scudo, restano ai piedi dell’attore con la scala corretta.
+- **IA aggiornata:** un consiglio carta deve avere ancora un bersaglio valido, oltre a carta ed energia.
+  Il segno segue il nemico che si sposta restando raggiungibile; un consiglio diventato impossibile
+  viene tolto anche mentre si attende la nuova ricerca. Puzzle di copertura, movimento, annullamento
+  e parità fra copia e gioco verificano il contratto. Regole, valori degli oggetti e contesto restano
+  quelli della spedizione, senza nuove tabelle o campi da simulare.
+- Verifica finale Mac: **2138/2138** test del profilo quick globale ottimizzato, tracking di memoria
+  pulito; strumenti Python **21/21**. Build strict e check senza assert riusciti, prove native piano/pianoro
+  concluse e catture ispezionate. La corsa globale debug interrotta non è conteggiata come successo.
+
+## 2026-11-06 — Polish della spedizione: input dei pannelli e avviso dei nemici
+
+- Zaino, scheda personaggio, mappa e pannelli della spedizione consumano gli input del mondo e
+  cancellano i comandi accodati, anche aprendo e chiudendo la mappa nello stesso frame.
+  I pulsanti mouse trattenuti non continuano fuoco o mira dietro il pannello; il clic su Zaino viene
+  intercettato prima delle interazioni sul terreno. I tempi dei pannelli restano quelli esistenti.
+  In prima persona il pannello libera anche il cursore: la chiusura non si trasforma in un colpo,
+  perché il fuoco richiede il rilascio e un nuovo clic.
+- I comandi del combattimento concluso non sopravvivono all’esplorazione e allo scontro successivo.
+  Verificata la pulizia già presente quando la finestra perde focus o un’altra scena prende il controllo.
+- **IA aggiornata:** un consumabile realmente usato notifica l’azione al pilot e libera il consiglio precedente.
+  Puzzle con cura effettiva, consumo dell’oggetto e nuova root; apertura dei pannelli, pausa, focus e uso
+  rifiutato conservano il consiglio quando lo stato non cambia. Copia, valutazione e contesto della run
+  continuano a usare le regole esistenti, senza nuove meccaniche o eccezioni alle tabelle esaustive.
+- Il segnale cromatico degli attacchi esisteva già: rosso per attacco/carica, viola per bomba/protezione,
+  con intensità e pulsazione legate al countdown e picco negli ultimi 0,25 secondi. I costumi degli altri
+  biomi ora ricevono la stessa tinta del corpo; prima potevano coprirla. Colori Cyber, tempi, collisioni,
+  sagome, inchiostro e trasparenza sono conservati; nessuna nuova texture o allocazione per fotogramma.
+- Verifica: run 36/36, application 23/23, renderer pertinente 6/6, integrazione IA/focus 3/3 e
+  cattura FPS 1/1 superati; build strict riuscita. Prova nativa della spedizione conclusa con tre
+  catture dello stesso attacco ispezionate. Procedura e limiti in `docs/verifica.md`.
+
+## 2026-11-05 — Direzione confermata: polish della spedizione
+
+- Su richiesta dell’utente, rimossi il laboratorio di combattimento A/B/C, varianti, scenari, driver,
+  flag, pulsante, IA dedicata e relativi rapporti/catture. Le prove non diventano un nuovo sistema di gioco.
+- La base resta la spedizione attuale, con esplorazione libera e combattimento tattico a griglia.
+  Le prossime migliorie di gameplay sono interventi mirati su comandi, interazioni, feedback e leggibilità.
+- Conservati il cartoncino con stampa animata e continuità alla pagina, il suo laboratorio grafico,
+  i fix della capacità degli snapshot e tutta l’IA della campagna. Nessuna pulizia dei branch.
+- Primo polish della spedizione: entrando in pausa vengono eliminati passo e comando accodati,
+  così non partono alla ripresa senza un nuovo input. Regressione riprodotta prima del fix e superata dopo.
+  IA: verificato il contratto di pausa già esistente; nessuna nuova mossa o regola da simulare.
+  Stato del giocatore, mazzo, RNG, effetti, clock e contesto rimangono invariati; controlli IA preservati.
+- Verifica finale: 28 test run e 23 application superati, build strict riuscita e avvio nativo del menu verificato.
+
+## 2026-11-05 — Moonshot: costo del laboratorio di cartoncino
+
+- Ricerca delle ombre nello spazio della luce e piani dei ricevitori preparati una volta per fotogramma.
+  Stesso ritaglio preciso, con scansione completa di riserva se il modello eccede il budget dell'indice.
+- Campionamento delle sagome preparato per asse; ombre e bordi inviati a raylib per poligono.
+  Classificazione delle celle limitata alle zone conservative delle figure. Nessuna semplificazione della geometria,
+  della stampa o delle animazioni; costo e resa verificati separatamente.
+- Sul M1 a 1080p il p95 della salita passa da 17,81–18,20 a 14,08–16,31 ms; tutte le dodici misure finali
+  del laboratorio rispettano 16,7 ms. 543 test renderer e 27 run superati; geometria identica su 2.185 pose
+  e 61 catture native identiche.
+  Il budget sul p95 non garantisce ogni frame della campagna; prova Windows ancora da fare.
+- IA: nessuna nuova regola o stato di gioco; simulazione, collisioni e bersagli invariati, controlli attivi.
+  [Misure, parità e limiti](docs/riferimenti/moonshot/fase1-prestazioni.md). Pulizia dei branch rimandata.
+
+## 2026-11-04 — Moonshot: capacità degli snapshot e stampa sul cartoncino
+
+- Snapshot con buffer proporzionati alla mappa, fino a 1792×1792 celle entro budget espliciti. Gli indici dei
+  layer passano da 16 a 32 bit; i salvataggi v1 supportati restano leggibili. Copia autonoma prima del thread
+  di salvataggio, lettura e decodifica limitate, ripristino senza alterare la stanza precedente se fallisce.
+- Prova reale di JSON e ripristino a 224, 448, 896 e 1792 celle per lato, compresi altezze e liquidi su un piano
+  superiore. Le dimensioni ordinarie della campagna restano quelle esistenti; regioni e streaming sono ancora da fare.
+- Il laboratorio della pagina usa i disegni procedurali del Viandante e del Brute come stampa animata sulla
+  superficie piegata. Margine e retro di cartoncino, piedi collegati alla pagina, atlante caricato una volta.
+  `P` mostra il solo supporto. Nella morte cambia l'espressione; il corpo si richiude insieme al cartoncino.
+- **IA aggiornata:** verifiche di copia e simulazione su 320×320 celle, puzzle oltre l'indice 65535 e prova del
+  contesto con cure, pericoli ed esclusione del cibo pescato. Nessuna nuova regola di combattimento o tabella elusa.
+  [Prove e limiti](docs/riferimenti/moonshot/fase1-cartoncino-capacita.md).
+
+## 2026-11-04 — Moonshot, Fase 1: laboratorio della pagina continua
+
+- Dal menu o con `--page-lab`, campione di foglio con Viandante, nemico, oggetto, arco, ponte e tetto: ritagli reali
+  e cerniere condivise, senza basette. Nove atti visivi, pausa, ispezione, ombre e prima persona del gioco.
+- `--smoke-page-lab` produce 21 viste e tre sequenze di 12 immagini; driver e strumenti conservano tempi, memoria
+  e catture native. Verificati 526 test renderer, 25 run, 23 application e 17 degli strumenti Python.
+- IA: nessuna nuova regola o stato di gameplay; il laboratorio ispeziona soltanto geometria e usa stato già conosciuto.
+  Nessuna modifica a collisioni, danni o bersagli della campagna; nessun controllo IA aggirato.
+- Campione ancora da approvare visivamente, con montatura e casi freccia/bomba/volo esplicitamente limitati.
+  Le tre misure M1 a 1080p non certificano 60 FPS stabili. Cartoncino e stampa animata potranno essere collegati
+  alla nuova superficie; questo collegamento non è già eseguito.
+  [Risultati, prove e limiti](docs/riferimenti/moonshot/fase1-risultati.md).
+
+## 2026-11-04 — Moonshot, Fase 0: strumenti per misurare prima di ampliare il mondo
+
+- Runner riproducibile in `tools/moonshot/`: copie isolate a 1×/2×/4×/8×, build debug/release separate dalle
+  misure, log integrali, hash, timeout e memoria del processo quando disponibile.
+- Il benchmark della spedizione può selezionare le scene, usare un tempo simulato fisso e conservare ogni
+  fotogramma, posizione e camera. Riporta anche p99, scatti oltre 16,67 ms, strutture residenti e cache del sole.
+- Se la scena di benchmark termina prima del previsto, conserva lo stato e i campioni parziali e termina
+  con errore; la sconfitta non lascia più lo strumento in attesa nell'hub.
+- Il probe senza finestra misura generazione, stanza, snapshot e primo consiglio IA sugli incontri generati.
+  I limiti del gioco restano attivi: una cattura fallita viene registrata, senza allargare gli indici.
+- Nessuna nuova regola, carta o contenuto: il modello della carta IA resta invariato ed è incluso nelle misure.
+  Protocollo e limiti sono in [tools/moonshot/README.md](tools/moonshot/README.md).
+  [Risultati locali e prove](docs/riferimenti/moonshot/fase0-risultati.md): 24 corse headless, 12 grafiche
+  complete e un timeout conservato; la diagnostica corretta riconosce e registra la sconfitta del caso 4×.
+
 
 ## 2026-11-04 — Unito il redesign di cartoncino (`codex/cartoncino-redesign-sole`) nel ramo `piano-ia`
 

@@ -1,0 +1,18 @@
+scale=4 biome=Cyber sample=0 side=640 generated=true room=true gen_ms=974.483 room_ms=1.714 gen_heap=2461632 peak_heap=24044384 heap=24044384 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=4 biome=Cyber sample=1 side=640 generated=true room=true gen_ms=1020.931 room_ms=1.426 gen_heap=2461632 peak_heap=24044384 heap=24044384 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=4 biome=Cyber sample=2 side=640 generated=true room=true gen_ms=859.483 room_ms=0.886 gen_heap=2461632 peak_heap=24044384 heap=24044384 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=4 biome=Snow sample=0 side=768 generated=true room=true gen_ms=234.029 room_ms=0.777 gen_heap=3539776 peak_heap=33773280 heap=33773280 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=4 biome=Snow sample=1 side=768 generated=true room=true gen_ms=233.186 room_ms=2.091 gen_heap=3539776 peak_heap=33773280 heap=33773280 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=4 biome=Snow sample=2 side=768 generated=true room=true gen_ms=234.059 room_ms=1.572 gen_heap=3539776 peak_heap=33773280 heap=33773280 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=4 biome=Space sample=0 side=896 generated=true room=true gen_ms=427.746 room_ms=0.960 gen_heap=4014912 peak_heap=44472032 heap=44472032 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=4 biome=Space sample=1 side=896 generated=true room=true gen_ms=427.626 room_ms=2.825 gen_heap=4014912 peak_heap=44472032 heap=44472032 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=4 biome=Space sample=2 side=896 generated=true room=true gen_ms=428.632 room_ms=2.132 gen_heap=4014912 peak_heap=44472032 heap=44472032 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0

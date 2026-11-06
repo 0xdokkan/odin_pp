@@ -1,0 +1,39 @@
+package main
+import "core:fmt"
+import "core:mem"
+import "core:time"
+import expedition "../src/expedition"
+import level "../src/level"
+import game "../src/game"
+import campaign "../src/campaign"
+main :: proc() {
+    for b in ([3]campaign.Biome{.Cyber,.Snow,.Space}) {
+        for sample in 0..<3 {
+            tracker: mem.Tracking_Allocator
+            mem.tracking_allocator_init(&tracker, context.allocator)
+            {
+                context.allocator = mem.tracking_allocator(&tracker)
+                w: expedition.World
+                data: level.Level
+                start:=time.tick_now()
+                ok:=expedition.generate(&w,&data,b,42,false)
+                generation_ms:=time.duration_milliseconds(time.tick_since(start))
+                generation_bytes:=tracker.current_memory_allocated
+                player,_:=game.create_player({100,5,0})
+                start=time.tick_now()
+                room,room_ok:=game.create_room(&data,&player,{room_seed=42})
+                room_ms:=time.duration_milliseconds(time.tick_since(start))
+                _=game.configure_expedition_combat(&room)
+                expedition.prepare_room(&w,&room)
+                snapshot:=new(expedition.Snapshot)
+                captured:=expedition.capture(&w,&room,snapshot)
+                fmt.printf("scale=%d biome=%v sample=%d side=%d generated=%v room=%v gen_ms=%.3f room_ms=%.3f gen_heap=%d peak_heap=%d heap=%d snapshot_bytes=%d capture=%v sites=%d groups=%d\n",#config(MOONSHOT_SCALE,1),b,sample,data.tiles.width,ok,room_ok,generation_ms,room_ms,generation_bytes,tracker.peak_memory_allocated,tracker.current_memory_allocated,size_of(expedition.Snapshot),captured,w.site_count,w.group_count)
+                free(snapshot)
+                game.destroy_room(&room)
+                level.destroy(&data)
+                fmt.printf("remaining_bytes=%d bad_free=%d\n",tracker.current_memory_allocated,len(tracker.bad_free_array))
+            }
+            mem.tracking_allocator_destroy(&tracker)
+        }
+    }
+}

@@ -77,6 +77,14 @@ route_gameplay_command :: proc(held: ^Buffered_Gameplay_Command, room: ^game.Roo
 		clear_gameplay_command_buffer(held)
 		return
 	}
+	// Cancelling a card also cancels its press kept during the player's
+	// action. It must not fire later after its targeting was put away. Other
+	// queued commands keep their existing routing; no fallback walk is
+	// emitted on the frame that consumes this card cancellation.
+	if (controls.right_pressed || run_pressed(controls, .Cancel)) && held.has_pending && held.pending.kind == .Play_Card {
+		held.pending, held.has_pending = {}, false
+		return
+	}
 	// The walk key pressed last is the one a held walk follows.
 	if has_command && command.kind == .Move {
 		for direction, index in keys {

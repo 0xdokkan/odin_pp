@@ -1,0 +1,18 @@
+scale=2 biome=Cyber sample=0 side=320 generated=true room=true gen_ms=261.245 room_ms=0.142 gen_heap=618432 peak_heap=7455584 heap=7455584 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=2 biome=Cyber sample=1 side=320 generated=true room=true gen_ms=210.174 room_ms=0.348 gen_heap=618432 peak_heap=7455584 heap=7455584 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=2 biome=Cyber sample=2 side=320 generated=true room=true gen_ms=210.563 room_ms=0.316 gen_heap=618432 peak_heap=7455584 heap=7455584 snapshot_bytes=1814672 capture=false sites=16 groups=10
+remaining_bytes=0 bad_free=0
+scale=2 biome=Snow sample=0 side=384 generated=true room=true gen_ms=56.068 room_ms=0.179 gen_heap=885568 peak_heap=9885408 heap=9885408 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=2 biome=Snow sample=1 side=384 generated=true room=true gen_ms=56.797 room_ms=0.561 gen_heap=885568 peak_heap=9885408 heap=9885408 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=2 biome=Snow sample=2 side=384 generated=true room=true gen_ms=59.547 room_ms=0.198 gen_heap=885568 peak_heap=9885408 heap=9885408 snapshot_bytes=1814672 capture=false sites=19 groups=14
+remaining_bytes=0 bad_free=0
+scale=2 biome=Space sample=0 side=448 generated=true room=true gen_ms=134.559 room_ms=0.279 gen_heap=1004352 peak_heap=12560096 heap=12560096 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=2 biome=Space sample=1 side=448 generated=true room=true gen_ms=236.770 room_ms=0.259 gen_heap=1004352 peak_heap=12560096 heap=12560096 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
+scale=2 biome=Space sample=2 side=448 generated=true room=true gen_ms=183.665 room_ms=0.265 gen_heap=1004352 peak_heap=12560096 heap=12560096 snapshot_bytes=1814672 capture=false sites=16 groups=12
+remaining_bytes=0 bad_free=0
